@@ -1,5 +1,7 @@
+# Ignored files
 bot.session
 session_name.session
+session_name.session-journal
 .env
 __pycache__/
 *.pyc
