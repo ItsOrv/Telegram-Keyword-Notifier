@@ -51,7 +51,7 @@ This project is a Telegram bot designed to monitor specified Telegram groups or 
    BOT_TOKEN=your_bot_token
    TARGET_GROUPS=2352342,23523412
    KEYWORDS=keyword1,keyword2
-   CHANNEL_ID=@your_channel_id
+   CHANNEL_ID=channelntc
    SESSION_NAME=your_session_name
    IGNORE_USERS=123244,432113
    ```
