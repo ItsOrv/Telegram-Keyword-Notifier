@@ -14,8 +14,9 @@ This project is a Telegram bot designed to monitor specified Telegram groups or 
 ### Prerequisites
 
 - Python 3.7 or later
-- A Telegram bot token (create a bot using [BotFather](https://core.telegram.org/bots#botfather))
-
+- A telegram account
+- A Telegram bot token
+- 
 ### Setup
 
 1. **Clone the repository**:
@@ -23,23 +24,36 @@ This project is a Telegram bot designed to monitor specified Telegram groups or 
    git clone https://github.com/your-username/telegram-message-monitor-bot.git
    cd telegram-message-monitor-bot
    ```
+2. **Create and activate a virtual environment (optional but recommended)**:
 
-2. **Install dependencies**:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+   
+   On Windows use:
+   ```bash
+   python3 -m venv venv
+   venv\Scripts\activate
+   ```
+   
+
+3. **Install dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Create and configure your `.env` file**:
+4. **Create and configure your `.env` file**:
    Create a `.env` file in the root of the project directory and add the following variables:
    ```plaintext
    API_ID=your_api_id
    API_HASH=your_api_hash
    BOT_TOKEN=your_bot_token
-   TARGET_GROUPS=group_id1,group_id2
+   TARGET_GROUPS=2352342,23523412
    KEYWORDS=keyword1,keyword2
    CHANNEL_ID=@your_channel_id
    SESSION_NAME=your_session_name
-   IGNORE_USERS=user_id1,user_id2
+   IGNORE_USERS=123244,432113
    ```
    - `API_ID` and `API_HASH`: Get these from [my.telegram.org](https://my.telegram.org).
    - `BOT_TOKEN`: The token for your bot, obtained from BotFather.
