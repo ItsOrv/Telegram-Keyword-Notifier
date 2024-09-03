@@ -1,0 +1,7 @@
+bot.session
+session_name.session
+.env
+__pycache__/
+*.pyc
+*.pyo
+.vscode/
