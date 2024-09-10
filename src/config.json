@@ -1,0 +1,6 @@
+{
+    "TARGET_GROUPS": ["group1", "group2", "group3"],
+    "KEYWORDS": ["keyword1", "keyword2"],
+    "CHANNEL_ID": -123456789,
+    "IGNORE_USERS": [12345678, 98765432]
+}
