@@ -12,4 +12,6 @@ services:
     container_name: management_bot
     volumes:
       - ./config.json:/app/config.json
-    command: python src/management_bot.py
+    depends_on:
+      - main_bot
+    entrypoint: ["sh", "-c", "sleep 120 && python src/management_bot.py"]
