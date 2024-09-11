@@ -1,8 +1,9 @@
+# bot.py
 import logging
 from telethon import TelegramClient, events
 from telethon.tl.types import InputMessageID
 from telethon.errors import SessionPasswordNeededError
-from config import API_ID, API_HASH, BOT_TOKEN, TARGET_GROUPS, KEYWORDS, CHANNEL_ID, SESSION_NAME
+from config import API_ID, API_HASH, BOT_TOKEN, TARGET_GROUPS, KEYWORDS, CHANNEL_ID, SESSION_NAME, IGNORE_USERS
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -14,9 +15,15 @@ bot = TelegramClient('bot', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 @client.on(events.NewMessage(chats=TARGET_GROUPS))
 async def my_event_handler(event):
     message = event.message.message
-    if any(keyword in message for keyword in KEYWORDS):
-        try:
-            user = await event.message.get_sender()
+    try:
+        user = await event.message.get_sender()
+        user_id = user.id
+
+        if user_id in IGNORE_USERS:
+            logger.info(f"Message ignored from user: {user_id}")
+            return
+
+        if any(keyword in message for keyword in KEYWORDS):
             user_username = user.username if user.username else str(user.id)
 
             if event.chat.username:
@@ -30,8 +37,8 @@ async def my_event_handler(event):
 
             text = (f"• Text:\n{message} \n• ID: @{user_username}\n• Link: {message_link}\n\n")
             await bot.send_message(CHANNEL_ID, text, link_preview=False)
-        except Exception as e:
-            logger.error(f"Error processing message: {e}")
+    except Exception as e:
+        logger.error(f"Error processing message: {e}")
 
 async def main():
     try:
