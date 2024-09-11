@@ -45,6 +45,7 @@ if [ ! -f .env ]; then
     read -p "Enter your API_ID: " api_id
     read -p "Enter your API_HASH: " api_hash
     read -p "Enter your BOT_TOKEN: " bot_token
+    read -p "Enter your CHANNEL_ID: " CHANNEL_ID
     read -p "Enter your SESSION_NAME: " session_name
 
     echo "API_ID=$api_id" > .env
