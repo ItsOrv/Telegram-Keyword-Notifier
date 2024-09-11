@@ -1,92 +1,104 @@
 # Telegram Message Monitor Bot
 
-This project is a Telegram bot designed to monitor specified Telegram groups or channels for messages containing specific keywords. When such messages are detected, the bot forwards them to a designated Telegram channel. Additionally, the bot allows for the exclusion of messages from specific users.
+This project provides a Telegram bot that monitors specific groups or channels for messages containing predefined keywords. Upon detection, the bot forwards these messages to a designated Telegram channel. Additionally, it supports excluding messages from particular users.
 
-## Features
+## Key Features
 
-- **Keyword Monitoring**: Automatically monitors specified Telegram groups or channels for messages containing predefined keywords.
-- **Message Forwarding**: Forwards detected messages to a specified Telegram channel.
-- **User Exclusion**: Supports ignoring messages from specific users based on their Telegram numeric user ID.
-- **Logging**: Comprehensive logging for easy debugging and monitoring.
+- **Keyword Monitoring**: Monitors messages in specified Telegram groups or channels based on user-defined keywords.
+- **Message Forwarding**: Automatically forwards detected messages to a specified Telegram channel.
+- **User Exclusion**: Enables the bot to ignore messages from specific users by their Telegram user ID.
+- **Logging**: Includes detailed logging for better debugging and monitoring.
+
+## Prerequisites
+
+- Python 3.12.1
+- Telegram account
+- Telegram bot token
 
 ## Installation
 
-### Prerequisites
+To install and configure the bot, run the following command in your terminal:
 
-- Python 3 or later
-- A telegram account
-- A Telegram bot token
-  
-### Setup
+```bash
+bash <(curl https://raw.githubusercontent.com/ItsOrv/Telegram-Message-Monitor/main/install.sh)
+```
+
+After installation, you will need to provide the required environment variables:
+
+```bash
+API_ID=your_api_id
+API_HASH=your_api_hash
+BOT_TOKEN=your_bot_token
+CHANNEL_ID=your_channel_id
+```
+
+### Manual Installation
+
+To install the bot manually, follow these steps:
 
 1. **Clone the repository**:
    ```bash
    git clone https://github.com/your-username/telegram-message-monitor-bot.git
    cd telegram-message-monitor-bot
    ```
-2. **Create and activate a virtual environment (optional but recommended)**:
 
+2. **Set up a virtual environment (optional but recommended)**:
    ```bash
    python3 -m venv venv
    source venv/bin/activate
    ```
-   
-   On Windows use:
-   ```bash
-   python3 -m venv venv
-   venv\Scripts\activate
-   ```
-   
 
 3. **Install dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Create and configure your `.env` file**:
-   Create a `.env` file in the root of the project directory and add the following variables:
-   ```plaintext
+4. **Configure the environment**:
+   Create a `.env` file in the project’s root directory with the following contents:
+   ```bash
    API_ID=your_api_id
    API_HASH=your_api_hash
    BOT_TOKEN=your_bot_token
-   TARGET_GROUPS=2352342,23523412
-   KEYWORDS=keyword1,keyword2
-   CHANNEL_ID=channelntc
-   SESSION_NAME=your_session_name
-   IGNORE_USERS=123244,432113
+   CHANNEL_ID=your_channel_id
    ```
-   - `API_ID` and `API_HASH`: Get these from [my.telegram.org](https://my.telegram.org).
-   - `BOT_TOKEN`: The token for your bot, obtained from BotFather.
-   - `TARGET_GROUPS`: A comma-separated list of group/channel IDs to monitor.
-   - `KEYWORDS`: A comma-separated list of keywords to monitor.
-   - `CHANNEL_ID`: The ID of the channel where you want to forward detected messages.
-   - `SESSION_NAME`: A name for the session (used for session storage).
-   - `IGNORE_USERS`: A comma-separated list of numeric user IDs to ignore.
+   - `API_ID` and `API_HASH`: Obtain these from [my.telegram.org](https://my.telegram.org).
+   - `BOT_TOKEN`: Generated through the BotFather on Telegram.
+   - `TARGET_GROUPS`: Comma-separated list of Telegram group or channel IDs to monitor.
+   - `CHANNEL_ID`: ID of the channel where messages will be forwarded.
 
 ## Usage
 
-To start the bot, simply run:
+To run the bot, use the following command:
 
 ```bash
-python bot.py
+python3 bot.py
 ```
 
-The bot will begin monitoring the specified Telegram groups or channels and will forward any messages containing the specified keywords to the designated channel, excluding messages from users listed in `IGNORE_USERS`.
+The bot will begin monitoring the specified Telegram groups or channels, forwarding any detected messages containing the specified keywords to your designated channel. Messages from ignored users will be excluded.
 
 ## Error Handling
 
-The bot includes error handling for common issues such as:
+The bot is equipped with error handling mechanisms for common scenarios, including:
 
-- **Session Password Needed**: Handles 2FA-enabled accounts by logging the need for the second factor.
-- **General Errors**: Logs any unexpected exceptions during message processing or client startup.
-
-
-
-### for update:
-```
-bash <(curl https://raw.githubusercontent.com/ItsOrv/Telegram-Message-Monitor/main/install.sh)
-
+- **Two-Factor Authentication (2FA)**: If 2FA is enabled, the bot will prompt for the necessary second factor.
+- **General Errors**: Logs any unexpected issues that occur during message processing or while starting the client.
 
 ## Contributing
 
-Contributions are welcome! Please submit a pull request or open an issue to discuss any changes.
+Contributions are welcome! Feel free to submit a pull request or open an issue to discuss proposed changes.
+
+## Future Updates (TO-DO):
+
+- **1.1**: Fix handling of private group links (prepend a 1 to the link).
+- **1.2**: Support for links from Glass Telegram groups.
+- **2.1**: Refactor Docker setup to support running both Python scripts simultaneously.
+- **2.2**: Add CLI control for restarting/updating the bot, or possibly implement these controls via the Telegram bot interface.
+- **3.1**: Create `install.sh` script (completed):
+   ```bash
+   bash <(curl https://raw.githubusercontent.com/ItsOrv/Telegram-Message-Monitor/main/install.sh)
+   ```
+- **4.1**: Combine `management.py` and `bot.py` into a single Python script.
+
+--- 
+
+This version is clearer, with a more professional tone and improved structure. It also provides more precise guidance and reduces redundancy. Let me know if you want to refine it further!
