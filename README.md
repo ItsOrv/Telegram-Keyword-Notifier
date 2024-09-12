@@ -2,7 +2,7 @@
 
 This project provides a Telegram bot that monitors specific groups or channels for messages containing predefined keywords. Upon detection, the bot forwards these messages to a designated Telegram channel. Additionally, it supports excluding messages from particular users.
 
-## Key Features
+## Features
 
 - **Keyword Monitoring**: Monitors messages in specified Telegram groups or channels based on user-defined keywords.
 - **Message Forwarding**: Automatically forwards detected messages to a specified Telegram channel.
@@ -89,7 +89,7 @@ Contributions are welcome! Feel free to submit a pull request or open an issue t
 
 ## Future Updates (TO-DO):
 
-- **1.1**: Fix handling of private group links (prepend a 1 to the link).
+- **1.1**: Fix handling of private group links (prepend a 1 to the link)(completed).
 - **1.2**: Support for links from Glass Telegram groups.
 - **2.1**: Refactor Docker setup to support running both Python scripts simultaneously.
 - **2.2**: Add CLI control for restarting/updating the bot, or possibly implement these controls via the Telegram bot interface.
@@ -97,8 +97,5 @@ Contributions are welcome! Feel free to submit a pull request or open an issue t
    ```bash
    bash <(curl https://raw.githubusercontent.com/ItsOrv/Telegram-Message-Monitor/main/install.sh)
    ```
-- **4.1**: Combine `management.py` and `bot.py` into a single Python script.
+- **4.1**: Combine `management.py` and `bot.py` into a single Python script(completed).
 
---- 
-
-This version is clearer, with a more professional tone and improved structure. It also provides more precise guidance and reduces redundancy. Let me know if you want to refine it further!
