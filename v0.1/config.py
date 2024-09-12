@@ -1,3 +1,4 @@
+# config.py
 import os
 from dotenv import load_dotenv
 
@@ -10,3 +11,4 @@ TARGET_GROUPS = list(map(int, os.getenv('TARGET_GROUPS').split(',')))
 KEYWORDS = os.getenv('KEYWORDS').split(',')
 CHANNEL_ID = os.getenv('CHANNEL_ID')
 SESSION_NAME = os.getenv('SESSION_NAME')
+IGNORE_USERS = list(map(int, os.getenv('IGNORE_USERS').split(',')))
