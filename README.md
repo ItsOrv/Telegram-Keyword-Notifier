@@ -16,7 +16,7 @@ This project provides a Telegram bot that monitors specific groups or channels f
 - Telegram account
 - Telegram bot token
 
-## Installation
+## Installation (Not working, use Manual Installation)
 
 To install and configure the bot, run the following command in your terminal:
 
