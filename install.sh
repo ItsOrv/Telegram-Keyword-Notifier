@@ -14,7 +14,7 @@ prompt_for_input() {
 echo "Installing Docker and setting up environment..."
 
 # Update package lists and install Docker
-sudo apt update
+sudo apt update && apt upgrade
 sudo apt install -y docker.io docker-compose
 
 # Clone the project from GitHub
