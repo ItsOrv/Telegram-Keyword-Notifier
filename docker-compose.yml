@@ -1,17 +1,12 @@
 version: '3'
-services:
-  main_bot:
-    build: .
-    container_name: main_bot
-    volumes:
-      - ./config.json:/app/config.json
-    command: python src/bot.py
 
-  management_bot:
+services:
+  app:
     build: .
-    container_name: management_bot
+    container_name: telegram_message_monitor
+    env_file:
+      - .env
     volumes:
-      - ./config.json:/app/config.json
-    depends_on:
-      - main_bot
-    entrypoint: ["sh", "-c", "sleep 120 && python src/management_bot.py"]
+      - ./src:/usr/src/app/src
+      - ./config.json:/usr/src/app/src/config.json
+    restart: always
