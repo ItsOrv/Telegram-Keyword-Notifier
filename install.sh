@@ -1,35 +1,47 @@
 #!/bin/bash
 
-# نصب نیازمندی‌ها و داکر
+# Function to prompt for user input
+prompt_for_input() {
+    local prompt="$1"
+    local default="$2"
+    local input
+
+    read -p "$prompt [$default]: " input
+    echo "${input:-$default}"
+}
+
+# Install Docker and Docker Compose
 echo "Installing Docker and setting up environment..."
 
 # Update package lists and install Docker
 sudo apt update
 sudo apt install -y docker.io docker-compose
 
-# Get user inputs for environment variables
-read -p "Enter your API_ID: " API_ID
-read -p "Enter your API_HASH: " API_HASH
-read -p "Enter your BOT_TOKEN: " BOT_TOKEN
-read -p "Enter your CHANNEL_ID: " CHANNEL_ID
-
-# Create the .env file
-cat <<EOL > /opt/Telegram-Message-Monitor/.env
-API_ID=${API_ID}
-API_HASH=${API_HASH}
-BOT_TOKEN=${BOT_TOKEN}
-CHANNEL_ID=${CHANNEL_ID}
-EOL
-
-# Clone the project from GitHub if it doesn't exist
+# Clone the project from GitHub
 if [ ! -d "/opt/Telegram-Message-Monitor" ]; then
     git clone https://github.com/ItsOrv/Telegram-Message-Monitor /opt/Telegram-Message-Monitor
 else
     echo "Project already cloned!"
 fi
 
-# Set up Docker container
+# Navigate to the project directory
 cd /opt/Telegram-Message-Monitor
+
+# Prompt for .env file inputs
+API_ID=$(prompt_for_input "Enter your API_ID")
+API_HASH=$(prompt_for_input "Enter your API_HASH")
+BOT_TOKEN=$(prompt_for_input "Enter your BOT_TOKEN")
+CHANNEL_ID=$(prompt_for_input "Enter your CHANNEL_ID")
+
+# Create .env file
+cat <<EOL > .env
+API_ID=$API_ID
+API_HASH=$API_HASH
+BOT_TOKEN=$BOT_TOKEN
+CHANNEL_ID=$CHANNEL_ID
+EOL
+
+# Set up Docker container
 sudo docker-compose up -d --build
 
 # Create the tmm command
@@ -42,7 +54,8 @@ show_menu() {
     echo "2. Stop container"
     echo "3. Restart container"
     echo "4. Update project from GitHub"
-    echo "5. Exit"
+    echo "5. Uninstall project"
+    echo "6. Exit"
     echo -n "Enter your choice: "
 }
 
@@ -72,6 +85,17 @@ update_project() {
     echo "Project updated and container rebuilt."
 }
 
+# Function to uninstall the project
+uninstall_project() {
+    echo "Stopping and removing Docker container..."
+    sudo docker-compose -f /opt/Telegram-Message-Monitor/docker-compose.yml down
+    echo "Removing project directory..."
+    sudo rm -rf /opt/Telegram-Message-Monitor
+    echo "Removing tmm command..."
+    sudo rm /usr/local/bin/tmm
+    echo "Uninstallation complete!"
+}
+
 # Main script
 while true; do
     show_menu
@@ -81,7 +105,8 @@ while true; do
         2) stop_container ;;
         3) restart_container ;;
         4) update_project ;;
-        5) echo "Exiting..."; exit 0 ;;
+        5) uninstall_project ;;
+        6) echo "Exiting..."; exit 0 ;;
         *) echo "Invalid option, please try again." ;;
     esac
 done
