@@ -1,3 +1,4 @@
+
 # Telegram Message Monitor Bot
 
 This project provides a Telegram bot that monitors specific groups or channels for messages containing predefined keywords. Upon detection, the bot forwards these messages to a designated Telegram channel. Additionally, it supports excluding messages from particular users.
@@ -23,7 +24,11 @@ To install and configure the bot, run the following command in your terminal:
 bash <(curl https://raw.githubusercontent.com/ItsOrv/Telegram-Message-Monitor/main/install.sh)
 ```
 
-After installation, you will need to provide the required environment variables:
+This script will install Docker and Docker Compose, clone the project repository, prompt you for required environment variables, create a `.env` file, and set up a Docker container. After installation, the `tmm` command will be available for managing the Docker container.
+
+### Environment Variables
+
+During the installation process, you will be prompted to provide the following environment variables:
 
 ```bash
 API_ID=your_api_id
@@ -32,14 +37,29 @@ BOT_TOKEN=your_bot_token
 CHANNEL_ID=your_channel_id
 ```
 
-### Manual Installation
+- `API_ID` and `API_HASH`: Obtain these from [my.telegram.org](https://my.telegram.org).
+- `BOT_TOKEN`: Generated through the BotFather on Telegram.
+- `CHANNEL_ID`: ID of the channel where messages will be forwarded.
+
+### Using `tmm` Command
+
+After installation, you can manage the Docker container using the `tmm` command. Available options are:
+
+1. **Start container**: Starts the container if it is not already running.
+2. **Stop container**: Stops the container if it is running.
+3. **Restart container**: Restarts the container and checks for correct installation.
+4. **Update project from GitHub**: Pulls the latest changes from the GitHub repository and rebuilds the container.
+5. **Uninstall project**: Stops and removes the Docker container, deletes the project directory, and removes the `tmm` command.
+6. **Exit**: Exits the script.
+
+## Manual Installation
 
 To install the bot manually, follow these steps:
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/ItsOrv/telegram-message-monitor.git
-   cd telegram-message-monitor-bot
+   git clone https://github.com/ItsOrv/Telegram-Message-Monitor.git
+   cd Telegram-Message-Monitor
    ```
 
 2. **Set up a virtual environment (optional but recommended)**:
@@ -63,7 +83,6 @@ To install the bot manually, follow these steps:
    ```
    - `API_ID` and `API_HASH`: Obtain these from [my.telegram.org](https://my.telegram.org).
    - `BOT_TOKEN`: Generated through the BotFather on Telegram.
-   - `TARGET_GROUPS`: Comma-separated list of Telegram group or channel IDs to monitor.
    - `CHANNEL_ID`: ID of the channel where messages will be forwarded.
 
 ## Usage
@@ -71,7 +90,7 @@ To install the bot manually, follow these steps:
 To run the bot, use the following command:
 
 ```bash
-python3 bot.py
+python3 src/main.py
 ```
 
 The bot will begin monitoring the specified Telegram groups or channels, forwarding any detected messages containing the specified keywords to your designated channel. Messages from ignored users will be excluded.
@@ -99,3 +118,5 @@ Contributions are welcome! Feel free to submit a pull request or open an issue t
    ```
 - **4.1**: Combine `management.py` and `bot.py` into a single Python script(completed).
 
+
+Feel free to adjust any details as needed!
