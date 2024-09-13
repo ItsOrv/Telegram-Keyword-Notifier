@@ -108,13 +108,17 @@ Contributions are welcome! Feel free to submit a pull request or open an issue t
 
 ## Future Updates (TO-DO):
 
-- **1.1**: Fix handling of private group links (prepend a 1 to the link).
+- **1.1**: ~~Fix handling of private group links (prepend a 1 to the link).~~
 - **1.2**: ~~Support for links from Glass Telegram groups.~~
 - **2.1**: ~~Refactor Docker setup to support running both Python scripts simultaneously.~~
-- **2.1.1**: Fix docker setup.
 - **2.2**: ~~Add CLI control for restarting/updating the bot, or possibly implement these controls via the Telegram bot interface.~~
 - **3.1**:~~Create `install.sh` script~~
 - **4.1**:~~Combine `management.py` and `bot.py` into a single Python script.‍‍~~
+- **5.1**: Fix `await event.respond`.
+- **5.2**: Fix docker setup.
+- **5.3** Fix `install.sh` file.
+
+  
 
 
 Feel free to adjust any details as needed!
