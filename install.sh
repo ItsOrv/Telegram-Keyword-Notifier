@@ -1,81 +1,79 @@
 #!/bin/bash
 
-# Function to check if a command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
+# نصب نیازمندی‌ها و داکر
+echo "Installing Docker and setting up environment..."
+
+# Update package lists and install Docker
+sudo apt update
+sudo apt install -y docker.io docker-compose
+
+# Clone the project from GitHub
+if [ ! -d "/opt/Telegram-Message-Monitor" ]; then
+    git clone https://github.com/ItsOrv/Telegram-Message-Monitor /opt/Telegram-Message-Monitor
+else
+    echo "Project already cloned!"
+fi
+
+# Set up Docker container
+cd /opt/Telegram-Message-Monitor
+sudo docker-compose up -d --build
+
+# Create the tmm command
+cat <<EOL > /usr/local/bin/tmm
+#!/bin/bash
+
+# Function to show the menu
+show_menu() {
+    echo "1. Start container"
+    echo "2. Stop container"
+    echo "3. Restart container"
+    echo "4. Update project from GitHub"
+    echo "5. Exit"
+    echo -n "Enter your choice: "
 }
 
-# Update package lists and upgrade all packages without confirmation
-echo "Updating system packages..."
-sudo apt update -y && sudo apt upgrade -y
+# Function to start the container
+start_container() {
+    sudo docker-compose -f /opt/Telegram-Message-Monitor/docker-compose.yml start
+    echo "Container started."
+}
 
-# Install Docker if it's not installed
-if ! command_exists docker; then
-    echo "Docker not found. Installing Docker..."
-    sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-    sudo apt update -y
-    sudo apt install -y docker-ce docker-ce-cli containerd.io
-    echo "Docker installed successfully."
-else
-    echo "Docker is already installed."
-fi
+# Function to stop the container
+stop_container() {
+    sudo docker-compose -f /opt/Telegram-Message-Monitor/docker-compose.yml stop
+    echo "Container stopped."
+}
 
-# Install Docker Compose if it's not installed
-if ! command_exists docker-compose; then
-    echo "Docker Compose not found. Installing Docker Compose..."
-    sudo curl -L "https://github.com/docker/compose/releases/download/v2.5.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    sudo chmod +x /usr/local/bin/docker-compose
-    echo "Docker Compose installed successfully."
-else
-    echo "Docker Compose is already installed."
-fi
+# Function to restart the container
+restart_container() {
+    sudo docker-compose -f /opt/Telegram-Message-Monitor/docker-compose.yml restart
+    echo "Container restarted."
+}
 
-# Clone the project repository
-echo "Cloning the project repository..."
-git clone https://github.com/ItsOrv/Telegram-Message-Monitor.git
-cd Telegram-Message-Monitor
+# Function to update the project
+update_project() {
+    cd /opt/Telegram-Message-Monitor
+    git pull origin main
+    sudo docker-compose up -d --build
+    echo "Project updated and container rebuilt."
+}
 
-# Create the .env file if it doesn't exist
-if [ ! -f .env ]; then
-    echo "Creating .env file..."
+# Main script
+while true; do
+    show_menu
+    read choice
+    case \$choice in
+        1) start_container ;;
+        2) stop_container ;;
+        3) restart_container ;;
+        4) update_project ;;
+        5) echo "Exiting..."; exit 0 ;;
+        *) echo "Invalid option, please try again." ;;
+    esac
+done
+EOL
 
-    # Ask user for input and write to .env file
-    read -p "Enter your API_ID: " api_id
-    read -p "Enter your API_HASH: " api_hash
-    read -p "Enter your BOT_TOKEN: " bot_token
-    read -p "Enter your CHANNEL_ID (testchannel): " CHANNEL_ID
+# Make the tmm command executable
+sudo chmod +x /usr/local/bin/tmm
 
-    echo "API_ID=$api_id" > .env
-    echo "API_HASH=$api_hash" >> .env
-    echo "BOT_TOKEN=$bot_token" >> .env
-    echo "CHANNEL_ID=$CHANNEL_ID" >> .env
-
-    echo ".env file created successfully."
-else
-    echo ".env file already exists."
-fi
-
-# Build and run the Docker container
-echo "Building and starting Docker container..."
-docker-compose up --build -d
-
-# Give some time for the container to start
-echo "Waiting for the container to initialize..."
-sleep 5
-
-# Check if the bot container is running
-container_status=$(docker ps --filter "name=telegram-bot" --format "{{.Status}}")
-if [[ $container_status == *"Up"* ]]; then
-    echo "Bot container is running successfully."
-else
-    echo "Bot container failed to start. Showing logs..."
-    docker-compose logs
-    exit 1
-fi
-
-# Attach to the container logs to see output (e.g., for inputting phone number and 2FA code)
-echo "Attaching to bot container logs to input verification codes..."
-docker-compose logs -f
-
+echo "Installation complete! Use 'tmm' to manage your container."
