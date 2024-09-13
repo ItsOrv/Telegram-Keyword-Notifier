@@ -14,18 +14,20 @@ prompt_for_input() {
 echo "Installing Docker and setting up environment..."
 
 # Update package lists and install Docker
-sudo apt update && apt upgrade
+sudo apt update && sudo apt upgrade -y
 sudo apt install -y docker.io docker-compose
 
 # Clone the project from GitHub
-if [ ! -d "/opt/Telegram-Message-Monitor" ]; then
-    git clone https://github.com/ItsOrv/Telegram-Message-Monitor /opt/Telegram-Message-Monitor
+PROJECT_DIR="/opt/Telegram-Message-Monitor"
+
+if [ ! -d "$PROJECT_DIR" ]; then
+    sudo git clone https://github.com/ItsOrv/Telegram-Message-Monitor "$PROJECT_DIR"
 else
     echo "Project already cloned!"
 fi
 
 # Navigate to the project directory
-cd /opt/Telegram-Message-Monitor
+cd "$PROJECT_DIR" || { echo "Failed to navigate to $PROJECT_DIR"; exit 1; }
 
 # Prompt for .env file inputs
 API_ID=$(prompt_for_input "Enter your API_ID")
@@ -79,7 +81,7 @@ restart_container() {
 
 # Function to update the project
 update_project() {
-    cd /opt/Telegram-Message-Monitor
+    cd /opt/Telegram-Message-Monitor || { echo "Failed to navigate to /opt/Telegram-Message-Monitor"; exit 1; }
     git pull origin main
     sudo docker-compose up -d --build
     echo "Project updated and container rebuilt."
@@ -99,7 +101,7 @@ uninstall_project() {
 # Main script
 while true; do
     show_menu
-    read choice
+    read -r choice
     case \$choice in
         1) start_container ;;
         2) stop_container ;;
