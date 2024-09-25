@@ -96,9 +96,3 @@ async def start_clients():
 
 if __name__ == '__main__':
     asyncio.run(start_clients())
-
-print('debug')
-
-print('debug')
-
-print('debug')
