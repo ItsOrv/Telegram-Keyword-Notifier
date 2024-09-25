@@ -48,8 +48,11 @@ async def my_event_handler(event):
 
             # Send message to the channel using the bot
             logger.info(f"Attempting to send message to channel: {CHANNEL_ID}")
-            await bot.send_message(CHANNEL_ID, text, link_preview=False)
-            logger.info(f"Message forwarded to channel {CHANNEL_ID}")
+            try:
+                await bot.send_message(CHANNEL_ID, text, link_preview=False)
+                logger.info(f"Message forwarded to channel {CHANNEL_ID}")
+            except Exception as e:
+                logger.error(f"Failed to send message to channel {CHANNEL_ID}: {e}", exc_info=True)
 
         except Exception as e:
             logger.error(f"Error processing message: {e}", exc_info=True)
@@ -62,22 +65,16 @@ async def start_clients():
         await bot.start()
         logger.info("Bot started successfully")
 
-        # Convert CHANNEL_ID to an integer if it is numeric
-        try:
-            channel_id = int(CHANNEL_ID) if CHANNEL_ID.isdigit() else CHANNEL_ID
-        except ValueError:
-            logger.error(f"Invalid CHANNEL_ID format: {CHANNEL_ID}")
-            return
 
         # Send startup messages
         try:
-            await client.send_message(channel_id, "account started")
+            await client.send_message(CHANNEL_ID, "account started")
             logger.info("Sent 'account started' message from account")
         except Exception as e:
             logger.error(f"Failed to send 'account started' message: {e}", exc_info=True)
 
         try:
-            await bot.send_message(channel_id, "bot started")
+            await bot.send_message(CHANNEL_ID, "bot started")
             logger.info("Sent 'bot started' message from bot")
         except Exception as e:
             logger.error(f"Failed to send 'bot started' message: {e}", exc_info=True)
@@ -95,4 +92,5 @@ async def start_clients():
         logger.info("Client and bot disconnected")
 
 if __name__ == '__main__':
-    asyncio.run(start_clients())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(start_clients())
