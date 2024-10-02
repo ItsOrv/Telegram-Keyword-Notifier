@@ -13,10 +13,10 @@ This project is a Telegram bot designed to monitor specified Telegram groups or 
 
 ### Prerequisites
 
-- Python 3.7 or later
+- Python 3 or later
 - A telegram account
 - A Telegram bot token
-- 
+  
 ### Setup
 
 1. **Clone the repository**:
