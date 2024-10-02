@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
 bot = TelegramClient('bot', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
-@client.on(events.NewMessage(chats=TARGET_GROUPS))
-async def my_event_handler(event):
+# Helper function to process and forward the message
+async def process_message(event):
     message = event.message.message
     sender_id = event.message.sender_id
 
@@ -48,14 +48,16 @@ async def my_event_handler(event):
 
             # Send message to the channel using the bot
             logger.info(f"Attempting to send message to channel: {CHANNEL_ID}")
-            try:
-                await bot.send_message(CHANNEL_ID, text, link_preview=False)
-                logger.info(f"Message forwarded to channel {CHANNEL_ID}")
-            except Exception as e:
-                logger.error(f"Failed to send message to channel {CHANNEL_ID}: {e}", exc_info=True)
+            await bot.send_message(CHANNEL_ID, text, link_preview=False)
+            logger.info(f"Message forwarded to channel {CHANNEL_ID}")
 
         except Exception as e:
             logger.error(f"Error processing message: {e}", exc_info=True)
+
+# Event handler for new messages
+@client.on(events.NewMessage(chats=TARGET_GROUPS))
+async def my_event_handler(event):
+    await process_message(event)
 
 async def start_clients():
     try:
@@ -65,19 +67,12 @@ async def start_clients():
         await bot.start()
         logger.info("Bot started successfully")
 
-
         # Send startup messages
-        try:
-            await client.send_message(CHANNEL_ID, "account started")
-            logger.info("Sent 'account started' message from account")
-        except Exception as e:
-            logger.error(f"Failed to send 'account started' message: {e}", exc_info=True)
+        await client.send_message(CHANNEL_ID, "account started")
+        logger.info("Sent 'account started' message from account")
 
-        try:
-            await bot.send_message(CHANNEL_ID, "bot started")
-            logger.info("Sent 'bot started' message from bot")
-        except Exception as e:
-            logger.error(f"Failed to send 'bot started' message: {e}", exc_info=True)
+        await bot.send_message(CHANNEL_ID, "bot started")
+        logger.info("Sent 'bot started' message from bot")
 
         # Run client until disconnected
         await client.run_until_disconnected()
