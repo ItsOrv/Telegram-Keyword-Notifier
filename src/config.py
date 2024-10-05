@@ -21,3 +21,5 @@ CHANNEL_ID = str(os.getenv('CHANNEL_ID'))
 SESSION_NAME = get_env_variable('SESSION_NAME')
 
 IGNORE_USERS = [int(user_id.strip()) for user_id in get_env_variable('IGNORE_USERS', '').split(',') if user_id.strip()]
+
+# wip
