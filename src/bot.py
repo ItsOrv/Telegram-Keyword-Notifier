@@ -1,18 +1,26 @@
 import logging
 from telethon import TelegramClient, events
 from telethon.errors import SessionPasswordNeededError
-from config import API_ID, API_HASH, BOT_TOKEN, TARGET_GROUPS, KEYWORDS, CHANNEL_ID, SESSION_NAME, IGNORE_USERS
+from config import API_ID, API_HASH, BOT_TOKEN, SESSION_NAME
+import json
 import asyncio
+
+# Load configuration from JSON file
+with open('config.json', 'r') as f:
+    config = json.load(f)
+
+TARGET_GROUPS = config['TARGET_GROUPS']
+KEYWORDS = config['KEYWORDS']
+CHANNEL_ID = config['CHANNEL_ID']
+IGNORE_USERS = config['IGNORE_USERS']
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize the clients
 client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
 bot = TelegramClient('bot', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
-# Helper function to process and forward the message
 async def process_message(event):
     message = event.message.message
     sender_id = event.message.sender_id
