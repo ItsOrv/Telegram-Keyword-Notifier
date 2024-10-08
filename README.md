@@ -80,6 +80,13 @@ The bot includes error handling for common issues such as:
 - **Session Password Needed**: Handles 2FA-enabled accounts by logging the need for the second factor.
 - **General Errors**: Logs any unexpected exceptions during message processing or client startup.
 
+
+
+### for update:
+```
+bash <(curl https://raw.githubusercontent.com/ItsOrv/Telegram-Message-Monitor/main/install.sh)
+
+
 ## Contributing
 
 Contributions are welcome! Please submit a pull request or open an issue to discuss any changes.
