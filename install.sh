@@ -1,11 +1,16 @@
 #!/bin/bash
 
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
 # Update package lists and upgrade all packages without confirmation
-echo "Updating system..."
+echo "Updating system packages..."
 sudo apt update -y && sudo apt upgrade -y
 
-# Install Docker if not installed
-if ! [ -x "$(command -v docker)" ]; then
+# Install Docker if it's not installed
+if ! command_exists docker; then
     echo "Docker not found. Installing Docker..."
     sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
@@ -17,8 +22,8 @@ else
     echo "Docker is already installed."
 fi
 
-# Install Docker Compose if not installed
-if ! [ -x "$(command -v docker-compose)" ]; then
+# Install Docker Compose if it's not installed
+if ! command_exists docker-compose; then
     echo "Docker Compose not found. Installing Docker Compose..."
     sudo curl -L "https://github.com/docker/compose/releases/download/v2.5.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
     sudo chmod +x /usr/local/bin/docker-compose
@@ -53,10 +58,24 @@ else
 fi
 
 # Build and run the Docker container
-echo "Starting Docker Compose..."
-if docker-compose up --build -d; then
-    echo "Project setup complete and bot is running."
+echo "Building and starting Docker container..."
+docker-compose up --build -d
+
+# Give some time for the container to start
+echo "Waiting for the container to initialize..."
+sleep 5
+
+# Check if the bot container is running
+container_status=$(docker ps --filter "name=telegram-bot" --format "{{.Status}}")
+if [[ $container_status == *"Up"* ]]; then
+    echo "Bot container is running successfully."
 else
-    echo "Failed to start Docker containers. Please check the logs for more details."
+    echo "Bot container failed to start. Showing logs..."
+    docker-compose logs
     exit 1
 fi
+
+# Attach to the container logs to see output (e.g., for inputting phone number and 2FA code)
+echo "Attaching to bot container logs to input verification codes..."
+docker-compose logs -f
+
