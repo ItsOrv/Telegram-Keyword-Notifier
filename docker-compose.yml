@@ -1,10 +1,15 @@
-version: '3.8'
-
+version: '3'
 services:
-  bot:
+  main_bot:
     build: .
-    env_file:
-      - .env
+    container_name: main_bot
     volumes:
-      - .:/app
-    restart: unless-stopped
+      - ./config.json:/app/config.json
+    command: python src/bot.py
+
+  management_bot:
+    build: .
+    container_name: management_bot
+    volumes:
+      - ./config.json:/app/config.json
+    command: python src/management_bot.py
