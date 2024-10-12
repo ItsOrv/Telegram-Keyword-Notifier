@@ -1,23 +1,31 @@
 import os
+import json
 from dotenv import load_dotenv
 
+# Load environment variables from .env file
 load_dotenv()
 
-def get_env_variable(name, default=None):
-    value = os.getenv(name)
-    if not value and default is None:
-        raise ValueError(f"{name} environment variable not set.")
-    return value
+# Load values from .env
+API_ID = int(os.getenv('API_ID'))
+API_HASH = os.getenv('API_HASH')
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+CHANNEL_ID = os.getenv('CHANNEL_ID')
+SESSION_NAME = os.getenv('SESSION_NAME')
 
-API_ID = int(get_env_variable('API_ID'))
-API_HASH = get_env_variable('API_HASH')
-BOT_TOKEN = get_env_variable('BOT_TOKEN')
+# Load configuration from config.json
+CONFIG_FILE = 'src/config.json'
 
-TARGET_GROUPS = [int(group_id.strip()) for group_id in get_env_variable('TARGET_GROUPS', '').split(',') if group_id.strip()]
+def load_json_config():
+    with open(CONFIG_FILE, 'r') as f:
+        return json.load(f)
 
-KEYWORDS = [keyword.strip() for keyword in get_env_variable('KEYWORDS', '').split(',') if keyword.strip()]
+def update_json_config(config):
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(config, f, indent=4)
 
-CHANNEL_ID = str(os.getenv('CHANNEL_ID'))
-SESSION_NAME = get_env_variable('SESSION_NAME')
+# Load dynamic config from JSON
+json_config = load_json_config()
 
-IGNORE_USERS = [int(user_id.strip()) for user_id in get_env_variable('IGNORE_USERS', '').split(',') if user_id.strip()]
+TARGET_GROUPS = json_config.get('TARGET_GROUPS', [])
+KEYWORDS = json_config.get('KEYWORDS', [])
+IGNORE_USERS = json_config.get('IGNORE_USERS', [])
