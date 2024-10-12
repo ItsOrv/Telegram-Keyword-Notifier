@@ -1,24 +1,15 @@
 import logging
 from telethon import TelegramClient, events
 from telethon.errors import SessionPasswordNeededError
-from config import API_ID, API_HASH, BOT_TOKEN, SESSION_NAME
-import json
+from config import API_ID, API_HASH, BOT_TOKEN, TARGET_GROUPS, KEYWORDS, CHANNEL_ID, IGNORE_USERS
 import asyncio
-
-# Load configuration from JSON file
-with open('config.json', 'r') as f:
-    config = json.load(f)
-
-TARGET_GROUPS = config['TARGET_GROUPS']
-KEYWORDS = config['KEYWORDS']
-CHANNEL_ID = config['CHANNEL_ID']
-IGNORE_USERS = config['IGNORE_USERS']
+import random
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
+main_client = TelegramClient("krtkmahan", API_ID, API_HASH)
 bot = TelegramClient('bot', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 async def process_message(event):
@@ -54,43 +45,47 @@ async def process_message(event):
             else:
                 text += "\n"
 
-            # Send message to the channel using the bot
+            # **Send the message using the correct client (client instead of bot)**
             logger.info(f"Attempting to send message to channel: {CHANNEL_ID}")
-            await bot.send_message(CHANNEL_ID, text, link_preview=False)
+            await main_client.send_message(CHANNEL_ID, text, link_preview=False)  # Use 'client' for account
             logger.info(f"Message forwarded to channel {CHANNEL_ID}")
 
         except Exception as e:
             logger.error(f"Error processing message: {e}", exc_info=True)
 
 # Event handler for new messages
-@client.on(events.NewMessage(chats=TARGET_GROUPS))
+@main_client.on(events.NewMessage(chats=TARGET_GROUPS))
 async def my_event_handler(event):
     await process_message(event)
 
 async def start_clients():
     try:
-        # Start both clients
-        await client.start()
+        # Start the client with phone number interaction if needed
+        await main_client.start(phone=lambda: input("Enter your phone number: "))
         logger.info("Client started successfully")
+        
+        # Start the bot
         await bot.start()
         logger.info("Bot started successfully")
 
-        # Send startup messages
-        await client.send_message(CHANNEL_ID, "account started")
+        # Send startup messages (make sure account messages use 'client')
+        await main_client.send_message(CHANNEL_ID, "account started")  # Send from account
         logger.info("Sent 'account started' message from account")
 
-        await bot.send_message(CHANNEL_ID, "bot started")
+        await bot.send_message(CHANNEL_ID, "bot started")  # Send from bot
         logger.info("Sent 'bot started' message from bot")
 
         # Run client until disconnected
-        await client.run_until_disconnected()
+        await main_client.run_until_disconnected()
 
     except SessionPasswordNeededError:
         logger.error("2FA enabled. Please provide the second factor.")
+        password = input("Enter your 2FA password: ")
+        await main_client.start(password=password)
     except Exception as e:
         logger.error(f"Error starting the client or bot: {e}", exc_info=True)
     finally:
-        await client.disconnect()
+        await main_client.disconnect()
         await bot.disconnect()
         logger.info("Client and bot disconnected")
 
