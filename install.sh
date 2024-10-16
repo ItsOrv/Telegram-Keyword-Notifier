@@ -45,13 +45,12 @@ if [ ! -f .env ]; then
     read -p "Enter your API_ID: " api_id
     read -p "Enter your API_HASH: " api_hash
     read -p "Enter your BOT_TOKEN: " bot_token
-    read -p "Enter your CHANNEL_ID: " CHANNEL_ID
-    read -p "Enter your SESSION_NAME: " session_name
+    read -p "Enter your CHANNEL_ID (testchannel): " CHANNEL_ID
 
     echo "API_ID=$api_id" > .env
     echo "API_HASH=$api_hash" >> .env
     echo "BOT_TOKEN=$bot_token" >> .env
-    echo "SESSION_NAME=$session_name" >> .env
+    echo "CHANNEL_ID=$CHANNEL_ID" >> .env
 
     echo ".env file created successfully."
 else
