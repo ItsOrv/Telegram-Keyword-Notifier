@@ -1,7 +1,7 @@
+from asyncio.log import logger
 from telethon import events
 import logging
 from utils.logging_setup import setup_logging
-
 
 class StatsHandler:
     def __init__(self, bot):

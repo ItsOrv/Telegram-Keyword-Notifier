@@ -1,6 +1,10 @@
 from telethon import events
 from handlers.account_handler import AccountHandler
-from asyncio.log import logger
+from handlers.keyword_handler import KeywordHandler
+from handlers.stats_handler import StatsHandler
+import logging
+
+logger = logging.getLogger(__name__)
 
 class CallbackHandler:
     def __init__(self, bot):
@@ -23,7 +27,13 @@ class CallbackHandler:
             elif data.startswith('delete_'):
                 session = data.replace('delete_', '')
                 await AccountHandler(self.bot).delete_client(session, event)
-            # Add other callback handlers here
+            elif data == 'add_keyword':
+                await KeywordHandler(self.bot).add_keyword_handler(event)
+            elif data == 'remove_keyword':
+                await KeywordHandler(self.bot).remove_keyword_handler(event)
+            elif data == 'show_stats':
+                await StatsHandler(self.bot).show_stats(event)
+            # Add other callback handlers here if needed
 
         except Exception as e:
             logger.error(f"Error in callback_handler: {e}")

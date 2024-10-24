@@ -1,6 +1,7 @@
 import asyncio
 from bot import TelegramBot
 import logging
+from utils.logging_setup import setup_logging
 
 def main():
     try:
@@ -13,4 +14,10 @@ def main():
         raise
 
 if __name__ == '__main__':
+    setup_logging()
     main()
+
+
+'''
+ورودی ها پردازش نمیشن و بقیه بخش ها هم تست نشده
+'''

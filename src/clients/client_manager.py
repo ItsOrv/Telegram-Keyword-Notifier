@@ -3,6 +3,10 @@ from telethon import events, Button
 from telethon.tl.types import User, Channel, Chat
 import logging
 from config import API_ID, API_HASH, BOT_TOKEN, TARGET_GROUPS, KEYWORDS, CHANNEL_ID, IGNORE_USERS, load_json_config, update_json_config
+from telethon import TelegramClient
+from telethon import events
+from telethon.tl.types import User, Channel, Chat
+import logging
 
 logger = logging.getLogger(__name__)
 

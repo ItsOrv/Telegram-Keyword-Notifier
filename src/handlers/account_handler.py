@@ -5,26 +5,36 @@ from datetime import datetime
 from asyncio.log import logger
 import os
 from config import API_ID, API_HASH, BOT_TOKEN, TARGET_GROUPS, KEYWORDS, CHANNEL_ID, IGNORE_USERS, load_json_config, update_json_config
+from telethon import TelegramClient
+from telethon.errors import SessionPasswordNeededError
+from telethon.tl.types import User, Channel, Chat
+from datetime import datetime
+from telethon import TelegramClient
+from telethon.errors import SessionPasswordNeededError
+from telethon.tl.types import User, Channel, Chat
+from datetime import datetime
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 class AccountHandler:
-    def __init__(self, bot, conversations):
+    def __init__(self, bot):
         self.bot = bot
-        self.conversations = conversations
 
-    async def add_account(self, event, conversations):
+    async def add_account(self, event):
         """Add a new Telegram account"""
         try:
             chat_id = event.chat_id
             # Send initial message
-            await self.bot.send_message(chat_id, "Please enter your phone number:")
-            self.bot.conversations[chat_id] = 'phone_number_handler'
+            await self.bot.bot.send_message(chat_id, "Please enter your phone number:")
+            self.bot._conversations[chat_id] = 'phone_number_handler'
         except Exception as e:
             logger.error(f"Error in add_account: {e}")
-            await self.bot.send_message(chat_id, "Error occurred while adding account. Please try again.")
+            await self.bot.bot.send_message(chat_id, "Error occurred while adding account. Please try again.")
 
     async def phone_number_handler(self, event):
         """Handle phone number input"""
-        print("test phone")
         try:
             phone_number = event.message.text.strip()
             chat_id = event.chat_id
@@ -34,8 +44,8 @@ class AccountHandler:
 
             if not await client.is_user_authorized():
                 await client.send_code_request(phone_number)
-                await self.bot.send_message(chat_id, "Enter the verification code:")
-                self.bot.conversations[chat_id] = 'code_handler'
+                await self.bot.bot.send_message(chat_id, "Enter the verification code:")
+                self.bot._conversations[chat_id] = 'code_handler'
                 self.bot.handlers['temp_client'] = client
                 self.bot.handlers['temp_phone'] = phone_number
             else:
@@ -43,8 +53,8 @@ class AccountHandler:
 
         except Exception as e:
             logger.error(f"Error in phone_number_handler: {e}")
-            await self.bot.send_message(chat_id, "Error occurred. Please try again.")
-            del self.bot.conversations[chat_id]
+            await self.bot.bot.send_message(chat_id, "Error occurred. Please try again.")
+            del self.bot._conversations[chat_id]
 
     async def code_handler(self, event):
         """Handle verification code input"""
@@ -58,12 +68,12 @@ class AccountHandler:
                 await client.sign_in(phone_number, code)
                 await self.finalize_client_setup(client, phone_number, chat_id)
             except SessionPasswordNeededError:
-                await self.bot.send_message(chat_id, "Enter your 2FA password:")
-                self.bot.conversations[chat_id] = 'password_handler'
+                await self.bot.bot.send_message(chat_id, "Enter your 2FA password:")
+                self.bot._conversations[chat_id] = 'password_handler'
 
         except Exception as e:
             logger.error(f"Error in code_handler: {e}")
-            await self.bot.send_message(chat_id, "Error occurred. Please try again.")
+            await self.bot.bot.send_message(chat_id, "Error occurred. Please try again.")
             self.cleanup_temp_handlers()
 
     async def password_handler(self, event):
@@ -79,7 +89,7 @@ class AccountHandler:
 
         except Exception as e:
             logger.error(f"Error in password_handler: {e}")
-            await self.bot.send_message(chat_id, "Error occurred. Please try again.")
+            await self.bot.bot.send_message(chat_id, "Error occurred. Please try again.")
             self.cleanup_temp_handlers()
 
     async def finalize_client_setup(self, client, phone_number, chat_id):
@@ -105,12 +115,12 @@ class AccountHandler:
                 events.NewMessage()
             )
 
-            await self.bot.send_message(chat_id, f"Account {phone_number} added successfully!")
+            await self.bot.bot.send_message(chat_id, f"Account {phone_number} added successfully!")
             self.cleanup_temp_handlers()
 
         except Exception as e:
             logger.error(f"Error in finalize_client_setup: {e}")
-            await self.bot.send_message(chat_id, "Error occurred while finalizing setup.")
+            await self.bot.bot.send_message(chat_id, "Error occurred while finalizing setup.")
             self.cleanup_temp_handlers()
 
     def cleanup_temp_handlers(self):
@@ -157,7 +167,7 @@ class AccountHandler:
 
             buttons = [[Button.url("📎 View Message", url=message_link)]]
 
-            await self.bot.send_message(
+            await self.bot.bot.send_message(
                 CHANNEL_ID,
                 text,
                 buttons=buttons,

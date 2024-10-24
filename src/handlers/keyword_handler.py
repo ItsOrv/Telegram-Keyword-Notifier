@@ -1,4 +1,7 @@
 from telethon import events
+import logging
+
+logger = logging.getLogger(__name__)
 
 class KeywordHandler:
     def __init__(self, bot):
@@ -7,6 +10,13 @@ class KeywordHandler:
     async def add_keyword_handler(self, event):
         """Add a keyword to monitor"""
         try:
+            # Check if the event is a callback query
+            if isinstance(event, events.CallbackQuery.Event):
+                await event.respond("Please enter the keyword you want to add.")
+                self.bot._conversations[event.chat_id] = 'add_keyword_handler'
+                return
+
+            # If the event is a message
             keyword = event.message.text.strip()
             if keyword not in self.bot.config['KEYWORDS']:
                 self.bot.config['KEYWORDS'].append(keyword)
@@ -26,6 +36,13 @@ class KeywordHandler:
     async def remove_keyword_handler(self, event):
         """Remove a keyword from monitoring"""
         try:
+            # Check if the event is a callback query
+            if isinstance(event, events.CallbackQuery.Event):
+                await event.respond("Please enter the keyword you want to remove.")
+                self.bot._conversations[event.chat_id] = 'remove_keyword_handler'
+                return
+
+            # If the event is a message
             keyword = event.message.text.strip()
             if keyword in self.bot.config['KEYWORDS']:
                 self.bot.config['KEYWORDS'].remove(keyword)
