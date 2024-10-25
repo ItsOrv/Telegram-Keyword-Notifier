@@ -1,7 +1,7 @@
-from asyncio.log import logger
-from telethon import events
 import logging
-from utils.logging_setup import setup_logging
+from telethon import events
+
+logger = logging.getLogger(__name__)
 
 class StatsHandler:
     def __init__(self, bot):
@@ -9,6 +9,7 @@ class StatsHandler:
 
     async def show_stats(self, event):
         """Show bot statistics"""
+        print("show_stats in StatsHandler")
         try:
             stats = {
                 "Total Accounts": len(self.bot.config['clients']),

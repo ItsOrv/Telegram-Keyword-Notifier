@@ -1,12 +1,17 @@
 from telethon import events, Button
-from asyncio.log import logger
+import logging
 from handlers.account_handler import AccountHandler
+
+logger = logging.getLogger(__name__)
+# command_handler.py
+# ...
 class CommandHandler:
     def __init__(self, bot):
         self.bot = bot
 
     async def start_command(self, event):
         """Handle /start command"""
+        print("start command in CommandHandler")
         try:
             buttons = [
                 [Button.inline("➕ Add Account", 'add_account')],
@@ -21,7 +26,7 @@ class CommandHandler:
                     Button.inline('✅ Remove Ignore', b'remove_ignore_user')
                 ],
                 [Button.inline('📊 Stats', b'show_stats')]
-            ]
+                ]
 
             await event.respond(
                 "🤖 Welcome to Telegram Management Bot\n\n"

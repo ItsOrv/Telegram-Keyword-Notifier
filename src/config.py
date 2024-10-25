@@ -2,17 +2,14 @@ import os
 import json
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
 load_dotenv()
 
-# Load values from .env
 API_ID = int(os.getenv('API_ID'))
 API_HASH = os.getenv('API_HASH')
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 CHANNEL_ID = os.getenv('CHANNEL_ID')
 SESSION_NAME = os.getenv('SESSION_NAME')
 
-# Load configuration from config.json
 CONFIG_FILE = 'config.json'
 
 def load_json_config():
@@ -23,7 +20,6 @@ def update_json_config(config):
     with open(CONFIG_FILE, 'w') as f:
         json.dump(config, f, indent=4)
 
-# Load dynamic config from JSON
 json_config = load_json_config()
 
 TARGET_GROUPS = json_config.get('TARGET_GROUPS', [])
