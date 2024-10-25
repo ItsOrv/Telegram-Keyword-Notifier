@@ -1,5 +1,7 @@
 import logging
 import os
+from asyncio.log import logger
+
 
 # Create logs directory if it doesn't exist
 LOG_DIR = "logs"
@@ -8,7 +10,7 @@ if not os.path.exists(LOG_DIR):
 
 # Setup logging configuration
 def setup_logging(log_filename="bot.log"):
-    print("setup_logging in logging_setup")
+    logger.info("setup_logging in logging_setup")
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",

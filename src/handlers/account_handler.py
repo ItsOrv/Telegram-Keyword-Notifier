@@ -7,6 +7,7 @@ from asyncio.log import logger
 from config import API_ID, API_HASH, CHANNEL_ID
 import logging
 import os
+from clients.client_manager import ClientManager
 
 logger = logging.getLogger(__name__)
 
@@ -14,13 +15,13 @@ class AccountHandler:
     def __init__(self, bot):
         self.bot = bot
         self._conversations = {}
+        self.ClientManager = bot.client_manager 
 
     async def add_account(self, event):
         """Add a new Telegram account"""
-        print("add_account in AccountHandler")
+        logger.info("add_account in AccountHandler")
         try:
             chat_id = event.chat_id
-            # Send initial message
             await self.bot.bot.send_message(chat_id, "Please enter your phone number:")
             self.bot._conversations[chat_id] = 'phone_number_handler'
         except Exception as e:
@@ -29,7 +30,7 @@ class AccountHandler:
 
     async def phone_number_handler(self, event):
         """Handle phone number input"""
-        print("phone_number_handler in AccountHandler")
+        logger.info("phone_number_handler in AccountHandler")
         try:
             phone_number = event.message.text.strip()
             chat_id = event.chat_id
@@ -38,6 +39,7 @@ class AccountHandler:
             await client.connect()
 
             if not await client.is_user_authorized():
+                await self.bot.bot.send_message(chat_id, "authorizing...")
                 await client.send_code_request(phone_number)
                 await self.bot.bot.send_message(chat_id, "Enter the verification code:")
                 self.bot._conversations[chat_id] = 'code_handler'
@@ -53,7 +55,7 @@ class AccountHandler:
 
     async def code_handler(self, event):
         """Handle verification code input"""
-        print("code_handler in AccountHandler")
+        logger.info("code_handler in AccountHandler")
         try:
             code = event.message.text.strip()
             chat_id = event.chat_id
@@ -74,7 +76,7 @@ class AccountHandler:
 
     async def password_handler(self, event):
         """Handle 2FA password input"""
-        print("password_handler in AccountHandler")
+        logger.info("password_handler in AccountHandler")
         try:
             password = event.message.text.strip()
             chat_id = event.chat_id
@@ -91,7 +93,7 @@ class AccountHandler:
 
     async def finalize_client_setup(self, client, phone_number, chat_id):
         """Finalize the client setup process"""
-        print("finalize_client_setup in AccountHandler")
+        logger.info("finalize_client_setup in AccountHandler")
         try:
             session_name = f"{phone_number}_session"
             client.session.save()
@@ -123,15 +125,31 @@ class AccountHandler:
 
     def cleanup_temp_handlers(self):
         """Clean up temporary handlers and data"""
-        print("cleanup_temp_handlers in AccountHandler")
+        logger.info("cleanup_temp_handlers in AccountHandler")
         if 'temp_client' in self.bot.handlers:
             del self.bot.handlers['temp_client']
         if 'temp_phone' in self.bot.handlers:
             del self.bot.handlers['temp_phone']
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     async def process_message(self, event):
         """Process and forward messages"""
-        print("process_message in AccountHandler")
+        logger.info("process_message in AccountHandler")
         try:
             message = event.message.text
             if not message:
@@ -177,9 +195,29 @@ class AccountHandler:
         except Exception as e:
             logger.error(f"Error processing message: {e}", exc_info=True)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     async def update_groups(self, event):
         """Update groups for all accounts"""
-        print("update_groups in AccountHandler")
+        logger.info("update_groups in AccountHandler")
+
+        # فراخوانی detect_sessions پیش از به‌روزرسانی گروه‌ها
+        self.ClientManager.detect_sessions()
+
         try:
             status_message = await event.respond("🔄 Updating groups...")
             total = len(self.bot.active_clients)
@@ -192,7 +230,6 @@ class AccountHandler:
                         dialog.entity.id for dialog in dialogs
                         if isinstance(dialog.entity, (Chat, Channel)) and not dialog.entity.broadcast
                     ]
-
                     # Update config
                     for client_info in self.bot.config['clients']:
                         if client_info['session'] == session_name:
@@ -207,15 +244,25 @@ class AccountHandler:
                     logger.error(f"Error updating groups for {session_name}: {e}")
 
             self.bot.config_manager.save_config()
-            await status_message.edit("✅ Groups updated successfully!")
+            await status_message.edit(f"✅ {updated} Groups updated successfully!")
 
         except Exception as e:
             logger.error(f"Error in update_groups: {e}")
             await event.respond("❌ Error updating groups. Please try again.")
 
+
+
+
+
+
+
+
+
+
+
     async def show_accounts(self, event):
         """Show all accounts with their status"""
-        print("show_accounts in AccountHandler")
+        logger.info("show_accounts in AccountHandler")
         try:
             if not self.bot.config['clients']:
                 await event.respond("No accounts added yet.")
@@ -250,7 +297,7 @@ class AccountHandler:
 
     async def toggle_client(self, session: str, event):
         """Toggle client active status"""
-        print("toggle_client in AccountHandler")
+        logger.info("toggle_client in AccountHandler")
         try:
             for client_info in self.bot.config['clients']:
                 if client_info['session'] == session:
@@ -280,7 +327,7 @@ class AccountHandler:
 
     async def delete_client(self, session: str, event):
         """Delete a client"""
-        print("delete_client in AccountHandler")
+        logger.info("delete_client in AccountHandler")
         try:
             # Disconnect if active
             if session in self.bot.active_clients:

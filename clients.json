@@ -1,5 +1,8 @@
 {
-    "clients": [],
+    "TARGET_GROUPS": [],
+    "KEYWORDS": [],
     "IGNORE_USERS": [],
-    "KEYWORDS": []
+    "clients": [
+        "258833982548.session"
+    ]
 }
