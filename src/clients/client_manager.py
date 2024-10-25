@@ -11,7 +11,7 @@ class ClientManager:
         self.active_clients = active_clients
         self.api_id = api_id
         self.api_hash = api_hash
-        self.config_manager = ConfigManager("clients.json")  # اضافه کردن ConfigManager
+        self.config_manager = ConfigManager("clients.json", self.config)  # اضافه کردن ConfigManager
 
     def detect_sessions(self):
         """Detects session files and adds them to the config if not already present."""
@@ -25,11 +25,11 @@ class ClientManager:
             if 'clients' not in self.config:
                 self.config['clients'] = []
             self.config['clients'].extend(sessions)
-            self.config_manager.config = self.config  # به روز کردن config در ConfigManager
-            self.config_manager.save_config()
+            self.config_manager.save_config(self.config)  # ذخیره و ادغام تنظیمات جدید با تنظیمات موجود
             logger.info(f"Detected sessions: {sessions}")
         else:
             logger.info("No new sessions detected.")
+
 
 
 
