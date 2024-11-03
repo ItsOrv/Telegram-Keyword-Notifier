@@ -6,12 +6,12 @@ from datetime import datetime
 from asyncio.log import logger
 from config import API_ID, API_HASH, CHANNEL_ID
 import logging
-import os
 from clients.client_manager import ClientManager
-import json
 from telethon.errors import FloodWaitError
-
 import asyncio
+import json
+import os
+
 
 logger = logging.getLogger(__name__)
 
@@ -236,6 +236,9 @@ class AccountHandler:
             logger.error(f"Error in update_groups: {e}")
             await event.respond(f"❌ Error identifying groups: {str(e)}")
 
+
+
+            
     async def process_messages_for_client(self, client):
         """Process messages for a specific client in a loop."""
         @client.on(events.NewMessage)
@@ -274,7 +277,10 @@ class AccountHandler:
                     chat_id = str(event.chat_id).replace('-100', '', 1)
                     message_link = f"https://t.me/c/{chat_id}/{event.id}"
 
-                buttons = [[Button.url("📎 View Message", url=message_link)]]
+                buttons = [
+                    [Button.url("📎 View Message", url=message_link)],
+                    [Button.inline("🚫 Ignore ID", data=f"ignore_{sender.id}")]  # دکمه نادیده‌گرفتن شناسه
+                ]
 
                 await self.bot.bot.send_message(
                     CHANNEL_ID,
@@ -285,6 +291,15 @@ class AccountHandler:
 
             except Exception as e:
                 logger.error(f"Error processing message: {e}", exc_info=True)
+
+
+
+
+
+
+
+
+
 
 
     async def show_accounts(self, event):
@@ -358,6 +373,13 @@ class AccountHandler:
         except Exception as e:
             logger.error(f"Error toggling client {session}: {e}")
             await event.respond("❌ Error toggling account status")
+
+
+
+
+
+
+
 
 
     async def delete_client(self, session: str, event):
