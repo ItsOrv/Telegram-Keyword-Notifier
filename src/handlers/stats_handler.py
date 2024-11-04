@@ -7,6 +7,7 @@ class StatsHandler:
     def __init__(self, bot):
         self.bot = bot
 
+    #PASS
     async def show_stats(self, event):
         """Show bot statistics"""
         logger.info("show_stats in StatsHandler")

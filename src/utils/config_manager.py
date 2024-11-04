@@ -16,6 +16,7 @@ class ConfigManager:
         }
         self.config = config if config is not None else self.load_config()
 
+    #PASS
     def load_config(self) -> Dict[str, Any]:
         """Load configuration from the JSON file."""
         logger.info(f"Loading config from {self.filename}")
@@ -37,6 +38,7 @@ class ConfigManager:
             logger.error(f"Unexpected error loading config: {e}")
             return self.default_config.copy()
 
+    #PASS
     def save_config(self, new_config: Dict[str, Any] = None) -> bool:
         """Save the current configuration to the JSON file."""
         logger.info("Saving config to file")
@@ -53,6 +55,7 @@ class ConfigManager:
             logger.error(f"Error saving config to {self.filename}: {e}")
             return False
 
+    #PASS
     def update_config(self, key: str, value: Any) -> bool:
         """Update a specific key in the configuration."""
         logger.info(f"Updating config key: {key}")
@@ -64,6 +67,7 @@ class ConfigManager:
         self.config[key] = value
         return self.save_config()
 
+    #PASS
     def merge_config(self, new_config: Dict[str, Any]) -> None:
         """Merge the new configuration with the existing configuration."""
         logger.info("Merging new configuration")
@@ -78,6 +82,7 @@ class ConfigManager:
             else:
                 self.config[key] = value
 
+    #PASS
     def get_config(self, key: str = None) -> Union[Dict[str, Any], Any]:
         """Get the entire config or a specific key's value."""
         if key is None:

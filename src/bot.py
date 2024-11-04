@@ -45,7 +45,6 @@ class TelegramBot:
             await self.start()
             logger.info("Bot is running...")
 
-            # اجرای process_message برای هر اکانت در حلقه
             tasks = [self.account_handler.process_messages_for_client(client) for client in self.active_clients.values()]
             await asyncio.gather(*tasks)
 

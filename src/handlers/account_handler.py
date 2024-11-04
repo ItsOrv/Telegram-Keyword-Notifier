@@ -1,4 +1,13 @@
-#account_handlers.py
+"""
+Account Handlers Module
+------------------------
+This module handles Telegram account management operations including:
+- Account addition and authentication
+- Group management and updates
+- Message processing and forwarding
+- Account status management
+"""
+
 from telethon import TelegramClient, events, Button
 from telethon.errors import SessionPasswordNeededError
 from telethon.tl.types import Channel, Chat
@@ -16,14 +25,32 @@ import os
 logger = logging.getLogger(__name__)
 
 class AccountHandler:
+    """
+    Handles all account-related operations for the Telegram bot.
+    Manages account creation, authentication, and message processing.
+    """
+    
     def __init__(self, bot):
+        """
+        Initialize AccountHandler with bot instance.
+        
+        Args:
+            bot: Bot instance containing configuration and client management
+        """
         self.bot = bot
         self._conversations = {}
         self.ClientManager = bot.client_manager 
 
-    #PASS
     async def add_account(self, event):
-        """Add a new Telegram account"""
+        """
+        Initiates the account addition process by requesting phone number.
+        
+        Args:
+            event: Telegram event containing chat information
+            
+        # TODO: Consider adding rate limiting to prevent spam
+        # TODO: Add validation for phone number format
+        """
         logger.info("add_account in AccountHandler")
         try:
             chat_id = event.chat_id
@@ -33,9 +60,17 @@ class AccountHandler:
             logger.error(f"Error in add_account: {e}")
             await self.bot.bot.send_message(chat_id, "Error occurred while adding account. Please try again.")
 
-    #PASS
     async def phone_number_handler(self, event):
-        """Handle phone number input"""
+        """
+        Handles phone number verification and initiates client connection.
+        
+        Args:
+            event: Telegram event containing the phone number
+            
+        # TODO: Add phone number format validation
+        # TODO: Implement retry mechanism for failed connections
+        # TODO: Add timeout for authorization process
+        """
         logger.info("phone_number_handler in AccountHandler")
         try:
             phone_number = event.message.text.strip()
@@ -59,9 +94,17 @@ class AccountHandler:
             await self.bot.bot.send_message(chat_id, "Error occurred. Please try again.")
             del self.bot._conversations[chat_id]
 
-    #PASS
     async def code_handler(self, event):
-        """Handle verification code input"""
+        """
+        Processes verification code and completes authentication.
+        
+        Args:
+            event: Telegram event containing the verification code
+            
+        # TODO: Add code format validation
+        # TODO: Implement retry mechanism for incorrect codes
+        # TODO: Add maximum attempts limit
+        """
         logger.info("code_handler in AccountHandler")
         try:
             code = event.message.text.strip()
@@ -81,9 +124,16 @@ class AccountHandler:
             await self.bot.bot.send_message(chat_id, "Error occurred. Please try again.")
             self.cleanup_temp_handlers()
 
-    #PASS
     async def password_handler(self, event):
-        """Handle 2FA password input"""
+        """
+        Handles 2FA password verification if required.
+        
+        Args:
+            event: Telegram event containing the 2FA password
+            
+        # TODO: Implement password attempt limiting
+        # TODO: Add secure password handling
+        """
         logger.info("password_handler in AccountHandler")
         try:
             password = event.message.text.strip()
@@ -99,15 +149,25 @@ class AccountHandler:
             await self.bot.bot.send_message(chat_id, "Error occurred. Please try again.")
             self.cleanup_temp_handlers()
 
-    #PASS
     async def finalize_client_setup(self, client, phone_number, chat_id):
-        """Finalize the client setup process"""
+        """
+        Completes client setup and saves configuration.
+        
+        Args:
+            client: Authorized TelegramClient instance
+            phone_number: User's phone number
+            chat_id: Chat ID for response messages
+            
+        # TODO: Implement backup mechanism for session files
+        # TODO: Add configuration validation
+        # SECURITY: Consider encrypting sensitive data in config
+        """
         logger.info("finalize_client_setup in AccountHandler")
         try:
             session_name = f"{phone_number}_session"
             client.session.save()
 
-            #XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+            # IMPROVEMENT: Consider using a database instead of JSON for client data
             self.bot.config['clients'].append({
                 "phone_number": phone_number,
                 "session": session_name,
@@ -116,7 +176,6 @@ class AccountHandler:
                 "disabled": False
             })
             self.bot.config_manager.save_config()
-            #XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
             self.bot.active_clients[session_name] = client
             client.add_event_handler(
@@ -132,18 +191,30 @@ class AccountHandler:
             await self.bot.bot.send_message(chat_id, "Error occurred while finalizing setup.")
             self.cleanup_temp_handlers()
 
-    #
     def cleanup_temp_handlers(self):
-        """Clean up temporary handlers and data"""
+        """
+        Removes temporary handlers and data after setup completion.
+        
+        # TODO: Add verification for complete cleanup
+        # TODO: Implement timeout for cleanup process
+        """
         logger.info("cleanup_temp_handlers in AccountHandler")
         if 'temp_client' in self.bot.handlers:
             del self.bot.handlers['temp_client']
         if 'temp_phone' in self.bot.handlers:
             del self.bot.handlers['temp_phone']
 
-    #PASS
     async def update_groups(self, event):
-        """Identify groups for each client and save their IDs in JSON without deleting previous data."""
+        """
+        Updates group information for all clients.
+        
+        Args:
+            event: Telegram event triggering the update
+            
+        # TODO: Implement incremental updates
+        # TODO: Add group metadata caching
+        # TODO: Implement proper error handling for rate limits
+        """
         logger.info("update_groups in AccountHandler")
 
         groups_per_client = {}
@@ -152,6 +223,7 @@ class AccountHandler:
         try:
             status_message = await event.respond("🔄 Identifying groups for each client...")
 
+            # Initialize JSON structure
             json_data = {
                 "TARGET_GROUPS": [],
                 "KEYWORDS": [],
@@ -159,6 +231,7 @@ class AccountHandler:
                 "clients": {}
             }
             
+            # Load existing data
             if os.path.exists("clients.json"):
                 try:
                     with open("clients.json", "r", encoding='utf-8') as json_file:
@@ -169,6 +242,7 @@ class AccountHandler:
                 except json.JSONDecodeError as e:
                     logger.error(f"JSON decode error: {e}")
 
+            # Process each client
             for session_name, client in self.bot.active_clients.items():
                 try:
                     logger.info(f"Processing client: {session_name}")
@@ -184,7 +258,7 @@ class AccountHandler:
                                     group_ids.add(dialog.entity.id)
                                     
                                 if len(group_ids) % 50 == 0:
-                                    await asyncio.sleep(2)
+                                    await asyncio.sleep(2)  # Rate limiting protection
                                     
                             except Exception as e:
                                 logger.error(f"Error processing dialog: {e}")
@@ -214,6 +288,7 @@ class AccountHandler:
                     logger.error(f"Error processing client {session_name}: {e}")
                     continue
 
+            # Update JSON data
             for session_name, group_ids in groups_per_client.items():
                 if session_name in json_data["clients"]:
                     existing_groups = json_data["clients"][session_name]
@@ -223,6 +298,7 @@ class AccountHandler:
                 else:
                     json_data["clients"][session_name] = group_ids
 
+            # Save updated data
             with open("clients.json", "w", encoding='utf-8') as json_file:
                 json.dump(json_data, json_file, indent=4, ensure_ascii=False)
                 logger.info(f"Saved data for {len(groups_per_client)} clients")
@@ -233,12 +309,25 @@ class AccountHandler:
             logger.error(f"Error in update_groups: {e}")
             await event.respond(f"❌ Error identifying groups: {str(e)}")
 
-    #PASS
     async def process_messages_for_client(self, client):
-        """Process messages for a specific client in a loop."""
+        """
+        Sets up message processing for a specific client.
+        
+        Args:
+            client: TelegramClient instance to process messages for
+            
+        # TODO: Implement message queuing system
+        # TODO: Add message deduplication
+        # TODO: Implement message filtering optimization
+        """
         @client.on(events.NewMessage)
         async def process_message(event):
-            """Process and forward messages for a single client."""
+            """
+            Processes and forwards new messages based on configured filters.
+            
+            Args:
+                event: NewMessage event from Telegram
+            """
             try:
                 message = event.message.text
                 if not message:
@@ -254,6 +343,7 @@ class AccountHandler:
                 chat = await event.get_chat()
                 chat_title = getattr(chat, 'title', 'Unknown Chat')
 
+                # Format message for forwarding
                 text = (
                     f"📝 New Message\n\n"
                     f"👤 From: {getattr(sender, 'first_name', '')} {getattr(sender, 'last_name', '')}\n"
@@ -262,6 +352,7 @@ class AccountHandler:
                     f"📜 Message:\n{message}\n"
                 )
 
+                # Generate message link
                 if hasattr(chat, 'username') and chat.username:
                     message_link = f"https://t.me/{chat.username}/{event.id}"
                 else:
@@ -283,51 +374,83 @@ class AccountHandler:
             except Exception as e:
                 logger.error(f"Error processing message: {e}", exc_info=True)
 
-    #PASS
     async def show_accounts(self, event):
-        """Show all accounts with their status."""
-        logger.info("show_accounts in AccountHandler")
-        try:
-            clients_data = self.bot.config.get('clients', {})
+            """
+            Display all registered accounts with their current status and controls.
             
-            if not isinstance(clients_data, dict) or not clients_data:
-                await event.respond("No accounts added yet.")
-                return
+            Args:
+                event: Telegram event triggering the account display
+                
+            Returns:
+                None. Sends interactive messages to the chat with account information
+                and control buttons.
+                
+            # TODO: Add pagination for large numbers of accounts
+            # TODO: Add sorting options (by status, group count, etc)
+            # TODO: Consider caching account status for faster display
+            """
+            logger.info("show_accounts in AccountHandler")
+            try:
+                # Get client data with empty dict as fallback
+                clients_data = self.bot.config.get('clients', {})
+                
+                # Validate client data structure
+                if not isinstance(clients_data, dict) or not clients_data:
+                    await event.respond("No accounts added yet.")
+                    return
 
-            messages = []
+                messages = []
 
-            for session, groups in clients_data.items():
-                phone = session.replace('.session', '') if session else 'Unknown'
-                groups_count = len(groups)
-                status = "🟢 Active" if session in self.bot.active_clients else "🔴 Inactive"
+                # Process each client account
+                for session, groups in clients_data.items():
+                    # Clean up phone number display
+                    phone = session.replace('.session', '') if session else 'Unknown'
+                    groups_count = len(groups)
+                    status = "🟢 Active" if session in self.bot.active_clients else "🔴 Inactive"
 
-                text = (
-                    f"📱 Phone: {phone}\n"
-                    f"👥 Groups: {groups_count}\n"
-                    f"📊 Status: {status}\n"
-                )
+                    # Format account information message
+                    text = (
+                        f"📱 Phone: {phone}\n"
+                        f"👥 Groups: {groups_count}\n"
+                        f"📊 Status: {status}\n"
+                    )
 
-                buttons = [
-                    [
-                        Button.inline("❌ Disable" if status == "🟢 Active" else "✅ Enable", data=f"toggle_{session}"),
-                        Button.inline("🗑 Delete", data=f"delete_{session}")
+                    # Create interactive control buttons
+                    buttons = [
+                        [
+                            Button.inline(
+                                "❌ Disable" if status == "🟢 Active" else "✅ Enable", 
+                                data=f"toggle_{session}"
+                            ),
+                            Button.inline("🗑 Delete", data=f"delete_{session}")
+                        ]
                     ]
-                ]
 
-                messages.append((text, buttons))
+                    messages.append((text, buttons))
 
-            for message_text, message_buttons in messages:
-                await event.respond(message_text, buttons=message_buttons)
+                # Send each account as a separate message with its controls
+                for message_text, message_buttons in messages:
+                    await event.respond(message_text, buttons=message_buttons)
 
-        except Exception as e:
-            logger.error(f"Error in show_accounts: {e}")
-            await event.respond("Error showing accounts. Please try again.")
+            except Exception as e:
+                logger.error(f"Error in show_accounts: {e}")
+                await event.respond("Error showing accounts. Please try again.")
 
-    #PASS
     async def toggle_client(self, session: str, event):
-        """Toggle client active status."""
+        """
+        Toggle the active/inactive status of a client account.
+        
+        Args:
+            session (str): Session identifier for the account
+            event: Telegram event triggering the toggle
+            
+        # TODO: Add status transition validation
+        # TODO: Implement graceful disconnection handling
+        # TODO: Add automatic reconnection attempts for failed enables
+        """
         logger.info("toggle_client in AccountHandler")
         try:
+            # Validate session exists
             if session not in self.bot.config['clients']:
                 await event.respond("❌ Account not found.")
                 return
@@ -335,38 +458,52 @@ class AccountHandler:
             currently_active = session in self.bot.active_clients
 
             if currently_active:
-                # Disable client
+                # Handle client disable
                 client = self.bot.active_clients[session]
                 await client.disconnect()
                 del self.bot.active_clients[session]
                 await event.respond(f"✅ Account {session} disabled")
             else:
-                # Enable client
+                # Handle client enable
                 client = TelegramClient(session, API_ID, API_HASH)
                 await client.start()
                 self.bot.active_clients[session] = client
                 await event.respond(f"✅ Account {session} enabled")
 
+            # Save updated configuration
             self.bot.config_manager.save_config()
 
         except Exception as e:
             logger.error(f"Error toggling client {session}: {e}")
             await event.respond("❌ Error toggling account status")
 
-    #PASS
     async def delete_client(self, session: str, event):
-        """Delete a client."""
+        """
+        Permanently delete a client account and its associated data.
+        
+        Args:
+            session (str): Session identifier for the account to delete
+            event: Telegram event triggering the deletion
+            
+        # TODO: Add confirmation step before deletion
+        # TODO: Implement backup before deletion
+        # TODO: Add cleanup verification
+        # SECURITY: Ensure secure deletion of sensitive data
+        """
         logger.info("delete_client in AccountHandler")
         try:
+            # Disconnect and remove active client if exists
             if session in self.bot.active_clients:
                 client = self.bot.active_clients[session]
                 await client.disconnect()
                 del self.bot.active_clients[session]
 
+            # Remove from configuration and clean up session file
             if session in self.bot.config['clients']:
                 del self.bot.config['clients'][session]
                 self.bot.config_manager.save_config()
 
+                # Clean up session file from disk
                 session_file = f"{session}"
                 if os.path.exists(session_file):
                     os.remove(session_file)
