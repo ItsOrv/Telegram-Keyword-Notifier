@@ -21,6 +21,7 @@ class AccountHandler:
         self._conversations = {}
         self.ClientManager = bot.client_manager 
 
+    #PASS
     async def add_account(self, event):
         """Add a new Telegram account"""
         logger.info("add_account in AccountHandler")
@@ -32,6 +33,7 @@ class AccountHandler:
             logger.error(f"Error in add_account: {e}")
             await self.bot.bot.send_message(chat_id, "Error occurred while adding account. Please try again.")
 
+    #PASS
     async def phone_number_handler(self, event):
         """Handle phone number input"""
         logger.info("phone_number_handler in AccountHandler")
@@ -57,6 +59,7 @@ class AccountHandler:
             await self.bot.bot.send_message(chat_id, "Error occurred. Please try again.")
             del self.bot._conversations[chat_id]
 
+    #PASS
     async def code_handler(self, event):
         """Handle verification code input"""
         logger.info("code_handler in AccountHandler")
@@ -78,6 +81,7 @@ class AccountHandler:
             await self.bot.bot.send_message(chat_id, "Error occurred. Please try again.")
             self.cleanup_temp_handlers()
 
+    #PASS
     async def password_handler(self, event):
         """Handle 2FA password input"""
         logger.info("password_handler in AccountHandler")
@@ -95,6 +99,7 @@ class AccountHandler:
             await self.bot.bot.send_message(chat_id, "Error occurred. Please try again.")
             self.cleanup_temp_handlers()
 
+    #PASS
     async def finalize_client_setup(self, client, phone_number, chat_id):
         """Finalize the client setup process"""
         logger.info("finalize_client_setup in AccountHandler")
@@ -102,7 +107,7 @@ class AccountHandler:
             session_name = f"{phone_number}_session"
             client.session.save()
 
-            # Add to config
+            #XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
             self.bot.config['clients'].append({
                 "phone_number": phone_number,
                 "session": session_name,
@@ -111,8 +116,8 @@ class AccountHandler:
                 "disabled": False
             })
             self.bot.config_manager.save_config()
+            #XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
-            # Add to active clients
             self.bot.active_clients[session_name] = client
             client.add_event_handler(
                 self.process_message,
@@ -127,6 +132,7 @@ class AccountHandler:
             await self.bot.bot.send_message(chat_id, "Error occurred while finalizing setup.")
             self.cleanup_temp_handlers()
 
+    #
     def cleanup_temp_handlers(self):
         """Clean up temporary handlers and data"""
         logger.info("cleanup_temp_handlers in AccountHandler")
@@ -135,6 +141,7 @@ class AccountHandler:
         if 'temp_phone' in self.bot.handlers:
             del self.bot.handlers['temp_phone']
 
+    #PASS
     async def update_groups(self, event):
         """Identify groups for each client and save their IDs in JSON without deleting previous data."""
         logger.info("update_groups in AccountHandler")
@@ -145,7 +152,6 @@ class AccountHandler:
         try:
             status_message = await event.respond("🔄 Identifying groups for each client...")
 
-            # بارگذاری اطلاعات قبلی
             json_data = {
                 "TARGET_GROUPS": [],
                 "KEYWORDS": [],
@@ -163,14 +169,12 @@ class AccountHandler:
                 except json.JSONDecodeError as e:
                     logger.error(f"JSON decode error: {e}")
 
-            # به‌روزرسانی گروه‌ها برای هر کلاینت فعال
             for session_name, client in self.bot.active_clients.items():
                 try:
                     logger.info(f"Processing client: {session_name}")
                     group_ids = set()
 
                     try:
-                        # دریافت همه دیالوگ‌ها با یک درخواست اولیه
                         dialogs = []
                         async for dialog in client.iter_dialogs(limit=None):
                             try:
@@ -179,7 +183,6 @@ class AccountHandler:
                                 ):
                                     group_ids.add(dialog.entity.id)
                                     
-                                # هر 50 گروه، یک تاخیر کوتاه
                                 if len(group_ids) % 50 == 0:
                                     await asyncio.sleep(2)
                                     
@@ -187,7 +190,6 @@ class AccountHandler:
                                 logger.error(f"Error processing dialog: {e}")
                                 continue
                                 
-                            # بروزرسانی پیام وضعیت هر 20 گروه
                             if len(group_ids) % 20 == 0:
                                 await status_message.edit(f"📊 Found {len(group_ids)} groups for {session_name}...")
 
@@ -203,19 +205,15 @@ class AccountHandler:
                         await status_message.edit(f"⚠️ Error processing {session_name}: {str(e)}")
                         continue
 
-                    # ذخیره گروه‌های یافت شده
                     groups_per_client[session_name] = list(group_ids)
                     logger.info(f"Found {len(group_ids)} groups for {session_name}")
                     await status_message.edit(f"✅ Found {len(group_ids)} groups for {session_name}")
-                    
-                    # تاخیر بین پردازش کلاینت‌های مختلف
                     await asyncio.sleep(3)
 
                 except Exception as e:
                     logger.error(f"Error processing client {session_name}: {e}")
                     continue
 
-            # ادغام اطلاعات جدید
             for session_name, group_ids in groups_per_client.items():
                 if session_name in json_data["clients"]:
                     existing_groups = json_data["clients"][session_name]
@@ -225,7 +223,6 @@ class AccountHandler:
                 else:
                     json_data["clients"][session_name] = group_ids
 
-            # ذخیره اطلاعات
             with open("clients.json", "w", encoding='utf-8') as json_file:
                 json.dump(json_data, json_file, indent=4, ensure_ascii=False)
                 logger.info(f"Saved data for {len(groups_per_client)} clients")
@@ -236,9 +233,7 @@ class AccountHandler:
             logger.error(f"Error in update_groups: {e}")
             await event.respond(f"❌ Error identifying groups: {str(e)}")
 
-
-
-            
+    #PASS
     async def process_messages_for_client(self, client):
         """Process messages for a specific client in a loop."""
         @client.on(events.NewMessage)
@@ -253,15 +248,12 @@ class AccountHandler:
                 if not sender or sender.id in self.bot.config['IGNORE_USERS']:
                     return
 
-                # Check keywords
                 if not any(keyword.lower() in message.lower() for keyword in self.bot.config['KEYWORDS']):
                     return
 
-                # Get chat info
                 chat = await event.get_chat()
                 chat_title = getattr(chat, 'title', 'Unknown Chat')
 
-                # Format message
                 text = (
                     f"📝 New Message\n\n"
                     f"👤 From: {getattr(sender, 'first_name', '')} {getattr(sender, 'last_name', '')}\n"
@@ -270,7 +262,6 @@ class AccountHandler:
                     f"📜 Message:\n{message}\n"
                 )
 
-                # Get message link
                 if hasattr(chat, 'username') and chat.username:
                     message_link = f"https://t.me/{chat.username}/{event.id}"
                 else:
@@ -279,7 +270,7 @@ class AccountHandler:
 
                 buttons = [
                     [Button.url("📎 View Message", url=message_link)],
-                    [Button.inline("🚫 Ignore ID", data=f"ignore_{sender.id}")]  # دکمه نادیده‌گرفتن شناسه
+                    [Button.inline("🚫 Ignore ID", data=f"ignore_{sender.id}")]
                 ]
 
                 await self.bot.bot.send_message(
@@ -292,16 +283,7 @@ class AccountHandler:
             except Exception as e:
                 logger.error(f"Error processing message: {e}", exc_info=True)
 
-
-
-
-
-
-
-
-
-
-
+    #PASS
     async def show_accounts(self, event):
         """Show all accounts with their status."""
         logger.info("show_accounts in AccountHandler")
@@ -312,11 +294,9 @@ class AccountHandler:
                 await event.respond("No accounts added yet.")
                 return
 
-            # ایجاد یک لیست برای ذخیره پیام‌ها
             messages = []
 
             for session, groups in clients_data.items():
-                # استخراج شماره تلفن از نام فایل سشن
                 phone = session.replace('.session', '') if session else 'Unknown'
                 groups_count = len(groups)
                 status = "🟢 Active" if session in self.bot.active_clients else "🔴 Inactive"
@@ -336,7 +316,6 @@ class AccountHandler:
 
                 messages.append((text, buttons))
 
-            # ارسال تمام پیام‌ها
             for message_text, message_buttons in messages:
                 await event.respond(message_text, buttons=message_buttons)
 
@@ -344,7 +323,7 @@ class AccountHandler:
             logger.error(f"Error in show_accounts: {e}")
             await event.respond("Error showing accounts. Please try again.")
 
-
+    #PASS
     async def toggle_client(self, session: str, event):
         """Toggle client active status."""
         logger.info("toggle_client in AccountHandler")
@@ -374,30 +353,20 @@ class AccountHandler:
             logger.error(f"Error toggling client {session}: {e}")
             await event.respond("❌ Error toggling account status")
 
-
-
-
-
-
-
-
-
+    #PASS
     async def delete_client(self, session: str, event):
         """Delete a client."""
         logger.info("delete_client in AccountHandler")
         try:
-            # Disconnect if active
             if session in self.bot.active_clients:
                 client = self.bot.active_clients[session]
                 await client.disconnect()
                 del self.bot.active_clients[session]
 
-            # Remove from config
             if session in self.bot.config['clients']:
                 del self.bot.config['clients'][session]
                 self.bot.config_manager.save_config()
 
-                # Delete session file
                 session_file = f"{session}"
                 if os.path.exists(session_file):
                     os.remove(session_file)
