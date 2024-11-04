@@ -17,10 +17,10 @@ Telegram Panel is a comprehensive tool designed to manage multiple Telegram acco
 - **Auto-Reply for Customer Support**: (soon) Accounts can automatically respond to incoming messages.
 - **Account Activity Monitoring and Analytics**: (soon) A dashboard provides insights into each account's activity, including group memberships, messages sent, and user interactions, helping with performance and engagement tracking.
 
-  - **Automated Direct Messages**: When a keyword is detected, the bot can send a message from one of the managed accounts to the message sender.
-  - **User Detection and ID Management**: (soon)
-    - If the sender’s ID is available, selects an account not already in a group with the user to send a message.
-    - If the ID is unavailable, selects an account within the same group as the user to send a message.
+- **Automated Direct Messages**: When a keyword is detected, the bot can send a message from one of the managed accounts to the message sender.
+- **User Detection and ID Management**: (soon)
+  - If the sender’s ID is available, selects an account not already in a group with the user to send a message.
+  - If the ID is unavailable, selects an account within the same group as the user to send a message.
 
 - **Categorized Keyword Monitoring**: (soon) Allows monitoring with multiple keyword categories, each linked to a specific channel for forwarding, making it possible to track multiple topics or products simultaneously.
 
