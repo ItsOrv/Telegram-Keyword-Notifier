@@ -75,7 +75,6 @@ class ConfigManager:
         for key, value in new_config.items():
             if key in self.config:
                 if isinstance(self.config[key], list) and isinstance(value, list):
-                    # حفظ ترتیب و حذف تکرار
                     self.config[key] = list(dict.fromkeys(value))
                 else:
                     self.config[key] = value

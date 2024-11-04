@@ -221,7 +221,7 @@ class AccountHandler:
         self.ClientManager.detect_sessions()
 
         try:
-            status_message = await event.respond("🔄 Identifying groups for each client...")
+            status_message = await event.respond("Please wait, Identifying groups for each client...")
 
             # Initialize JSON structure
             json_data = {
@@ -265,23 +265,23 @@ class AccountHandler:
                                 continue
                                 
                             if len(group_ids) % 20 == 0:
-                                await status_message.edit(f"📊 Found {len(group_ids)} groups for {session_name}...")
+                                await status_message.edit(f"Found {len(group_ids)} groups for {session_name}...")
 
                     except FloodWaitError as e:
                         wait_time = e.seconds
                         logger.info(f"FloodWaitError: Sleeping for {wait_time} seconds")
-                        await status_message.edit(f"⏳ Rate limited. Waiting for {wait_time} seconds...")
+                        await status_message.edit(f"Rate limited. Waiting for {wait_time} seconds...")
                         await asyncio.sleep(wait_time)
                         continue
                         
                     except Exception as e:
                         logger.error(f"Error in dialog iteration: {e}")
-                        await status_message.edit(f"⚠️ Error processing {session_name}: {str(e)}")
+                        await status_message.edit(f"Error processing {session_name}: {str(e)}")
                         continue
 
                     groups_per_client[session_name] = list(group_ids)
                     logger.info(f"Found {len(group_ids)} groups for {session_name}")
-                    await status_message.edit(f"✅ Found {len(group_ids)} groups for {session_name}")
+                    await status_message.edit(f"Found {len(group_ids)} groups for {session_name}")
                     await asyncio.sleep(3)
 
                 except Exception as e:
@@ -303,11 +303,11 @@ class AccountHandler:
                 json.dump(json_data, json_file, indent=4, ensure_ascii=False)
                 logger.info(f"Saved data for {len(groups_per_client)} clients")
 
-            await status_message.edit(f"✅  {len(group_ids)} Groups identified and saved successfully for all clients!")
+            await status_message.edit(f"That's it, {len(group_ids)} Groups identified and saved successfully for all clients!")
 
         except Exception as e:
             logger.error(f"Error in update_groups: {e}")
-            await event.respond(f"❌ Error identifying groups: {str(e)}")
+            await event.respond(f"Error identifying groups: {str(e)}")
 
     async def process_messages_for_client(self, client):
         """
@@ -345,11 +345,10 @@ class AccountHandler:
 
                 # Format message for forwarding
                 text = (
-                    f"📝 New Message\n\n"
-                    f"👤 From: {getattr(sender, 'first_name', '')} {getattr(sender, 'last_name', '')}\n"
-                    f"🆔 User ID: `{sender.id}`\n"
-                    f"💭 Chat: {chat_title}\n\n"
-                    f"📜 Message:\n{message}\n"
+                    f"• User: {getattr(sender, 'first_name', '')} {getattr(sender, 'last_name', '')}\n"
+                    f"• User ID: `{sender.id}`\n"
+                    f"• Chat: {chat_title}\n\n"
+                    f"• Message:\n{message}\n"
                 )
 
                 # Generate message link
@@ -360,8 +359,8 @@ class AccountHandler:
                     message_link = f"https://t.me/c/{chat_id}/{event.id}"
 
                 buttons = [
-                    [Button.url("📎 View Message", url=message_link)],
-                    [Button.inline("🚫 Ignore ID", data=f"ignore_{sender.id}")]
+                    [Button.url("View Message", url=message_link)],
+                    [Button.inline("🚫Ignore🚫", data=f"ignore_{sender.id}")]
                 ]
 
                 await self.bot.bot.send_message(
@@ -410,9 +409,9 @@ class AccountHandler:
 
                     # Format account information message
                     text = (
-                        f"📱 Phone: {phone}\n"
-                        f"👥 Groups: {groups_count}\n"
-                        f"📊 Status: {status}\n"
+                        f"• Phone: {phone}\n"
+                        f"• Groups: {groups_count}\n"
+                        f"• Status: {status}\n"
                     )
 
                     # Create interactive control buttons
@@ -452,7 +451,7 @@ class AccountHandler:
         try:
             # Validate session exists
             if session not in self.bot.config['clients']:
-                await event.respond("❌ Account not found.")
+                await event.respond("Account not found.")
                 return
 
             currently_active = session in self.bot.active_clients
@@ -462,20 +461,20 @@ class AccountHandler:
                 client = self.bot.active_clients[session]
                 await client.disconnect()
                 del self.bot.active_clients[session]
-                await event.respond(f"✅ Account {session} disabled")
+                await event.respond(f"Account {session} disabled")
             else:
                 # Handle client enable
                 client = TelegramClient(session, API_ID, API_HASH)
                 await client.start()
                 self.bot.active_clients[session] = client
-                await event.respond(f"✅ Account {session} enabled")
+                await event.respond(f"Account {session} enabled")
 
             # Save updated configuration
             self.bot.config_manager.save_config()
 
         except Exception as e:
             logger.error(f"Error toggling client {session}: {e}")
-            await event.respond("❌ Error toggling account status")
+            await event.respond("Error toggling account status")
 
     async def delete_client(self, session: str, event):
         """
@@ -508,10 +507,10 @@ class AccountHandler:
                 if os.path.exists(session_file):
                     os.remove(session_file)
 
-                await event.respond(f"✅ Account deleted successfully")
+                await event.respond(f"Account deleted successfully")
             else:
-                await event.respond("❌ Account not found.")
+                await event.respond("Account not found.")
 
         except Exception as e:
             logger.error(f"Error deleting client {session}: {e}")
-            await event.respond("❌ Error deleting account")
+            await event.respond("Error deleting account")

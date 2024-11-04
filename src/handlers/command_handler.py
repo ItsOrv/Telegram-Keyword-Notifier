@@ -3,8 +3,7 @@ import logging
 from handlers.account_handler import AccountHandler
 
 logger = logging.getLogger(__name__)
-# command_handler.py
-# ...
+
 class CommandHandler:
     def __init__(self, bot):
         self.bot = bot
@@ -14,23 +13,22 @@ class CommandHandler:
         logger.info("start command in CommandHandler")
         try:
             buttons = [
-                [Button.inline("➕ Add Account", 'add_account')],
-                [Button.inline("👥 Show Accounts", b'show_accounts')],
-                [Button.inline("🔄 Update Groups", b'update_groups')],
+                [Button.inline("Add Account", 'add_account')],
+                [Button.inline("Show Accounts", b'show_accounts')],
+                [Button.inline("Update Groups", b'update_groups')],
                 [
-                    Button.inline('🔑 Add Keyword', b'add_keyword'),
-                    Button.inline('❌ Remove Keyword', b'remove_keyword')
+                    Button.inline('Add Keyword', b'add_keyword'),
+                    Button.inline('Remove Keyword', b'remove_keyword')
                 ],
                 [
-                    Button.inline('🚫 Ignore User', b'ignore_user'),
-                    Button.inline('✅ Remove Ignore', b'remove_ignore_user')
+                    Button.inline('Ignore User', b'ignore_user'),
+                    Button.inline('Remove Ignore', b'remove_ignore_user')
                 ],
-                [Button.inline('📊 Stats', b'show_stats')]
+                [Button.inline('Stats', b'show_stats')]
                 ]
 
             await event.respond(
-                "🤖 Welcome to Telegram Management Bot\n\n"
-                "Choose an option from the menu below:",
+                "Telegram Management Bot\n\n",
                 buttons=buttons
             )
 
