@@ -81,5 +81,3 @@ async def remove_keyword_handler(event):
 # Start the bot
 bot.start()
 bot.run_until_disconnected()
-
-# wip
