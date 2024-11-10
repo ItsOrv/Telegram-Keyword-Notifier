@@ -38,7 +38,7 @@ To install the bot manually, follow these steps:
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/ItsOrv/telegram-message-monitor-bot.git
+   git clone https://github.com/ItsOrv/telegram-message-monitor.git
    cd telegram-message-monitor-bot
    ```
 
