@@ -5,27 +5,31 @@ from config import API_ID, API_HASH, BOT_TOKEN, TARGET_GROUPS, KEYWORDS, CHANNEL
 import asyncio
 import random
 
-# Setup logging
+# logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize the clients
-main_client = TelegramClient("krtkmahan", API_ID, API_HASH)
-bot = TelegramClient('bot', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
-bot2 = TelegramClient("bot2", API_ID, API_HASH).start(bot_token=BOT_TOKEN)
+# clients
+main_client = TelegramClient("krtkmahan", API_ID, API_HASH) # Recive messages
+bot = TelegramClient('bot', API_ID, API_HASH).start(bot_token=BOT_TOKEN) # Sending to Channel
+bot2 = TelegramClient("bot2", API_ID, API_HASH).start(bot_token=BOT_TOKEN) # Keyboard
 
-# Function to process incoming messages
+# process incoming messages
 async def process_message(event):
     message = event.message.message
     sender_id = event.message.sender_id
-
     logger.info(f"Received a new message from {sender_id}")
 
-    if sender_id in IGNORE_USERS:
+    # Load Vars
+    config = load_json_config()
+    ignore_users = config['IGNORE_USERS']
+    keywords = config['KEYWORDS']
+
+    # Messages loop
+    if sender_id in ignore_users:
         logger.info(f"Ignoring message from {sender_id}")
         return
-
-    if any(keyword.lower() in message.lower() for keyword in KEYWORDS):
+    if any(keyword.lower() in message.lower() for keyword in keywords):
         try:
             user = await event.message.get_sender()
             user_id = user.id
@@ -48,47 +52,52 @@ async def process_message(event):
         except Exception as e:
             logger.error(f"Error processing message: {e}", exc_info=True)
 
-
 @main_client.on(events.NewMessage(chats=TARGET_GROUPS))
 async def my_event_handler(event):
     await process_message(event)
 
-# Bot 2: Add "Update Groups", "Add Keyword", "Remove Keyword", and "Ignore User" buttons
+# Bot2 buttons
 @bot2.on(events.NewMessage(pattern='/start'))
 async def start(event):
     buttons = [
         [Button.inline('Update Groups', b'update_groups')],
         [Button.inline('Add Keyword', b'add_keyword'), Button.inline('Remove Keyword', b'remove_keyword')],
         [Button.inline('Ignore User', b'ignore_user')],
+        [Button.inline('Remove Ignore User', b'remove_ignore_user')],  # New button added here
     ]
     await event.respond('Management Menu', buttons=buttons)
 
-# Handle button clicks for configuration updates
+# Handle button clicks
 @bot2.on(events.CallbackQuery)
 async def callback(event):
     config = load_json_config()
-
+    # update
     if event.data == b'update_groups':
         await main_client.start()
         dialogs = await main_client.get_dialogs()
         groups = [dialog.entity.id for dialog in dialogs if dialog.is_group]
         config['TARGET_GROUPS'] = groups
         update_json_config(config)
-        await event.respond(f"Groups updated: {groups}")
-
+        await event.answer(f"Groups updated: {groups}")
+    # ignore user
     elif event.data == b'ignore_user':
-        await event.respond('Please enter the user ID to ignore:')
+        await event.answer('Please enter the user ID to ignore:')
         bot2.add_event_handler(ignore_user_handler)
-
+    # remove ignore user
+    elif event.data == b'remove_ignore_user':
+        await event.answer('Please enter the user ID to remove from ignore list:')
+        bot2.add_event_handler(remove_ignore_user_handler)
+    # add keyword
     elif event.data == b'add_keyword':
-        await event.respond('Please enter the keyword to add:')
+        await event.answer('Please enter the keyword to add:')
         bot2.add_event_handler(add_keyword_handler)
-
+    # remove keyword
     elif event.data == b'remove_keyword':
-        await event.respond('Please enter the keyword to remove:')
+        await event.answer('Please enter the keyword to remove:')
         bot2.add_event_handler(remove_keyword_handler)
 
 # Handlers for user inputs
+# ignore users
 async def ignore_user_handler(event):
     config = load_json_config()
     user_id = int(event.message.message)
@@ -98,7 +107,19 @@ async def ignore_user_handler(event):
         await event.respond(f"User {user_id} added to ignore list.")
     else:
         await event.respond(f"User {user_id} is already in the ignore list.")
-
+    config = load_json_config()  # Reload config after update
+# remove ignore user
+async def remove_ignore_user_handler(event):
+    config = load_json_config()
+    user_id = int(event.message.message)
+    if user_id in config['IGNORE_USERS']:
+        config['IGNORE_USERS'].remove(user_id)
+        update_json_config(config)
+        await event.respond(f"User {user_id} removed from ignore list.")
+    else:
+        await event.respond(f"User {user_id} was not in the ignore list.")
+    config = load_json_config()  # Reload config after update
+# add keyword
 async def add_keyword_handler(event):
     config = load_json_config()
     keyword = event.message.message
@@ -108,7 +129,8 @@ async def add_keyword_handler(event):
         await event.respond(f"Keyword '{keyword}' added.")
     else:
         await event.respond(f"Keyword '{keyword}' already exists.")
-
+    config = load_json_config()  # Reload config after update
+# remove keyword
 async def remove_keyword_handler(event):
     config = load_json_config()
     keyword = event.message.message
@@ -118,8 +140,9 @@ async def remove_keyword_handler(event):
         await event.respond(f"Keyword '{keyword}' removed.")
     else:
         await event.respond(f"Keyword '{keyword}' not found.")
+    config = load_json_config()  # Reload config after update
 
-# Start the clients
+# Start clients
 async def start_clients():
     try:
         await main_client.start(phone=lambda: input("Enter your phone number: "))
@@ -145,7 +168,7 @@ async def start_clients():
         await bot.disconnect()
         logger.info("Client and bot disconnected")
 
-# Run the combined script
+# Run
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.run_until_complete(start_clients())
