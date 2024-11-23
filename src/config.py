@@ -29,11 +29,3 @@ json_config = load_json_config()
 TARGET_GROUPS = json_config.get('TARGET_GROUPS', [])
 KEYWORDS = json_config.get('KEYWORDS', [])
 IGNORE_USERS = json_config.get('IGNORE_USERS', [])
-
-print('debug')
-
-print('debug')
-
-print('debug')
-
-print('debug')
