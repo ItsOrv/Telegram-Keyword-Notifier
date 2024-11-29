@@ -1,17 +1,22 @@
-# Use the official Python image.
-FROM python:3.12.1
+# Use an official Python runtime as a parent image
+FROM python:3.12
 
-# Set the working directory inside the container
-WORKDIR /app
+# Set the working directory
+WORKDIR /usr/src/app
 
-# Copy the requirements file into the container
-COPY requirements.txt .
-
-# Install the dependencies
+# Copy the requirements file and install dependencies
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the app's code
-COPY . .
+# Copy the rest of the application code
+COPY ./src ./src
+COPY ./config.json ./src/config.json
 
-# Command to run the bot script
-CMD ["python", "src/bot.py"]
+# Copy the .env file (this will be generated during the installation)
+COPY .env .env
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+
+# Command to run your application
+CMD ["python", "./src/main.py"]
