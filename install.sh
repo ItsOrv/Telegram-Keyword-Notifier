@@ -7,7 +7,21 @@ echo "Installing Docker and setting up environment..."
 sudo apt update
 sudo apt install -y docker.io docker-compose
 
-# Clone the project from GitHub
+# Get user inputs for environment variables
+read -p "Enter your API_ID: " API_ID
+read -p "Enter your API_HASH: " API_HASH
+read -p "Enter your BOT_TOKEN: " BOT_TOKEN
+read -p "Enter your CHANNEL_ID: " CHANNEL_ID
+
+# Create the .env file
+cat <<EOL > /opt/Telegram-Message-Monitor/.env
+API_ID=${API_ID}
+API_HASH=${API_HASH}
+BOT_TOKEN=${BOT_TOKEN}
+CHANNEL_ID=${CHANNEL_ID}
+EOL
+
+# Clone the project from GitHub if it doesn't exist
 if [ ! -d "/opt/Telegram-Message-Monitor" ]; then
     git clone https://github.com/ItsOrv/Telegram-Message-Monitor /opt/Telegram-Message-Monitor
 else
