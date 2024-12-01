@@ -77,5 +77,3 @@ EOL
 sudo chmod +x /usr/local/bin/tmm
 
 echo "Installation complete! Use 'tmm' to manage your container."
-
-# TODO revisit
