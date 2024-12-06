@@ -10,3 +10,5 @@ services:
       - ./src:/usr/src/app/src
       - ./config.json:/usr/src/app/src/config.json
     restart: always
+
+# wip
