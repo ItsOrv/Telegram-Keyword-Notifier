@@ -13,7 +13,7 @@ CHANNEL_ID = os.getenv('CHANNEL_ID')
 SESSION_NAME = os.getenv('SESSION_NAME')
 
 # Load configuration from config.json
-CONFIG_FILE = 'src/config.json'
+CONFIG_FILE = 'config.json'
 
 def load_json_config():
     with open(CONFIG_FILE, 'r') as f:
