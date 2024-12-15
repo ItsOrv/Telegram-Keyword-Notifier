@@ -175,3 +175,5 @@ if __name__ == '__main__':
     bot2.run_until_disconnected()
 
 print('debug')
+
+print('debug')
