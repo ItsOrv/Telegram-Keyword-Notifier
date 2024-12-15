@@ -173,7 +173,3 @@ if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.run_until_complete(start_clients())
     bot2.run_until_disconnected()
-
-print('debug')
-
-print('debug')
