@@ -3,11 +3,26 @@ from telethon import TelegramClient, events, Button
 from telethon.errors import SessionPasswordNeededError
 from config import API_ID, API_HASH, BOT_TOKEN, TARGET_GROUPS, KEYWORDS, CHANNEL_ID, IGNORE_USERS, load_json_config, update_json_config
 import asyncio
+import json
+import os
 import random
 
 # logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Load clients configuration from JSON
+def load_json_config():
+    if os.path.exists('clients.json'):
+        with open('clients.json', 'r') as f:
+            return json.load(f)
+    else:
+        return {'clients': []}
+
+# Update clients configuration
+def update_json_config(config):
+    with open('clients.json', 'w') as f:
+        json.dump(config, f, indent=4)
 
 # clients
 main_client = TelegramClient("krtkmahan", API_ID, API_HASH) # Recive messages
