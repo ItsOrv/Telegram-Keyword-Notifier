@@ -1,6 +1,6 @@
 from telethon import events, Button
 from asyncio.log import logger
-
+from handlers.account_handler import AccountHandler
 class CommandHandler:
     def __init__(self, bot):
         self.bot = bot
@@ -9,7 +9,7 @@ class CommandHandler:
         """Handle /start command"""
         try:
             buttons = [
-                [Button.inline("➕ Add Account", b'add_account')],
+                [Button.inline("➕ Add Account", 'add_account')],
                 [Button.inline("👥 Show Accounts", b'show_accounts')],
                 [Button.inline("🔄 Update Groups", b'update_groups')],
                 [
