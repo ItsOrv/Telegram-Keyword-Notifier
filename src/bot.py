@@ -1,13 +1,7 @@
 import logging
 from telethon import TelegramClient, events, Button
-from telethon.errors import SessionPasswordNeededError, FloodWaitError
-from telethon.tl.types import User, Channel, Chat
-from config import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID
+from config import API_ID, API_HASH, BOT_TOKEN
 import asyncio
-import json
-import os
-from typing import Dict, List, Union
-from datetime import datetime
 from utils.config_manager import ConfigManager
 from utils.logging_setup import setup_logging
 from handlers.message_handler import MessageHandler
@@ -18,17 +12,16 @@ from handlers.keyword_handler import KeywordHandler
 from handlers.stats_handler import StatsHandler
 from clients.client_manager import ClientManager
 
-
 logger = logging.getLogger(__name__)
 
 class TelegramBot:
     def __init__(self):
         self.config_manager = ConfigManager('clients.json')
         self.bot = TelegramClient('bot2', API_ID, API_HASH)
-        self.active_clients: Dict[str, TelegramClient] = {}
+        self.active_clients = {}
         self.config = self.config_manager.load_config()
-        self.handlers = {}  # Store message handlers
-        self._conversations = {}  # Store active conversations
+        self.handlers = {}
+        self._conversations = {}
         self.client_manager = ClientManager(self.config, self.active_clients, API_ID, API_HASH)
 
     async def init_handlers(self):
@@ -53,7 +46,5 @@ class TelegramBot:
         except Exception as e:
             logger.error(f"Error running bot: {e}")
         finally:
-            # Cleanup
             await self.client_manager.disconnect_all_clients()
             await self.bot.disconnect()
-
