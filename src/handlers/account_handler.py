@@ -1,29 +1,23 @@
+#account_handlers.py
 from telethon import TelegramClient, events, Button
 from telethon.errors import SessionPasswordNeededError
-from telethon.tl.types import User, Channel, Chat
+from telethon.tl.types import Channel, Chat
 from datetime import datetime
 from asyncio.log import logger
-import os
-from config import API_ID, API_HASH, BOT_TOKEN, TARGET_GROUPS, KEYWORDS, CHANNEL_ID, IGNORE_USERS, load_json_config, update_json_config
-from telethon import TelegramClient
-from telethon.errors import SessionPasswordNeededError
-from telethon.tl.types import User, Channel, Chat
-from datetime import datetime
-from telethon import TelegramClient
-from telethon.errors import SessionPasswordNeededError
-from telethon.tl.types import User, Channel, Chat
-from datetime import datetime
+from config import API_ID, API_HASH, CHANNEL_ID
 import logging
-
+import os
 
 logger = logging.getLogger(__name__)
 
 class AccountHandler:
     def __init__(self, bot):
         self.bot = bot
+        self._conversations = {}
 
     async def add_account(self, event):
         """Add a new Telegram account"""
+        print("add_account in AccountHandler")
         try:
             chat_id = event.chat_id
             # Send initial message
@@ -35,6 +29,7 @@ class AccountHandler:
 
     async def phone_number_handler(self, event):
         """Handle phone number input"""
+        print("phone_number_handler in AccountHandler")
         try:
             phone_number = event.message.text.strip()
             chat_id = event.chat_id
@@ -58,6 +53,7 @@ class AccountHandler:
 
     async def code_handler(self, event):
         """Handle verification code input"""
+        print("code_handler in AccountHandler")
         try:
             code = event.message.text.strip()
             chat_id = event.chat_id
@@ -78,6 +74,7 @@ class AccountHandler:
 
     async def password_handler(self, event):
         """Handle 2FA password input"""
+        print("password_handler in AccountHandler")
         try:
             password = event.message.text.strip()
             chat_id = event.chat_id
@@ -94,9 +91,10 @@ class AccountHandler:
 
     async def finalize_client_setup(self, client, phone_number, chat_id):
         """Finalize the client setup process"""
+        print("finalize_client_setup in AccountHandler")
         try:
             session_name = f"{phone_number}_session"
-            client.session.save(session_name)
+            client.session.save()
 
             # Add to config
             self.bot.config['clients'].append({
@@ -125,6 +123,7 @@ class AccountHandler:
 
     def cleanup_temp_handlers(self):
         """Clean up temporary handlers and data"""
+        print("cleanup_temp_handlers in AccountHandler")
         if 'temp_client' in self.bot.handlers:
             del self.bot.handlers['temp_client']
         if 'temp_phone' in self.bot.handlers:
@@ -132,6 +131,7 @@ class AccountHandler:
 
     async def process_message(self, event):
         """Process and forward messages"""
+        print("process_message in AccountHandler")
         try:
             message = event.message.text
             if not message:
@@ -179,6 +179,7 @@ class AccountHandler:
 
     async def update_groups(self, event):
         """Update groups for all accounts"""
+        print("update_groups in AccountHandler")
         try:
             status_message = await event.respond("🔄 Updating groups...")
             total = len(self.bot.active_clients)
@@ -214,6 +215,7 @@ class AccountHandler:
 
     async def show_accounts(self, event):
         """Show all accounts with their status"""
+        print("show_accounts in AccountHandler")
         try:
             if not self.bot.config['clients']:
                 await event.respond("No accounts added yet.")
@@ -248,6 +250,7 @@ class AccountHandler:
 
     async def toggle_client(self, session: str, event):
         """Toggle client active status"""
+        print("toggle_client in AccountHandler")
         try:
             for client_info in self.bot.config['clients']:
                 if client_info['session'] == session:
@@ -277,6 +280,7 @@ class AccountHandler:
 
     async def delete_client(self, session: str, event):
         """Delete a client"""
+        print("delete_client in AccountHandler")
         try:
             # Disconnect if active
             if session in self.bot.active_clients:
