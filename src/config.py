@@ -10,7 +10,8 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 CHANNEL_ID = os.getenv('CHANNEL_ID')
 SESSION_NAME = os.getenv('SESSION_NAME')
 
-CONFIG_FILE = 'config.json'
+"""
+CONFIG_FILE = 'clients.json'
 
 def load_json_config():
     with open(CONFIG_FILE, 'r') as f:
@@ -21,7 +22,4 @@ def update_json_config(config):
         json.dump(config, f, indent=4)
 
 json_config = load_json_config()
-
-TARGET_GROUPS = json_config.get('TARGET_GROUPS', [])
-KEYWORDS = json_config.get('KEYWORDS', [])
-IGNORE_USERS = json_config.get('IGNORE_USERS', [])
+"""
