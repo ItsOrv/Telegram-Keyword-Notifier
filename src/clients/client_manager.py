@@ -1,12 +1,7 @@
-#clinet_manager.py
+import os
 from telethon import TelegramClient
-from telethon import events, Button
 import logging
-from config import CHANNEL_ID
-from telethon import TelegramClient
-from telethon import events
-import logging
-from handlers.account_handler import AccountHandler
+from utils.config_manager import ConfigManager  # فرض اینکه ConfigManager برای مدیریت فایل config استفاده می‌شود
 
 logger = logging.getLogger(__name__)
 
@@ -16,31 +11,42 @@ class ClientManager:
         self.active_clients = active_clients
         self.api_id = api_id
         self.api_hash = api_hash
+        self.config_manager = ConfigManager("clients.json")  # اضافه کردن ConfigManager
+
+    def detect_sessions(self):
+        """Detects session files and adds them to the config if not already present."""
+        sessions = []
+        for filename in os.listdir('.'):
+            if filename.endswith('.session') and filename != 'bot2.session' and filename not in self.config.get('clients', []):
+                sessions.append(filename)
+
+        # اضافه کردن سشن‌های جدید به تنظیمات و ذخیره در فایل clients.json
+        if sessions:
+            if 'clients' not in self.config:
+                self.config['clients'] = []
+            self.config['clients'].extend(sessions)
+            self.config_manager.config = self.config  # به روز کردن config در ConfigManager
+            self.config_manager.save_config()
+            logger.info(f"Detected sessions: {sessions}")
+        else:
+            logger.info("No new sessions detected.")
+
+
 
     async def start_saved_clients(self):
-        """Start all saved client sessions"""
-        print("start_saved_clients in ClientManager")
-        for client_info in self.config['clients']:
-            session_name = client_info['session']
-            if not client_info.get('disabled', False):  # Only start enabled clients
-                try:
-                    client = TelegramClient(session_name, self.api_id, self.api_hash)
-                    await client.start()
-                    self.active_clients[session_name] = client
-                    # Add message handler for this client
-                    client.add_event_handler(
-                        self.process_message,
-                        events.NewMessage(chats=client_info.get('groups', []))
-                    )
-                    logger.info(f"Started client: {session_name}")
-                except Exception as e:
-                    logger.error(f"Error starting client {session_name}: {e}")
+        """Start all clients listed in the configuration."""
+        self.detect_sessions()
+        for session_name in self.config.get('clients', []):
+            client = TelegramClient(session_name, self.api_id, self.api_hash)
+            await client.connect()
+            if await client.is_user_authorized():
+                self.active_clients[session_name] = client
+                logger.info(f"Started client: {session_name}")
+            else:
+                logger.info(f"Client {session_name} is not authorized, skipping.")
 
     async def disconnect_all_clients(self):
-        """Disconnect all active clients"""
-        print("disconnect_all_clients in ClientManager")
+        """Disconnect all active clients."""
         for client in self.active_clients.values():
-            try:
-                await client.disconnect()
-            except Exception as e:
-                logger.error(f"Error disconnecting client: {e}")
+            await client.disconnect()
+        self.active_clients.clear()
