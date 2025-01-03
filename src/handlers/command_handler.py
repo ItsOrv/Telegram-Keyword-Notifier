@@ -11,7 +11,7 @@ class CommandHandler:
 
     async def start_command(self, event):
         """Handle /start command"""
-        print("start command in CommandHandler")
+        logger.info("start command in CommandHandler")
         try:
             buttons = [
                 [Button.inline("➕ Add Account", 'add_account')],
