@@ -9,7 +9,7 @@ class KeywordHandler:
 
     async def add_keyword_handler(self, event):
         """Add a keyword to monitor"""
-        print("add_keyword_handler in KeywordHandler")
+        logger.info("add_keyword_handler in KeywordHandler")
         try:
             if isinstance(event, events.CallbackQuery.Event):
                 await event.respond("Please enter the keyword you want to add.")
@@ -18,7 +18,7 @@ class KeywordHandler:
 
             keyword = event.message.text.strip()
             if keyword not in self.bot.config['KEYWORDS']:
-                self.bot.config['KEYWORDS'].append(keyword)
+                self.bot.config['KEYWORDS'].append (str(keyword))
                 self.bot.config_manager.save_config()
                 await event.respond(f"✅ Keyword '{keyword}' added successfully")
             else:
@@ -33,7 +33,7 @@ class KeywordHandler:
 
     async def remove_keyword_handler(self, event):
         """Remove a keyword from monitoring"""
-        print("remove_keyword_handler in KeywordHandler")
+        logger.info("remove_keyword_handler in KeywordHandler")
         try:
             if isinstance(event, events.CallbackQuery.Event):
                 await event.respond("Please enter the keyword you want to remove.")
@@ -57,7 +57,7 @@ class KeywordHandler:
 
     async def ignore_user_handler(self, event):
         """Ignore a user from further interaction"""
-        print("ignore_user_handler in KeywordHandler")
+        logger.info("ignore_user_handler in KeywordHandler")
         try:
             if isinstance(event, events.CallbackQuery.Event):
                 await event.respond("Please enter the user ID you want to ignore.")
@@ -81,7 +81,7 @@ class KeywordHandler:
 
     async def delete_ignore_user_handler(self, event):
         """Remove a user from the ignore list"""
-        print("delete_ignore_user_handler in KeywordHandler")
+        logger.info("delete_ignore_user_handler in KeywordHandler")
         try:
             if isinstance(event, events.CallbackQuery.Event):
                 await event.respond("Please enter the user ID you want to stop ignoring.")
