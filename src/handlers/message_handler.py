@@ -1,6 +1,8 @@
 from telethon import events
 from handlers.account_handler import AccountHandler
 from handlers.keyword_handler import KeywordHandler
+import logging
+from asyncio.log import logger
 
 class MessageHandler:
     def __init__(self, bot):
@@ -11,7 +13,7 @@ class MessageHandler:
 
     async def message_handler(self, event):
         """Handle incoming messages based on conversation state"""
-        print("message_handler in MessageHandler")
+        logger.info("message_handler in MessageHandler")
         
         if event.chat_id in self.bot._conversations:
             handler_name = self.bot._conversations[event.chat_id]
@@ -26,33 +28,22 @@ class MessageHandler:
 
             elif handler_name == 'password_handler':
                 await self.account_handler.password_handler(event)
-                del self.bot._conversations[event.chat_id]
                 return True
 
             elif handler_name == 'ignore_user_handler':
                 await self.keyword_handler.ignore_user_handler(event)
-                del self.bot._conversations[event.chat_id]
                 return True
 
             elif handler_name == 'delete_ignore_user_handler':
                 await self.keyword_handler.delete_ignore_user_handler(event)
-                del self.bot._conversations[event.chat_id]
                 return True
 
             elif handler_name == 'add_keyword_handler':
                 await self.keyword_handler.add_keyword_handler(event)
-                del self.bot._conversations[event.chat_id]
                 return True
 
             elif handler_name == 'remove_keyword_handler':
                 await self.keyword_handler.remove_keyword_handler(event)
-                del self.bot._conversations[event.chat_id]
                 return True
-
-            # Add other handlers as needed
-            # elif handler_name == 'another_handler':
-            #     await self.account_handler.another_handler(event)
-            #     del self.bot._conversations[event.chat_id]
-            #     return True
 
         return False

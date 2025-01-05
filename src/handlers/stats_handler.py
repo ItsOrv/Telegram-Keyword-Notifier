@@ -9,7 +9,7 @@ class StatsHandler:
 
     async def show_stats(self, event):
         """Show bot statistics"""
-        print("show_stats in StatsHandler")
+        logger.info("show_stats in StatsHandler")
         try:
             stats = {
                 "Total Accounts": len(self.bot.config['clients']),
