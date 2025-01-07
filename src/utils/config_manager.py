@@ -5,7 +5,7 @@ import os
 logger = logging.getLogger(__name__)
 
 class ConfigManager:
-    def __init__(self, filename="clients.json"):
+    def __init__(self, filename="clients.json", config=None):
         self.filename = filename
         self.default_config = {
             "TARGET_GROUPS": [],
@@ -13,7 +13,10 @@ class ConfigManager:
             "IGNORE_USERS": [],
             "clients": []  # اینجا کلید جدید clients اضافه شد
         }
-        self.config = self.load_config()
+        if config is not None:
+            self.config = config
+        else:
+            self.config = self.load_config()
 
     def load_config(self):
         """Load configuration from the JSON file."""
@@ -34,9 +37,12 @@ class ConfigManager:
             logger.error(f"Error decoding JSON in {self.filename}: {e}")
             return self.default_config.copy()
 
-    def save_config(self):
-        """Save the current configuration to the JSON file."""
+    def save_config(self, new_config=None):
+        """Save the current configuration to the JSON file, merging new configuration if provided."""
         logger.info("save_config in ConfigManager")
+        if new_config:
+            self.merge_config(new_config)
+
         try:
             with open(self.filename, 'w') as f:
                 json.dump(self.config, f, indent=4)
@@ -53,3 +59,26 @@ class ConfigManager:
             logger.info(f"Config updated: {key} = {value}")
         else:
             logger.warning(f"Key {key} not found in config.")
+
+    def merge_config(self, new_config):
+        """Merge the new configuration with the existing configuration."""
+        logger.info("Merging new configuration with existing configuration")
+        for key, value in new_config.items():
+            if key in self.config:
+                if isinstance(self.config[key], list):
+                    self.config[key] = list(set(self.config[key]) & set(value))  # حذف عناصر حذف شده
+                else:
+                    self.config[key] = value
+            else:
+                self.config[key] = value
+
+    def load_json_config(self):
+        if os.path.exists(self.filename):
+            with open(self.filename, 'r') as f:
+                return json.load(f)
+        else:
+            return {'clients': [], 'IGNORE_USERS': [], 'KEYWORDS': []}
+
+    def update_json_config(self, config):
+        with open(self.filename, 'w') as f:
+            json.dump(config, f, indent=4)

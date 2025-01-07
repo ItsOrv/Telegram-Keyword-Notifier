@@ -18,8 +18,8 @@ class KeywordHandler:
 
             keyword = event.message.text.strip()
             if keyword not in self.bot.config['KEYWORDS']:
-                self.bot.config['KEYWORDS'].append (str(keyword))
-                self.bot.config_manager.save_config()
+                self.bot.config['KEYWORDS'].append(str(keyword))
+                self.bot.config_manager.save_config(self.bot.config)  # ذخیره و ادغام تنظیمات جدید با تنظیمات موجود
                 await event.respond(f"✅ Keyword '{keyword}' added successfully")
             else:
                 await event.respond(f"⚠️ Keyword '{keyword}' already exists")
@@ -43,7 +43,7 @@ class KeywordHandler:
             keyword = event.message.text.strip()
             if keyword in self.bot.config['KEYWORDS']:
                 self.bot.config['KEYWORDS'].remove(keyword)
-                self.bot.config_manager.save_config()
+                self.bot.config_manager.save_config(self.bot.config)  # ذخیره و ادغام تنظیمات جدید با تنظیمات موجود
                 await event.respond(f"✅ Keyword '{keyword}' removed successfully")
             else:
                 await event.respond(f"⚠️ Keyword '{keyword}' not found")
@@ -67,7 +67,7 @@ class KeywordHandler:
             user_id = event.message.text.strip()
             if user_id not in self.bot.config['IGNORE_USERS']:
                 self.bot.config['IGNORE_USERS'].append(user_id)
-                self.bot.config_manager.save_config()
+                self.bot.config_manager.save_config(self.bot.config)  # ذخیره و ادغام تنظیمات جدید با تنظیمات موجود
                 await event.respond(f"✅ User ID '{user_id}' is now ignored")
             else:
                 await event.respond(f"⚠️ User ID '{user_id}' is already ignored")
@@ -91,7 +91,7 @@ class KeywordHandler:
             user_id = event.message.text.strip()
             if user_id in self.bot.config['IGNORE_USERS']:
                 self.bot.config['IGNORE_USERS'].remove(user_id)
-                self.bot.config_manager.save_config()
+                self.bot.config_manager.save_config(self.bot.config)  # ذخیره و ادغام تنظیمات جدید با تنظیمات موجود
                 await event.respond(f"✅ User ID '{user_id}' is no longer ignored")
             else:
                 await event.respond(f"⚠️ User ID '{user_id}' not found in ignored list")

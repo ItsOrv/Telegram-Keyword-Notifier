@@ -146,109 +146,43 @@ class AccountHandler:
 
 
 
-
-    async def process_message(self, event):
-        """Process and forward messages"""
-        logger.info("process_message in AccountHandler")
-        try:
-            message = event.message.text
-            if not message:
-                return
-
-            sender = await event.get_sender()
-            if not sender or sender.id in self.bot.config['IGNORE_USERS']:
-                return
-
-            # Check keywords
-            if not any(keyword.lower() in message.lower() for keyword in self.bot.config['KEYWORDS']):
-                return
-
-            # Get chat info
-            chat = await event.get_chat()
-            chat_title = getattr(chat, 'title', 'Unknown Chat')
-
-            # Format message
-            text = (
-                f"📝 New Message\n\n"
-                f"👤 From: {getattr(sender, 'first_name', '')} {getattr(sender, 'last_name', '')}\n"
-                f"🆔 User ID: `{sender.id}`\n"
-                f"💭 Chat: {chat_title}\n\n"
-                f"📜 Message:\n{message}\n"
-            )
-
-            # Get message link
-            if hasattr(chat, 'username') and chat.username:
-                message_link = f"https://t.me/{chat.username}/{event.id}"
-            else:
-                chat_id = str(event.chat_id).replace('-100', '', 1)
-                message_link = f"https://t.me/c/{chat_id}/{event.id}"
-
-            buttons = [[Button.url("📎 View Message", url=message_link)]]
-
-            await self.bot.bot.send_message(
-                CHANNEL_ID,
-                text,
-                buttons=buttons,
-                link_preview=False
-            )
-
-        except Exception as e:
-            logger.error(f"Error processing message: {e}", exc_info=True)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     async def update_groups(self, event):
-        """Update groups for all accounts"""
-        logger.info("update_groups in AccountHandler")
+        """Update groups for all accounts and process messages directly."""
+        logger.info("update_and_process_groups in AccountHandler")
 
-        # فراخوانی detect_sessions پیش از به‌روزرسانی گروه‌ها
+        # فراخوانی detect_sessions برای شناسایی سشن‌های جدید
         self.ClientManager.detect_sessions()
 
         try:
-            status_message = await event.respond("🔄 Updating groups...")
+            status_message = await event.respond("🔄 Updating and processing messages from groups...")
             total = len(self.bot.active_clients)
             updated = 0
 
             for session_name, client in self.bot.active_clients.items():
                 try:
                     dialogs = await client.get_dialogs()
-                    groups = [
-                        dialog.entity.id for dialog in dialogs
-                        if isinstance(dialog.entity, (Chat, Channel)) and not dialog.entity.broadcast
-                    ]
-                    # Update config
-                    for client_info in self.bot.config['clients']:
-                        if client_info['session'] == session_name:
-                            client_info['groups'] = groups
-                            break
+                    for dialog in dialogs:
+                        # بررسی اینکه دیالوگ گروه باشد و کانال پخش نباشد
+                        if isinstance(dialog.entity, (Chat, Channel)) and not (isinstance(dialog.entity, Channel) and dialog.entity.broadcast):
+                            # به‌روزرسانی شمارش گروه‌های پردازش شده
+                            updated += 1
+                            progress = (updated / total) * 100
+                            await status_message.edit(f"🔄 Updating and processing... {progress:.1f}%")
 
-                    updated += 1
-                    progress = (updated / total) * 100
-                    await status_message.edit(f"🔄 Updating groups... {progress:.1f}%")
+                            # پردازش پیام‌های گروه
+                            async for message in client.iter_messages(dialog.entity):
+                                # بررسی پیام و ارسال آن در صورت تطابق با شرایط
+                                if await self.process_message(message):
+                                    await self.forward_message(message, dialog.entity)
 
                 except Exception as e:
-                    logger.error(f"Error updating groups for {session_name}: {e}")
+                    logger.error(f"Error updating groups or processing messages for {session_name}: {e}")
 
-            self.bot.config_manager.save_config()
-            await status_message.edit(f"✅ {updated} Groups updated successfully!")
+            await status_message.edit(f"✅ {updated} groups updated and messages processed successfully!")
 
         except Exception as e:
-            logger.error(f"Error in update_groups: {e}")
-            await event.respond("❌ Error updating groups. Please try again.")
+            logger.error(f"Error in update_and_process_groups: {e}")
+            await event.respond("❌ Error updating and processing messages. Please try again.")
 
 
 
@@ -256,6 +190,66 @@ class AccountHandler:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+    async def process_messages_for_client(self, client):
+        """Process messages for a specific client in a loop."""
+        @client.on(events.NewMessage)
+        async def process_message(event):
+            """Process and forward messages for a single client."""
+            try:
+                message = event.message.text
+                if not message:
+                    return
+
+                sender = await event.get_sender()
+                if not sender or sender.id in self.bot.config['IGNORE_USERS']:
+                    return
+
+                # Check keywords
+                if not any(keyword.lower() in message.lower() for keyword in self.bot.config['KEYWORDS']):
+                    return
+
+                # Get chat info
+                chat = await event.get_chat()
+                chat_title = getattr(chat, 'title', 'Unknown Chat')
+
+                # Format message
+                text = (
+                    f"📝 New Message\n\n"
+                    f"👤 From: {getattr(sender, 'first_name', '')} {getattr(sender, 'last_name', '')}\n"
+                    f"🆔 User ID: `{sender.id}`\n"
+                    f"💭 Chat: {chat_title}\n\n"
+                    f"📜 Message:\n{message}\n"
+                )
+
+                # Get message link
+                if hasattr(chat, 'username') and chat.username:
+                    message_link = f"https://t.me/{chat.username}/{event.id}"
+                else:
+                    chat_id = str(event.chat_id).replace('-100', '', 1)
+                    message_link = f"https://t.me/c/{chat_id}/{event.id}"
+
+                buttons = [[Button.url("📎 View Message", url=message_link)]]
+
+                await self.bot.bot.send_message(
+                    CHANNEL_ID,
+                    text,
+                    buttons=buttons,
+                    link_preview=False
+                )
+
+            except Exception as e:
+                logger.error(f"Error processing message: {e}", exc_info=True)
 
 
 
@@ -268,7 +262,7 @@ class AccountHandler:
                 await event.respond("No accounts added yet.")
                 return
 
-            for client_info in self.bot.config['clients']:
+            for client_info in self.bot.config ['clients']:
                 phone = client_info['phone_number']
                 session = client_info['session']
                 groups = len(client_info.get('groups', []))
