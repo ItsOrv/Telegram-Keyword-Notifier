@@ -1,84 +1,85 @@
 import json
 import logging
 import os
+from typing import Dict, Any, Union
 
 logger = logging.getLogger(__name__)
 
 class ConfigManager:
-    def __init__(self, filename="clients.json", config=None):
+    def __init__(self, filename: str = "clients.json", config: Dict[str, Any] = None):
         self.filename = filename
         self.default_config = {
             "TARGET_GROUPS": [],
             "KEYWORDS": [],
             "IGNORE_USERS": [],
-            "clients": []  # اینجا کلید جدید clients اضافه شد
+            "clients": []
         }
-        if config is not None:
-            self.config = config
-        else:
-            self.config = self.load_config()
+        self.config = config if config is not None else self.load_config()
 
-    def load_config(self):
+    def load_config(self) -> Dict[str, Any]:
         """Load configuration from the JSON file."""
-        logger.info("load_config in ConfigManager")
+        logger.info(f"Loading config from {self.filename}")
+        
         if not os.path.exists(self.filename):
             logger.warning(f"Config file {self.filename} does not exist. Creating a new one.")
-            self.save_config()  # ذخیره تنظیمات پیش‌فرض به عنوان فایل جدید
-            return self.default_config.copy()  # کپی از دیکشنری پیش‌فرض ایجاد می‌کند
+            self.save_config()
+            return self.default_config.copy()
 
         try:
-            with open(self.filename, 'r') as f:
+            with open(self.filename, 'r', encoding='utf-8') as f:
                 loaded_config = json.load(f)
-                logger.info("Config file found!")
-                # ترکیب دیکشنری‌های موجود و پیش‌فرض در صورت عدم وجود کلیدهایی در فایل
-                combined_config = {**self.default_config, **loaded_config}
-                return combined_config
+                logger.info("Config file loaded successfully")
+                return {**self.default_config, **loaded_config}
         except json.JSONDecodeError as e:
             logger.error(f"Error decoding JSON in {self.filename}: {e}")
             return self.default_config.copy()
+        except Exception as e:
+            logger.error(f"Unexpected error loading config: {e}")
+            return self.default_config.copy()
 
-    def save_config(self, new_config=None):
-        """Save the current configuration to the JSON file, merging new configuration if provided."""
-        logger.info("save_config in ConfigManager")
+    def save_config(self, new_config: Dict[str, Any] = None) -> bool:
+        """Save the current configuration to the JSON file."""
+        logger.info("Saving config to file")
+        
         if new_config:
             self.merge_config(new_config)
 
         try:
-            with open(self.filename, 'w') as f:
-                json.dump(self.config, f, indent=4)
-                logger.info("JSON file saved successfully")
+            with open(self.filename, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, indent=4, ensure_ascii=False)
+            logger.info("Config saved successfully")
+            return True
         except Exception as e:
             logger.error(f"Error saving config to {self.filename}: {e}")
+            return False
 
-    def update_config(self, key, value):
+    def update_config(self, key: str, value: Any) -> bool:
         """Update a specific key in the configuration."""
-        logger.info(f"Updating config for key: {key}")
-        if key in self.config:
-            self.config[key] = value
-            self.save_config()
-            logger.info(f"Config updated: {key} = {value}")
-        else:
-            logger.warning(f"Key {key} not found in config.")
+        logger.info(f"Updating config key: {key}")
+        
+        if key not in self.config:
+            logger.warning(f"Key {key} not found in config")
+            return False
+            
+        self.config[key] = value
+        return self.save_config()
 
-    def merge_config(self, new_config):
+    def merge_config(self, new_config: Dict[str, Any]) -> None:
         """Merge the new configuration with the existing configuration."""
-        logger.info("Merging new configuration with existing configuration")
+        logger.info("Merging new configuration")
+        
         for key, value in new_config.items():
             if key in self.config:
-                if isinstance(self.config[key], list):
-                    self.config[key] = list(set(self.config[key]) & set(value))  # حذف عناصر حذف شده
+                if isinstance(self.config[key], list) and isinstance(value, list):
+                    # حفظ ترتیب و حذف تکرار
+                    self.config[key] = list(dict.fromkeys(value))
                 else:
                     self.config[key] = value
             else:
                 self.config[key] = value
 
-    def load_json_config(self):
-        if os.path.exists(self.filename):
-            with open(self.filename, 'r') as f:
-                return json.load(f)
-        else:
-            return {'clients': [], 'IGNORE_USERS': [], 'KEYWORDS': []}
-
-    def update_json_config(self, config):
-        with open(self.filename, 'w') as f:
-            json.dump(config, f, indent=4)
+    def get_config(self, key: str = None) -> Union[Dict[str, Any], Any]:
+        """Get the entire config or a specific key's value."""
+        if key is None:
+            return self.config
+        return self.config.get(key)
