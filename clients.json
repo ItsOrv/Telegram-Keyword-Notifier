@@ -5,7 +5,9 @@
         "vpn",
         "کانفیگ"
     ],
-    "IGNORE_USERS": [],
+    "IGNORE_USERS": [
+        2173772355
+    ],
     "clients": [
         "258833982548.session"
     ]
