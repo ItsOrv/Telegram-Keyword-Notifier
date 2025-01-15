@@ -8,8 +8,6 @@ from config import API_ID, API_HASH, CHANNEL_ID
 import logging
 import os
 from clients.client_manager import ClientManager
-import random
-import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +16,6 @@ class AccountHandler:
         self.bot = bot
         self._conversations = {}
         self.ClientManager = bot.client_manager 
-        self.dialogs_cache = None
-
 
     async def add_account(self, event):
         """Add a new Telegram account"""
@@ -205,22 +201,12 @@ class AccountHandler:
 
 
 
-    async def get_cached_dialogs(self, client):
-        """Fetch dialogs with caching to prevent excessive requests."""
-        if self.dialogs_cache is None:
-            self.dialogs_cache = await client.get_dialogs()
-        return self.dialogs_cache
-
     async def process_messages_for_client(self, client):
         """Process messages for a specific client in a loop."""
         @client.on(events.NewMessage)
         async def process_message(event):
             """Process and forward messages for a single client."""
             try:
-                # Ignore messages from the target channel to avoid looping
-                if event.chat_id == CHANNEL_ID:
-                    return
-
                 message = event.message.text
                 if not message:
                     return
@@ -229,16 +215,15 @@ class AccountHandler:
                 if not sender or sender.id in self.bot.config['IGNORE_USERS']:
                     return
 
-                # Check keywords in the message
+                # Check keywords
                 if not any(keyword.lower() in message.lower() for keyword in self.bot.config['KEYWORDS']):
                     return
 
-                # Get chat info and cache dialogs
+                # Get chat info
                 chat = await event.get_chat()
                 chat_title = getattr(chat, 'title', 'Unknown Chat')
-                dialogs = await self.get_cached_dialogs(client)  # Cache dialog fetch
 
-                # Format message text
+                # Format message
                 text = (
                     f"📝 New Message\n\n"
                     f"👤 From: {getattr(sender, 'first_name', '')} {getattr(sender, 'last_name', '')}\n"
@@ -247,7 +232,7 @@ class AccountHandler:
                     f"📜 Message:\n{message}\n"
                 )
 
-                # Create a link to the message if possible
+                # Get message link
                 if hasattr(chat, 'username') and chat.username:
                     message_link = f"https://t.me/{chat.username}/{event.id}"
                 else:
@@ -256,7 +241,6 @@ class AccountHandler:
 
                 buttons = [[Button.url("📎 View Message", url=message_link)]]
 
-                # Send message to the channel with random delay to prevent flood wait errors
                 await self.bot.bot.send_message(
                     CHANNEL_ID,
                     text,
@@ -264,11 +248,11 @@ class AccountHandler:
                     link_preview=False
                 )
 
-                # Add random delay to avoid flood wait errors
-                await asyncio.sleep(random.randint(2, 10))
-
             except Exception as e:
                 logger.error(f"Error processing message: {e}", exc_info=True)
+
+
+
 
     async def show_accounts(self, event):
         """Show all accounts with their status"""

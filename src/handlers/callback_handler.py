@@ -43,6 +43,12 @@ class CallbackHandler:
             elif data == 'remove_keyword':
                 logger.info("remove_keyword in callback_handler in CallbackHandler")
                 await KeywordHandler(self.bot).remove_keyword_handler(event)
+            elif data == 'ignore_user':
+                logger.info("ignore_user in callback_handler in CallbackHandler")
+                await KeywordHandler(self.bot).ignore_user_handler(event)
+            elif data == 'remove_ignore_user':
+                logger.info("remove_ignore_user in callback_handler in CallbackHandler")
+                await KeywordHandler(self.bot).delete_ignore_user_handler(event)
             elif data == 'show_stats':
                 logger.info("show_stats in callback_handler in CallbackHandler")
                 await StatsHandler(self.bot).show_stats(event)
