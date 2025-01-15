@@ -23,13 +23,7 @@ class TelegramBot:
         self.handlers = {}
         self._conversations = {}
         self.client_manager = ClientManager(self.config, self.active_clients, API_ID, API_HASH)
-        self.account_handler = AccountHandler(self)  # اضافه کردن AccountHandler برای دسترسی به process_message
-
-    async def init_handlers(self):
-        """Initialize all event handlers"""
-        self.bot.add_event_handler(CommandHandler(self).start_command, events.NewMessage(pattern='/start'))
-        self.bot.add_event_handler(CallbackHandler(self).callback_handler, events.CallbackQuery())
-        self.bot.add_event_handler(MessageHandler(self).message_handler, events.NewMessage())
+        self.account_handler = AccountHandler(self)
 
     async def start(self):
         """Start the bot and initialize all components"""
@@ -38,13 +32,20 @@ class TelegramBot:
         await self.client_manager.start_saved_clients()
         logger.info("Bot started successfully")
 
+    async def init_handlers(self):
+        """Initialize all event handlers"""
+        self.bot.add_event_handler(CommandHandler(self).start_command, events.NewMessage(pattern='/start'))
+        self.bot.add_event_handler(CallbackHandler(self).callback_handler, events.CallbackQuery())
+        self.bot.add_event_handler(MessageHandler(self).message_handler, events.NewMessage())
+
+
     async def run(self):
         """Run the bot"""
         try:
             await self.start()
             logger.info("Bot is running...")
 
-            # اجرای process_message برای همه اکانت‌های فعال در یک حلقه پیوسته
+            # اجرای process_message برای هر اکانت در حلقه
             tasks = [self.account_handler.process_messages_for_client(client) for client in self.active_clients.values()]
             await asyncio.gather(*tasks)
 
