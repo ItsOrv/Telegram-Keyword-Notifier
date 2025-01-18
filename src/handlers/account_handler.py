@@ -8,6 +8,10 @@ from config import API_ID, API_HASH, CHANNEL_ID
 import logging
 import os
 from clients.client_manager import ClientManager
+import json
+from telethon.errors import FloodWaitError
+
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -131,75 +135,106 @@ class AccountHandler:
         if 'temp_phone' in self.bot.handlers:
             del self.bot.handlers['temp_phone']
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     async def update_groups(self, event):
-        """Update groups for all accounts and process messages directly."""
-        logger.info("update_and_process_groups in AccountHandler")
+        """Identify groups for each client and save their IDs in JSON without deleting previous data."""
+        logger.info("update_groups in AccountHandler")
 
-        # فراخوانی detect_sessions برای شناسایی سشن‌های جدید
+        groups_per_client = {}
         self.ClientManager.detect_sessions()
 
         try:
-            status_message = await event.respond("🔄 Updating and processing messages from groups...")
-            total = len(self.bot.active_clients)
-            updated = 0
+            status_message = await event.respond("🔄 Identifying groups for each client...")
 
+            # بارگذاری اطلاعات قبلی
+            json_data = {
+                "TARGET_GROUPS": [],
+                "KEYWORDS": [],
+                "IGNORE_USERS": [],
+                "clients": {}
+            }
+            
+            if os.path.exists("clients.json"):
+                try:
+                    with open("clients.json", "r", encoding='utf-8') as json_file:
+                        loaded_data = json.loads(json_file.read())
+                        json_data.update(loaded_data)
+                        if isinstance(json_data["clients"], list):
+                            json_data["clients"] = {session: [] for session in json_data["clients"]}
+                except json.JSONDecodeError as e:
+                    logger.error(f"JSON decode error: {e}")
+
+            # به‌روزرسانی گروه‌ها برای هر کلاینت فعال
             for session_name, client in self.bot.active_clients.items():
                 try:
-                    dialogs = await client.get_dialogs()
-                    for dialog in dialogs:
-                        # بررسی اینکه دیالوگ گروه باشد و کانال پخش نباشد
-                        if isinstance(dialog.entity, (Chat, Channel)) and not (isinstance(dialog.entity, Channel) and dialog.entity.broadcast):
-                            # به‌روزرسانی شمارش گروه‌های پردازش شده
-                            updated += 1
-                            progress = (updated / total) * 100
-                            await status_message.edit(f"🔄 Updating and processing... {progress:.1f}%")
+                    logger.info(f"Processing client: {session_name}")
+                    group_ids = set()
 
-                            # پردازش پیام‌های گروه
-                            async for message in client.iter_messages(dialog.entity):
-                                # بررسی پیام و ارسال آن در صورت تطابق با شرایط
-                                if await self.process_message(message):
-                                    await self.forward_message(message, dialog.entity)
+                    try:
+                        # دریافت همه دیالوگ‌ها با یک درخواست اولیه
+                        dialogs = []
+                        async for dialog in client.iter_dialogs(limit=None):
+                            try:
+                                if isinstance(dialog.entity, (Chat, Channel)) and not (
+                                    isinstance(dialog.entity, Channel) and dialog.entity.broadcast
+                                ):
+                                    group_ids.add(dialog.entity.id)
+                                    
+                                # هر 50 گروه، یک تاخیر کوتاه
+                                if len(group_ids) % 50 == 0:
+                                    await asyncio.sleep(2)
+                                    
+                            except Exception as e:
+                                logger.error(f"Error processing dialog: {e}")
+                                continue
+                                
+                            # بروزرسانی پیام وضعیت هر 20 گروه
+                            if len(group_ids) % 20 == 0:
+                                await status_message.edit(f"📊 Found {len(group_ids)} groups for {session_name}...")
+
+                    except FloodWaitError as e:
+                        wait_time = e.seconds
+                        logger.info(f"FloodWaitError: Sleeping for {wait_time} seconds")
+                        await status_message.edit(f"⏳ Rate limited. Waiting for {wait_time} seconds...")
+                        await asyncio.sleep(wait_time)
+                        continue
+                        
+                    except Exception as e:
+                        logger.error(f"Error in dialog iteration: {e}")
+                        await status_message.edit(f"⚠️ Error processing {session_name}: {str(e)}")
+                        continue
+
+                    # ذخیره گروه‌های یافت شده
+                    groups_per_client[session_name] = list(group_ids)
+                    logger.info(f"Found {len(group_ids)} groups for {session_name}")
+                    await status_message.edit(f"✅ Found {len(group_ids)} groups for {session_name}")
+                    
+                    # تاخیر بین پردازش کلاینت‌های مختلف
+                    await asyncio.sleep(3)
 
                 except Exception as e:
-                    logger.error(f"Error updating groups or processing messages for {session_name}: {e}")
+                    logger.error(f"Error processing client {session_name}: {e}")
+                    continue
 
-            await status_message.edit(f"✅ {updated} groups updated and messages processed successfully!")
+            # ادغام اطلاعات جدید
+            for session_name, group_ids in groups_per_client.items():
+                if session_name in json_data["clients"]:
+                    existing_groups = json_data["clients"][session_name]
+                    if not isinstance(existing_groups, list):
+                        existing_groups = []
+                    json_data["clients"][session_name] = list(set(existing_groups + group_ids))
+                else:
+                    json_data["clients"][session_name] = group_ids
+
+            # ذخیره اطلاعات
+            with open("clients.json", "w", encoding='utf-8') as json_file:
+                json.dump(json_data, json_file, indent=4, ensure_ascii=False)
+                logger.info(f"Saved data for {len(groups_per_client)} clients")
+
+            await status_message.edit(f"✅  {len(group_ids)} Groups identified and saved successfully for all clients!")
 
         except Exception as e:
-            logger.error(f"Error in update_and_process_groups: {e}")
-            await event.respond("❌ Error updating and processing messages. Please try again.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+            logger.error(f"Error in update_groups: {e}")
+            await event.respond(f"❌ Error identifying groups: {str(e)}")
 
     async def process_messages_for_client(self, client):
         """Process messages for a specific client in a loop."""
@@ -253,37 +288,40 @@ class AccountHandler:
 
 
 
-
     async def show_accounts(self, event):
         """Show all accounts with their status"""
         logger.info("show_accounts in AccountHandler")
         try:
-            if not self.bot.config['clients']:
+            if not isinstance(self.bot.config['clients'], list) or not self.bot.config['clients']:
                 await event.respond("No accounts added yet.")
                 return
 
-            for client_info in self.bot.config ['clients']:
-                phone = client_info['phone_number']
-                session = client_info['session']
-                groups = len(client_info.get('groups', []))
-                status = "🟢 Active" if session in self.bot.active_clients else "🔴 Inactive"
+            for clients in self.bot.config['clients']:
+                # بررسی اینکه client_info دیکشنری است
+                if isinstance(clients, dict):
+                    session = clients.get('session', 'Unknown')
+                    # استخراج شماره تلفن از نام فایل سشن
+                    phone = session.replace('.session', '') if session != 'Unknown' else 'Unknown'
+                    groups = len(clients.get('groups', []))
+                    status = "🟢 Active" if session in self.bot.active_clients else "🔴 Inactive"
 
-                text = (
-                    f"📱 Phone: {phone}\n"
-                    f"📑 Session: {session}\n"
-                    f"👥 Groups: {groups}\n"
-                    f"📊 Status: {status}\n"
-                )
+                    text = (
+                        f"📱 Phone: {phone}\n"
+                        f"📑 Session: {session}\n"
+                        f"👥 Groups: {groups}\n"
+                        f"📊 Status: {status}\n"
+                    )
 
-                buttons = [
-                    [
-                        Button.inline("❌ Disable" if status == "🟢 Active" else "✅ Enable",
-                                    data=f"toggle_{session}"),
-                        Button.inline("🗑 Delete", data=f"delete_{session}")
+                    buttons = [
+                        [
+                            Button.inline("❌ Disable" if status == "🟢 Active" else "✅ Enable", data=f"toggle_{session}"),
+                            Button.inline("🗑 Delete", data=f"delete_{session}")
+                        ]
                     ]
-                ]
 
-                await event.respond(text, buttons=buttons)
+                    await event.respond(text, buttons=buttons)
+                else:
+                    logger.warning(f"Invalid client_info format: {clients}")
 
         except Exception as e:
             logger.error(f"Error in show_accounts: {e}")
