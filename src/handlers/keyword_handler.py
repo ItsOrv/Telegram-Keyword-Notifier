@@ -16,15 +16,15 @@ class KeywordHandler:
                 self.bot._conversations[event.chat_id] = 'add_keyword_handler'
                 return
 
-            keyword = event.message.text.strip()
+            keyword = str(event.message.text.strip())
             if keyword not in self.bot.config['KEYWORDS']:
-                self.bot.config['KEYWORDS'].append(str(keyword))
+                self.bot.config['KEYWORDS'].append(keyword)
                 self.bot.config_manager.save_config(self.bot.config)  # ذخیره و ادغام تنظیمات جدید با تنظیمات موجود
                 await event.respond(f"✅ Keyword '{keyword}' added successfully")
             else:
                 await event.respond(f"⚠️ Keyword '{keyword}' already exists")
 
-            keywords = ', '.join(self.bot.config['KEYWORDS'])
+            keywords = ', '.join(str(k) for k in self.bot.config['KEYWORDS'])  # تبدیل همه به رشته
             await event.respond(f"📝 Current keywords: {keywords}")
 
         except Exception as e:
@@ -40,7 +40,7 @@ class KeywordHandler:
                 self.bot._conversations[event.chat_id] = 'remove_keyword_handler'
                 return
 
-            keyword = event.message.text.strip()
+            keyword = str(event.message.text.strip())  # تبدیل به رشته
             if keyword in self.bot.config['KEYWORDS']:
                 self.bot.config['KEYWORDS'].remove(keyword)
                 self.bot.config_manager.save_config(self.bot.config)  # ذخیره و ادغام تنظیمات جدید با تنظیمات موجود
@@ -48,7 +48,7 @@ class KeywordHandler:
             else:
                 await event.respond(f"⚠️ Keyword '{keyword}' not found")
 
-            keywords = ', '.join(self.bot.config['KEYWORDS'])
+            keywords = ', '.join(str(k) for k in self.bot.config['KEYWORDS'])  # تبدیل همه به رشته
             await event.respond(f"📝 Current keywords: {keywords}")
 
         except Exception as e:
@@ -64,15 +64,15 @@ class KeywordHandler:
                 self.bot._conversations[event.chat_id] = 'ignore_user_handler'
                 return
 
-            user_id = event.message.text.strip()
+            user_id = int(event.message.text.strip())  # تبدیل به عدد صحیح
             if user_id not in self.bot.config['IGNORE_USERS']:
-                self.bot.config['IGNORE_USERS'].append(user_id)
+                self.bot.config['IGNORE_USERS'].append(user_id)  # بدون تبدیل به رشته
                 self.bot.config_manager.save_config(self.bot.config)  # ذخیره و ادغام تنظیمات جدید با تنظیمات موجود
-                await event.respond(f"✅ User ID '{user_id}' is now ignored")
+                await event.respond(f"✅ User ID {user_id} is now ignored")
             else:
-                await event.respond(f"⚠️ User ID '{user_id}' is already ignored")
+                await event.respond(f"⚠️ User ID {user_id} is already ignored")
 
-            ignored_users = ', '.join(self.bot.config['IGNORE_USERS'])
+            ignored_users = ', '.join(str(u) for u in self.bot.config['IGNORE_USERS'])  # تبدیل به رشته برای نمایش
             await event.respond(f"📝 Ignored users: {ignored_users}")
 
         except Exception as e:
@@ -88,15 +88,15 @@ class KeywordHandler:
                 self.bot._conversations[event.chat_id] = 'delete_ignore_user_handler'
                 return
 
-            user_id = event.message.text.strip()
+            user_id = int(event.message.text.strip())  # تبدیل به عدد صحیح
             if user_id in self.bot.config['IGNORE_USERS']:
-                self.bot.config['IGNORE_USERS'].remove(user_id)
+                self.bot.config['IGNORE_USERS'].remove(user_id)  # بدون تبدیل به رشته
                 self.bot.config_manager.save_config(self.bot.config)  # ذخیره و ادغام تنظیمات جدید با تنظیمات موجود
-                await event.respond(f"✅ User ID '{user_id}' is no longer ignored")
+                await event.respond(f"✅ User ID {user_id} is no longer ignored")
             else:
-                await event.respond(f"⚠️ User ID '{user_id}' not found in ignored list")
+                await event.respond(f"⚠️ User ID {user_id} not found in ignored list")
 
-            ignored_users = ', '.join(self.bot.config['IGNORE_USERS'])
+            ignored_users = ', '.join(str(u) for u in self.bot.config['IGNORE_USERS'])  # تبدیل به رشته برای نمایش
             await event.respond(f"📝 Ignored users: {ignored_users}")
 
         except Exception as e:
