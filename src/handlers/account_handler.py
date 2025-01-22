@@ -287,78 +287,81 @@ class AccountHandler:
                 logger.error(f"Error processing message: {e}", exc_info=True)
 
 
-
     async def show_accounts(self, event):
-        """Show all accounts with their status"""
+        """Show all accounts with their status."""
         logger.info("show_accounts in AccountHandler")
         try:
-            if not isinstance(self.bot.config['clients'], list) or not self.bot.config['clients']:
+            clients_data = self.bot.config.get('clients', {})
+            
+            if not isinstance(clients_data, dict) or not clients_data:
                 await event.respond("No accounts added yet.")
                 return
 
-            for clients in self.bot.config['clients']:
-                # بررسی اینکه client_info دیکشنری است
-                if isinstance(clients, dict):
-                    session = clients.get('session', 'Unknown')
-                    # استخراج شماره تلفن از نام فایل سشن
-                    phone = session.replace('.session', '') if session != 'Unknown' else 'Unknown'
-                    groups = len(clients.get('groups', []))
-                    status = "🟢 Active" if session in self.bot.active_clients else "🔴 Inactive"
+            # ایجاد یک لیست برای ذخیره پیام‌ها
+            messages = []
 
-                    text = (
-                        f"📱 Phone: {phone}\n"
-                        f"📑 Session: {session}\n"
-                        f"👥 Groups: {groups}\n"
-                        f"📊 Status: {status}\n"
-                    )
+            for session, groups in clients_data.items():
+                # استخراج شماره تلفن از نام فایل سشن
+                phone = session.replace('.session', '') if session else 'Unknown'
+                groups_count = len(groups)
+                status = "🟢 Active" if session in self.bot.active_clients else "🔴 Inactive"
 
-                    buttons = [
-                        [
-                            Button.inline("❌ Disable" if status == "🟢 Active" else "✅ Enable", data=f"toggle_{session}"),
-                            Button.inline("🗑 Delete", data=f"delete_{session}")
-                        ]
+                text = (
+                    f"📱 Phone: {phone}\n"
+                    f"👥 Groups: {groups_count}\n"
+                    f"📊 Status: {status}\n"
+                )
+
+                buttons = [
+                    [
+                        Button.inline("❌ Disable" if status == "🟢 Active" else "✅ Enable", data=f"toggle_{session}"),
+                        Button.inline("🗑 Delete", data=f"delete_{session}")
                     ]
+                ]
 
-                    await event.respond(text, buttons=buttons)
-                else:
-                    logger.warning(f"Invalid client_info format: {clients}")
+                messages.append((text, buttons))
+
+            # ارسال تمام پیام‌ها
+            for message_text, message_buttons in messages:
+                await event.respond(message_text, buttons=message_buttons)
 
         except Exception as e:
             logger.error(f"Error in show_accounts: {e}")
             await event.respond("Error showing accounts. Please try again.")
 
+
     async def toggle_client(self, session: str, event):
-        """Toggle client active status"""
+        """Toggle client active status."""
         logger.info("toggle_client in AccountHandler")
         try:
-            for client_info in self.bot.config['clients']:
-                if client_info['session'] == session:
-                    currently_active = session in self.bot.active_clients
+            if session not in self.bot.config['clients']:
+                await event.respond("❌ Account not found.")
+                return
 
-                    if currently_active:
-                        # Disable client
-                        client = self.bot.active_clients[session]
-                        await client.disconnect()
-                        del self.bot.active_clients[session]
-                        client_info['disabled'] = True
-                        await event.respond(f"✅ Account {client_info['phone_number']} disabled")
-                    else:
-                        # Enable client
-                        client = TelegramClient(session, API_ID, API_HASH)
-                        await client.start()
-                        self.bot.active_clients[session] = client
-                        client_info['disabled'] = False
-                        await event.respond(f"✅ Account {client_info['phone_number']} enabled")
+            currently_active = session in self.bot.active_clients
 
-                    self.bot.config_manager.save_config()
-                    break
+            if currently_active:
+                # Disable client
+                client = self.bot.active_clients[session]
+                await client.disconnect()
+                del self.bot.active_clients[session]
+                await event.respond(f"✅ Account {session} disabled")
+            else:
+                # Enable client
+                client = TelegramClient(session, API_ID, API_HASH)
+                await client.start()
+                self.bot.active_clients[session] = client
+                await event.respond(f"✅ Account {session} enabled")
+
+            self.bot.config_manager.save_config()
 
         except Exception as e:
             logger.error(f"Error toggling client {session}: {e}")
             await event.respond("❌ Error toggling account status")
 
+
     async def delete_client(self, session: str, event):
-        """Delete a client"""
+        """Delete a client."""
         logger.info("delete_client in AccountHandler")
         try:
             # Disconnect if active
@@ -368,18 +371,18 @@ class AccountHandler:
                 del self.bot.active_clients[session]
 
             # Remove from config
-            self.bot.config['clients'] = [
-                client for client in self.bot.config['clients']
-                if client['session'] != session
-            ]
-            self.bot.config_manager.save_config()
+            if session in self.bot.config['clients']:
+                del self.bot.config['clients'][session]
+                self.bot.config_manager.save_config()
 
-            # Delete session file
-            session_file = f"{session}.session"
-            if os.path.exists(session_file):
-                os.remove(session_file)
+                # Delete session file
+                session_file = f"{session}"
+                if os.path.exists(session_file):
+                    os.remove(session_file)
 
-            await event.respond(f"✅ Account deleted successfully")
+                await event.respond(f"✅ Account deleted successfully")
+            else:
+                await event.respond("❌ Account not found.")
 
         except Exception as e:
             logger.error(f"Error deleting client {session}: {e}")
