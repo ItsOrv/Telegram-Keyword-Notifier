@@ -1,7 +1,7 @@
 import os
 from telethon import TelegramClient
 import logging
-from utils.config_manager import ConfigManager  # فرض اینکه ConfigManager برای مدیریت فایل config استفاده می‌شود
+from utils.config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +11,7 @@ class ClientManager:
         self.active_clients = active_clients
         self.api_id = api_id
         self.api_hash = api_hash
-        self.config_manager = ConfigManager("clients.json", self.config)  # اضافه کردن ConfigManager
+        self.config_manager = ConfigManager("clients.json", self.config)
 
     def detect_sessions(self):
         """Detects session files and adds them to the config if not already present."""
