@@ -26,6 +26,9 @@ class CallbackHandler:
             elif data == 'show_accounts':
                 logger.info("show_accounts in callback_handler in CallbackHandler")
                 await AccountHandler(self.bot).show_accounts(event)
+            elif data.startswith('ignore_'):
+                user_id = int(data.split('_')[1])
+                await KeywordHandler(self.bot).ignore_user(user_id, event)
             elif data == 'update_groups':
                 logger.info("update_groups in callback_handler in CallbackHandler")
                 await AccountHandler(self.bot).update_groups(event)
@@ -56,3 +59,5 @@ class CallbackHandler:
         except Exception as e:
             logger.error(f"Error in callback_handler: {e}")
             await event.respond("Error processing request. Please try again.")
+
+

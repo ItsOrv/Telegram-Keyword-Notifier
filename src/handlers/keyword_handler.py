@@ -102,3 +102,21 @@ class KeywordHandler:
         except Exception as e:
             logger.error(f"Error deleting ignored user: {e}")
             await event.respond("❌ Error deleting ignored user")
+
+    async def ignore_user(self, user_id, event):
+        """Ignore a user from further interaction."""
+        logger.info("ignore_user in KeywordHandler")
+        try:
+            if user_id not in self.bot.config['IGNORE_USERS']:
+                self.bot.config['IGNORE_USERS'].append(user_id)
+                self.bot.config_manager.save_config(self.bot.config)  # ذخیره تنظیمات جدید
+                await event.respond(f"✅ User ID {user_id} is now ignored")
+            else:
+                await event.respond(f"⚠️ User ID {user_id} is already ignored")
+
+            ignored_users = ', '.join(str(u) for u in self.bot.config['IGNORE_USERS'])  # تبدیل به رشته برای نمایش
+            await event.respond(f"📝 Ignored users: {ignored_users}")
+
+        except Exception as e:
+            logger.error(f"Error ignoring user: {e}")
+            await event.respond("❌ Error ignoring user")
