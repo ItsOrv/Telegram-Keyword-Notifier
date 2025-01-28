@@ -31,7 +31,7 @@ class ClientManager:
         else:
             logger.info("No new sessions detected.")
 
-    #
+    #XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
     async def start_saved_clients(self):
         """Start all clients listed in the configuration."""
         self.detect_sessions()
@@ -46,6 +46,7 @@ class ClientManager:
                 logger.info(f"Client {session_name} is not authorized, skipping.")
                 await client.disconnect()
             await asyncio.sleep(1)
+    #XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
     #PASS
     async def disconnect_all_clients(self):
