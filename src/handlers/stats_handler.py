@@ -19,7 +19,7 @@ class StatsHandler:
                 "Ignored Users": len(self.bot.config['IGNORE_USERS'])
             }
 
-            text = "📊 Bot Statistics\n\n"
+            text = "Bot Statistics\n\n"
             for key, value in stats.items():
                 text += f"• {key}: {value}\n"
 
@@ -27,4 +27,4 @@ class StatsHandler:
 
         except Exception as e:
             logger.error(f"Error showing stats: {e}")
-            await event.respond("❌ Error showing statistics")
+            await event.respond("Error showing statistics")

@@ -21,16 +21,16 @@ class KeywordHandler:
             if keyword not in self.bot.config['KEYWORDS']:
                 self.bot.config['KEYWORDS'].append(keyword)
                 self.bot.config_manager.save_config(self.bot.config)
-                await event.respond(f"✅ Keyword '{keyword}' added successfully")
+                await event.respond(f"Keyword '{keyword}' added successfully")
             else:
-                await event.respond(f"⚠️ Keyword '{keyword}' already exists")
+                await event.respond(f"Keyword '{keyword}' already exists")
 
             keywords = ', '.join(str(k) for k in self.bot.config['KEYWORDS'])
             await event.respond(f"📝 Current keywords: {keywords}")
 
         except Exception as e:
             logger.error(f"Error adding keyword: {e}")
-            await event.respond("❌ Error adding keyword")
+            await event.respond("Error adding keyword")
 
     #PASS
     async def remove_keyword_handler(self, event):
@@ -46,16 +46,16 @@ class KeywordHandler:
             if keyword in self.bot.config['KEYWORDS']:
                 self.bot.config['KEYWORDS'].remove(keyword)
                 self.bot.config_manager.save_config(self.bot.config)
-                await event.respond(f"✅ Keyword '{keyword}' removed successfully")
+                await event.respond(f"Keyword '{keyword}' removed successfully")
             else:
-                await event.respond(f"⚠️ Keyword '{keyword}' not found")
+                await event.respond(f"Keyword '{keyword}' not found")
 
             keywords = ', '.join(str(k) for k in self.bot.config['KEYWORDS'])
-            await event.respond(f"📝 Current keywords: {keywords}")
+            await event.respond(f"Current keywords: {keywords}")
 
         except Exception as e:
             logger.error(f"Error removing keyword: {e}")
-            await event.respond("❌ Error removing keyword")
+            await event.respond("Error removing keyword")
 
     #PASS
     async def ignore_user_handler(self, event):
@@ -71,16 +71,16 @@ class KeywordHandler:
             if user_id not in self.bot.config['IGNORE_USERS']:
                 self.bot.config['IGNORE_USERS'].append(user_id)
                 self.bot.config_manager.save_config(self.bot.config)
-                await event.respond(f"✅ User ID {user_id} is now ignored")
+                await event.respond(f"User ID {user_id} is now ignored")
             else:
-                await event.respond(f"⚠️ User ID {user_id} is already ignored")
+                await event.respond(f"User ID {user_id} is already ignored")
 
             ignored_users = ', '.join(str(u) for u in self.bot.config['IGNORE_USERS'])
-            await event.respond(f"📝 Ignored users: {ignored_users}")
+            await event.respond(f"Ignored users: {ignored_users}")
 
         except Exception as e:
             logger.error(f"Error ignoring user: {e}")
-            await event.respond("❌ Error ignoring user")
+            await event.respond("Error ignoring user")
 
     #PASS
     async def delete_ignore_user_handler(self, event):
@@ -96,16 +96,16 @@ class KeywordHandler:
             if user_id in self.bot.config['IGNORE_USERS']:
                 self.bot.config['IGNORE_USERS'].remove(user_id)
                 self.bot.config_manager.save_config(self.bot.config)
-                await event.respond(f"✅ User ID {user_id} is no longer ignored")
+                await event.respond(f"User ID {user_id} is no longer ignored")
             else:
-                await event.respond(f"⚠️ User ID {user_id} not found in ignored list")
+                await event.respond(f"User ID {user_id} not found in ignored list")
 
             ignored_users = ', '.join(str(u) for u in self.bot.config['IGNORE_USERS'])
-            await event.respond(f"📝 Ignored users: {ignored_users}")
+            await event.respond(f"Ignored users: {ignored_users}")
 
         except Exception as e:
             logger.error(f"Error deleting ignored user: {e}")
-            await event.respond("❌ Error deleting ignored user")
+            await event.respond("Error deleting ignored user")
 
     #PASS
     async def ignore_user(self, user_id, event): # for channel button
@@ -115,10 +115,10 @@ class KeywordHandler:
             if user_id not in self.bot.config['IGNORE_USERS']:
                 self.bot.config['IGNORE_USERS'].append(user_id)
                 self.bot.config_manager.save_config(self.bot.config)
-                await event.respond(f"✅ User ID {user_id} is now ignored")
+                await event.respond(f"User ID {user_id} is now ignored")
             else:
-                await event.respond(f"⚠️ User ID {user_id} is already ignored")
+                await event.respond(f"User ID {user_id} is already ignored")
 
         except Exception as e:
             logger.error(f"Error ignoring user: {e}")
-            await event.respond("❌ Error ignoring user")
+            await event.respond("Error ignoring user")
