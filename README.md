@@ -1,34 +1,59 @@
+# Telegram Panel
 
-# Telegram Message Monitor Bot
-
-This project provides a Telegram bot that monitors specific groups or channels for messages containing predefined keywords. Upon detection, the bot forwards these messages to a designated Telegram channel. Additionally, it supports excluding messages from particular users.
+Telegram Panel is a comprehensive tool designed to manage multiple Telegram accounts, monitor groups or channels, and automate messaging operations based on predefined rules. This project provides a robust bot that can monitor specific groups or channels for messages containing keywords, automatically forward them to designated channels, exclude specific users, and manage various messaging automation features. 
 
 ## Features
 
-- **Keyword Monitoring**: Monitors messages in specified Telegram groups or channels based on user-defined keywords.
-- **Message Forwarding**: Automatically forwards detected messages to a specified Telegram channel.
-- **User Exclusion**: Enables the bot to ignore messages from specific users by their Telegram user ID.
-- **Logging**: Includes detailed logging for better debugging and monitoring.
+### Core Functionality
+- **Multi-Account Management**: Manages multiple Telegram accounts, enabling batch operations on a large scale.
+- **Keyword Monitoring**: Monitors specified Telegram groups or channels for user-defined keywords.
+- **Message Forwarding**: Automatically forwards detected messages containing keywords to pre-configured channels based on category.
+- **User Exclusion**: Ignores messages from specific users by their Telegram user ID, ensuring irrelevant messages are not forwarded.
+- **Logging and Error Handling**: Provides detailed logs for easier debugging and efficient monitoring. Handles common errors, including two-factor authentication (2FA) prompts and general message processing issues.
+- **Automated Post-Liking**: (soon) Synchronize all accounts within the panel to like a specific post, enabling quick engagement for promoting specific posts or advertisements.
+- **Channel Joining for All Accounts**: (soon) Enroll multiple accounts into one or more Telegram channels simultaneously.
+- **User Blocking**: (soon) Block specific users across all managed accounts by providing a list of user IDs.
+- **Mass Advertising via Direct Messages**: (soon) Select from a list of advertising messages stored in a .txt file within the bot. The bot sends these messages to targeted users either based on user ID or by finding users within mutual groups.
+- **Auto-Reply for Customer Support**: (soon) Accounts can automatically respond to incoming messages.
+- **Account Activity Monitoring and Analytics**: (soon) A dashboard provides insights into each account's activity, including group memberships, messages sent, and user interactions, helping with performance and engagement tracking.
+
+  - **Automated Direct Messages**: When a keyword is detected, the bot can send a message from one of the managed accounts to the message sender.
+  - **User Detection and ID Management**: (soon)
+    - If the sender’s ID is available, selects an account not already in a group with the user to send a message.
+    - If the ID is unavailable, selects an account within the same group as the user to send a message.
+
+- **Categorized Keyword Monitoring**: (soon) Allows monitoring with multiple keyword categories, each linked to a specific channel for forwarding, making it possible to track multiple topics or products simultaneously.
+
+### Docker Integration with CLI
+- **Containerized Environment**: (soon) This bot runs within a Docker container for consistency and easier deployment.
+- **CLI Command Control**: (soon) With the `tmm` command, you can start, stop, restart, and update the bot easily within the Docker environment. You can also manage configurations and check for updates directly from the CLI.
 
 ## Prerequisites
 
 - Python 3.12.1
-- Telegram account
-- Telegram bot token
+- Telegram account(s) with Bot API token(s)
+- Docker and Docker Compose (recommended for deployment)
 
-## Installation (Not working, use Manual Installation)
+## Installation (NOT READY, INSTALL MANUALLY)
 
-To install and configure the bot, run the following command in your terminal:
+### Automated Installation (Docker)
+For Docker installation, execute the following command:
 
 ```bash
-bash <(curl https://raw.githubusercontent.com/ItsOrv/Telegram-Message-Monitor/main/install.sh)
+bash <(curl -s https://raw.githubusercontent.com/ItsOrv/Telegram-Panel/main/install.sh)
 ```
 
-This script will install Docker and Docker Compose, clone the project repository, prompt you for required environment variables, create a `.env` file, and set up a Docker container. After installation, the `tmm` command will be available for managing the Docker container.
+This script will:
+- Install Docker and Docker Compose
+- Clone the project repository
+- Prompt for required environment variables
+- Configure the environment and create a `.env` file
+- Build and deploy the Docker container
+- Add the `tmm` command for managing the bot
 
 ### Environment Variables
 
-During the installation process, you will be prompted to provide the following environment variables:
+During the installation, you’ll need to provide the following environment variables:
 
 ```bash
 API_ID=your_api_id
@@ -37,88 +62,77 @@ BOT_TOKEN=your_bot_token
 CHANNEL_ID=your_channel_id
 ```
 
-- `API_ID` and `API_HASH`: Obtain these from [my.telegram.org](https://my.telegram.org).
-- `BOT_TOKEN`: Generated through the BotFather on Telegram.
-- `CHANNEL_ID`: ID of the channel where messages will be forwarded.
+- **API_ID** and **API_HASH**: Obtain these from [my.telegram.org](https://my.telegram.org).
+- **BOT_TOKEN**: Generated via BotFather on Telegram.
+- **CHANNEL_ID**: ID of the target channel for forwarding messages.
 
-### Using `tmm` Command
+### Using the `tmm` Command
 
-After installation, you can manage the Docker container using the `tmm` command. Available options are:
+The `tmm` command allows you to manage the Docker container. Options include:
+1. **Start**: Starts the container if it’s not already running.
+2. **Stop**: Stops the container if it’s currently running.
+3. **Restart**: Restarts the container and checks for correct installation.
+4. **Update**: Pulls the latest changes from GitHub and rebuilds the container.
+5. **Uninstall**: Stops and removes the Docker container, project files, and `tmm` command.
 
-1. **Start container**: Starts the container if it is not already running.
-2. **Stop container**: Stops the container if it is running.
-3. **Restart container**: Restarts the container and checks for correct installation.
-4. **Update project from GitHub**: Pulls the latest changes from the GitHub repository and rebuilds the container.
-5. **Uninstall project**: Stops and removes the Docker container, deletes the project directory, and removes the `tmm` command.
-6. **Exit**: Exits the script.
+### Manual Installation
 
-## Manual Installation
+To install manually without Docker, follow these steps:
 
-To install the bot manually, follow these steps:
-
-1. **Clone the repository**:
+1. Clone the repository:
    ```bash
-   git clone https://github.com/ItsOrv/Telegram-Message-Monitor.git
-   cd Telegram-Message-Monitor
+   git clone https://github.com/ItsOrv/Telegram-Panel.git
+   cd Telegram-Panel
    ```
 
-2. **Set up a virtual environment (optional but recommended)**:
+2. Set up a virtual environment (optional but recommended):
    ```bash
    python3 -m venv venv
    source venv/bin/activate
    ```
 
-3. **Install dependencies**:
+3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Configure the environment**:
-   Create a `.env` file in the project’s root directory with the following contents:
+4. Configure the environment:
+   Create a `.env` file with the following details:
    ```bash
    API_ID=your_api_id
    API_HASH=your_api_hash
    BOT_TOKEN=your_bot_token
    CHANNEL_ID=your_channel_id
    ```
-   - `API_ID` and `API_HASH`: Obtain these from [my.telegram.org](https://my.telegram.org).
-   - `BOT_TOKEN`: Generated through the BotFather on Telegram.
-   - `CHANNEL_ID`: ID of the channel where messages will be forwarded.
 
 ## Usage
 
-To run the bot, use the following command:
-
+To start the bot manually, use:
 ```bash
 python3 src/main.py
 ```
 
-The bot will begin monitoring the specified Telegram groups or channels, forwarding any detected messages containing the specified keywords to your designated channel. Messages from ignored users will be excluded.
+The bot will monitor specified Telegram groups or channels, forwarding detected messages to designated channels, and managing automated messaging based on predefined rules.
+
+## Future Updates
+
+### Planned Features
+- **Automated Message Sending**: A feature to send predefined messages directly to users who trigger keywords. This can be configured with specific messages stored in a text file and set to automatically send when triggered.
+- **Enhanced Multi-Category Monitoring**: Support for multiple keyword categories with each category linked to a unique destination channel, simplifying multi-topic tracking.
+- **Real-Time Monitoring with Prioritization**: Fine-tune keyword monitoring to prioritize urgent messages or topics.
+- **Advanced Analytics and Logging**: Improved logging for detailed performance insights, error tracking, and usage analytics.
 
 ## Error Handling
 
-The bot is equipped with error handling mechanisms for common scenarios, including:
-
-- **Two-Factor Authentication (2FA)**: If 2FA is enabled, the bot will prompt for the necessary second factor.
-- **General Errors**: Logs any unexpected issues that occur during message processing or while starting the client.
+The bot includes mechanisms to handle various errors:
+- **Two-Factor Authentication (2FA)**: Prompts for a second factor if 2FA is enabled on any account.
+- **Client Authorization**: Checks for client authorization and skips unauthorized accounts.
+- **Connection Issues**: Logs and retries for connectivity issues, ensuring reliability across multiple accounts.
 
 ## Contributing
 
-Contributions are welcome! Feel free to submit a pull request or open an issue to discuss proposed changes.
+Contributions are welcome! Please submit a pull request or open an issue if you’d like to add new features or report bugs.
 
-## Future Updates (TO-DO):
+---
 
-- **1.1**: ~~Fix handling of private group links (prepend a 1 to the link).~~
-- **1.2**: ~~Support for links from Glass Telegram groups.~~
-- **2.1**: ~~Refactor Docker setup to support running both Python scripts simultaneously.~~
-- **2.2**: ~~Add CLI control for restarting/updating the bot, or possibly implement these controls via the Telegram bot interface.~~
-- **3.1**:~~Create `install.sh` script~~
-- **4.1**:~~Combine `management.py` and `bot.py` into a single Python script.‍‍~~
-- **5.1**: Fix `await event.respond`.
-- **5.2**: Fix docker setup.
-- **5.3** Fix `install.sh` file.
-
-  
-
-
-Feel free to adjust any details as needed!
+Feel free to adjust any details as needed for your setup.
