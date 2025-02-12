@@ -54,3 +54,4 @@ class ClientManager:
         for client in self.active_clients.values():
             await client.disconnect()
         self.active_clients.clear()
+
