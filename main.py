@@ -1,7 +1,7 @@
 import asyncio
 import logging
-from bot import TelegramBot
-from utils.logging_setup import setup_logging
+from src.Telbot import TelegramBot
+from src.Logger import setup_logging
 
 def main():
     try:
