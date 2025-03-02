@@ -1,6 +1,7 @@
 {
     "TARGET_GROUPS": [],
-    "KEYWORDS": [],
+    "KEYWORDS": [
+    ],
     "IGNORE_USERS": [],
     "clients": {}
 }
