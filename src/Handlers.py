@@ -612,7 +612,7 @@ class CommandHandler:
 
 class KeywordHandler:
     def __init__(self, tbot):
-        self.bot = tbot
+        self.tbot = tbot
 
     #PASS
     async def add_keyword_handler(self, event):
