@@ -519,20 +519,44 @@ class CallbackHandler:
         # Map callback data to handler methods
         self.callback_actions = {
             'add_account': self.account_handler.add_account,
-            'show_accounts': self.account_handler.show_accounts,
+            'list_accounts': self.account_handler.show_accounts,
             'update_groups': self.account_handler.update_groups,
             'add_keyword': self.keyword_handler.add_keyword_handler,
             'remove_keyword': self.keyword_handler.remove_keyword_handler,
             'ignore_user': self.keyword_handler.ignore_user_handler,
             'remove_ignore_user': self.keyword_handler.delete_ignore_user_handler,
             'show_stats': self.stats_handler.show_stats,
-            'monitor_mode': self.show_monitor_keyboard
+            'monitor_mode': self.show_monitor_keyboard,
+            'account_management': self.show_account_management_keyboard,
+            'bulk_operations': self.show_bulk_operations_keyboard,
+            'individual_keyboard': self.show_individual_keyboard,
+            'report': self.show_report_keyboard,
+            'exit':self.show_start_keyboard
         }
+
+    def show_start_keyboard(self, event):
+        return Keyboard.show_keyboard('start', event)
 
     def show_monitor_keyboard(self, event):
         """Handles the monitor mode keyboard display"""
         return Keyboard.show_keyboard('monitor', event)
-    
+
+    def show_account_management_keyboard(self, event):
+        """Handles the account management keyboard display"""
+        return Keyboard.show_keyboard('account_management', event)
+
+    def show_bulk_operations_keyboard(self, event):
+        """Handles the bulk operations keyboard display"""
+        return Keyboard.show_keyboard('bulk', event)
+
+    def show_individual_keyboard(self, event):
+        """Handles the individual operations keyboard display"""
+        return Keyboard.show_keyboard('individual_keyboard', event)
+
+    def show_report_keyboard(self, event):
+        """Handles the report keyboard display"""
+        return Keyboard.show_keyboard('report', event)
+
     
     async def callback_handler(self, event):
         """Handle callback queries"""
@@ -781,33 +805,25 @@ class StatsHandler:
 
 
 
-
-
-
-
-from telethon import Button
-
-from telethon import Button
-
 class Keyboard:
 
     @staticmethod
     def start_keyboard():
         """Returns the start menu keyboard"""
         return [
-            [Button.inline("Bulk Operations", 'bulk_operations')],
-            [Button.inline("Individual Operations", 'individual_operations')],
-            [Button.inline("Monitor Mode", 'monitor_mode')],
             [Button.inline("Account Management", 'account_management')],
+                [
+                Button.inline("Individual", 'individual_keyboard'),
+                Button.inline("Bulk", 'bulk_operations')
+                ],
+            [Button.inline("Monitor Mode", 'monitor_mode')],
             [Button.inline("Report", 'report')]
-        ]
+                ]
 
     @staticmethod
     def monitor_keyboard():
         """Returns the monitor mode keyboard"""
         return [
-            [Button.inline("Show Accounts", b'show_accounts')],
-            [Button.inline("Update Groups", b'update_groups')],
             [
                 Button.inline('Add Keyword', b'add_keyword'),
                 Button.inline('Remove Keyword', b'remove_keyword')
@@ -815,18 +831,27 @@ class Keyboard:
             [
                 Button.inline('Ignore User', b'ignore_user'),
                 Button.inline('Remove Ignore', b'remove_ignore_user')
-            ]
+            ],
+            [Button.inline("Update Groups", b'update_groups')],
+            [
+                Button.inline('Show Groups', b'show_groups'),
+                Button.inline('Show Keyword', b'Show_keyword')
+            ],
+            [Button.inline("Show Ignores", b'show_ignores')],
+            [Button.inline("Exit", 'exit')]
         ]
 
     @staticmethod
     def bulk_keyboard():
         """Returns a keyboard with action buttons like like, join, block, message, comment"""
         return [
-            [Button.inline('Like', 'like')],
+            [Button.inline('Reaction', 'reaction')],
+            [Button.inline('Poll', 'poll')],
             [Button.inline('Join', 'join')],
             [Button.inline('Block', 'block')],
-            [Button.inline('Message', 'message')],
-            [Button.inline('Comment', 'comment')]
+            [Button.inline('Send pv', 'send_pv')],
+            [Button.inline('Comment', 'comment')],
+            [Button.inline("Exit", 'exit')]
         ]
 
     @staticmethod
@@ -835,7 +860,8 @@ class Keyboard:
         return [
             [Button.inline('Add Account', 'add_account')],
             [Button.inline('Remove Account', 'remove_account')],
-            [Button.inline('List Accounts', 'list_accounts')]
+            [Button.inline('List Accounts', 'list_accounts')],
+            [Button.inline("Exit", 'exit')]
         ]
 
     @staticmethod
@@ -860,6 +886,19 @@ class Keyboard:
         ]
 
     @staticmethod
+    def individual_keyboard():
+        """Returns the keyboard for individual operations"""
+        return [
+            [Button.inline("Send PV", 'send_pv')],
+            [Button.inline("Join", 'join')],
+            [Button.inline("Left", 'left')],
+            [Button.inline("Comment", 'comment')],
+            [Button.inline("Exit", 'exit')]
+
+        ]
+
+
+    @staticmethod
     def show_keyboard(keyboard_name, event=None):
         """Dynamically returns and shows the requested keyboard based on its name"""
         keyboards = {
@@ -868,8 +907,11 @@ class Keyboard:
             'bulk': Keyboard.bulk_keyboard(),
             'account_management': Keyboard.account_management_keyboard(),
             'channel_message': Keyboard.channel_message_keyboard,
-            'toggle_and_delete': Keyboard.toggle_and_delete_keyboard
+            'toggle_and_delete': Keyboard.toggle_and_delete_keyboard,
+            'individual_keyboard': Keyboard.individual_keyboard()
+            
         }
+    
 
         # Return the keyboard if it exists
         keyboard = keyboards.get(keyboard_name, None)
