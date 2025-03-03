@@ -341,10 +341,7 @@ class AccountHandler:
                     chat_id = str(event.chat_id).replace('-100', '', 1)
                     message_link = f"https://t.me/c/{chat_id}/{event.id}"
 
-                buttons = [
-                    [Button.url("View Message", url=message_link)],
-                    [Button.inline("\ud83d\udeabIgnore\ud83d\udeab", data=f"ignore_{sender.id}")]
-                ]
+                buttons = Keyboard.channel_message_keyboard(message_link, sender.id)
 
                 await self.tbot.tbot.send_message(
                     CHANNEL_ID,
@@ -406,15 +403,7 @@ class AccountHandler:
                     )
 
                     # Create interactive control buttons
-                    buttons = [
-                        [
-                            Button.inline(
-                                "❌ Disable" if status == "🟢 Active" else "✅ Enable", 
-                                data=f"toggle_{session}"
-                            ),
-                            Button.inline("🗑 Delete", data=f"delete_{session}")
-                        ]
-                    ]
+                    buttons = Keyboard.toggle_and_delete_keyboard(session)
 
                     messages.append((text, buttons))
                 except Exception as e:
@@ -522,54 +511,59 @@ class AccountHandler:
 
 class CallbackHandler:
     def __init__(self, tbot):
-        self.bot = tbot
+        self.tbot = tbot
+        self.account_handler = AccountHandler(self.tbot)
+        self.keyword_handler = KeywordHandler(self.tbot)
+        self.stats_handler = StatsHandler(self.tbot)
 
+        # Map callback data to handler methods
+        self.callback_actions = {
+            'add_account': self.account_handler.add_account,
+            'show_accounts': self.account_handler.show_accounts,
+            'update_groups': self.account_handler.update_groups,
+            'add_keyword': self.keyword_handler.add_keyword_handler,
+            'remove_keyword': self.keyword_handler.remove_keyword_handler,
+            'ignore_user': self.keyword_handler.ignore_user_handler,
+            'remove_ignore_user': self.keyword_handler.delete_ignore_user_handler,
+            'show_stats': self.stats_handler.show_stats,
+            'monitor_mode': self.show_monitor_keyboard
+        }
+
+    def show_monitor_keyboard(self, event):
+        """Handles the monitor mode keyboard display"""
+        return Keyboard.show_keyboard('monitor', event)
+    
+    
     async def callback_handler(self, event):
         """Handle callback queries"""
         logger.info("callback_handler in CallbackHandler")
         try:
             data = event.data.decode()
 
-            if data == 'add_account':
-                logger.info("add_account in callback_handler in CallbackHandler")
-                await AccountHandler(self.bot).add_account(event)
-            elif data == 'request_phone_number':
-                logger.info("request_phone_number in callback_handler in CallbackHandler")
+            # Handle special cases (e.g., phone number request, toggle, delete, ignore)
+            if data == 'request_phone_number':
+                logger.info("request_phone_number in callback_handler")
                 await event.respond("Please enter your phone number:")
                 self.tbot._conversations[event.chat_id] = 'phone_number_handler'
-            elif data == 'show_accounts':
-                logger.info("show_accounts in callback_handler in CallbackHandler")
-                await AccountHandler(self.bot).show_accounts(event)
             elif data.startswith('ignore_'):
                 user_id = int(data.split('_')[1])
-                await KeywordHandler(self.bot).ignore_user(user_id, event)
-            elif data == 'update_groups':
-                logger.info("update_groups in callback_handler in CallbackHandler")
-                await AccountHandler(self.bot).update_groups(event)
+                await self.keyword_handler.ignore_user(user_id, event)
             elif data.startswith('toggle_'):
-                logger.info("toggle_ in callback_handler in CallbackHandler")
                 session = data.replace('toggle_', '')
-                await AccountHandler(self.bot).toggle_client(session, event)
+                await self.account_handler.toggle_client(session, event)
             elif data.startswith('delete_'):
-                logger.info("delete_ in callback_handler in CallbackHandler")
                 session = data.replace('delete_', '')
-                await AccountHandler(self.bot).delete_client(session, event)
-            elif data == 'add_keyword':
-                logger.info("add_keyword in callback_handler in CallbackHandler")
-                await KeywordHandler(self.bot).add_keyword_handler(event)
-            elif data == 'remove_keyword':
-                logger.info("remove_keyword in callback_handler in CallbackHandler")
-                await KeywordHandler(self.bot).remove_keyword_handler(event)
-            elif data == 'ignore_user':
-                logger.info("ignore_user in callback_handler in CallbackHandler")
-                await KeywordHandler(self.bot).ignore_user_handler(event)
-            elif data == 'remove_ignore_user':
-                logger.info("remove_ignore_user in callback_handler in CallbackHandler")
-                await KeywordHandler(self.bot).delete_ignore_user_handler(event)
-            elif data == 'show_stats':
-                logger.info("show_stats in callback_handler in CallbackHandler")
-                await StatsHandler(self.bot).show_stats(event)
-            
+                await self.account_handler.delete_client(session, event)
+            else:
+                # Handle standard actions based on callback data
+                action = self.callback_actions.get(data)
+                if action:
+                    logger.info(f"{data} in callback_handler")
+                    await action(event)
+                else:
+                    logger.error(f"No handler found for callback data: {data}")
+                    await event.respond("Unknown command.")
+
         except Exception as e:
             logger.error(f"Error in callback_handler: {e}")
             await event.respond("Error processing request. Please try again.")
@@ -585,20 +579,7 @@ class CommandHandler:
         """Handle /start command"""
         logger.info("start command in CommandHandler")
         try:
-            buttons = [
-                [Button.inline("Add Account", 'add_account')],
-                [Button.inline("Show Accounts", b'show_accounts')],
-                [Button.inline("Update Groups", b'update_groups')],
-                [
-                    Button.inline('Add Keyword', b'add_keyword'),
-                    Button.inline('Remove Keyword', b'remove_keyword')
-                ],
-                [
-                    Button.inline('Ignore User', b'ignore_user'),
-                    Button.inline('Remove Ignore', b'remove_ignore_user')
-                ],
-                [Button.inline('Stats', b'show_stats')]
-                ]
+            buttons = Keyboard.start_keyboard()
 
             await event.respond(
                 "Telegram Management Bot\n\n",
@@ -799,3 +780,105 @@ class StatsHandler:
             await event.respond("Error showing statistics")
 
 
+
+
+
+
+
+from telethon import Button
+
+from telethon import Button
+
+class Keyboard:
+
+    @staticmethod
+    def start_keyboard():
+        """Returns the start menu keyboard"""
+        return [
+            [Button.inline("Bulk Operations", 'bulk_operations')],
+            [Button.inline("Individual Operations", 'individual_operations')],
+            [Button.inline("Monitor Mode", 'monitor_mode')],
+            [Button.inline("Account Management", 'account_management')],
+            [Button.inline("Report", 'report')]
+        ]
+
+    @staticmethod
+    def monitor_keyboard():
+        """Returns the monitor mode keyboard"""
+        return [
+            [Button.inline("Show Accounts", b'show_accounts')],
+            [Button.inline("Update Groups", b'update_groups')],
+            [
+                Button.inline('Add Keyword', b'add_keyword'),
+                Button.inline('Remove Keyword', b'remove_keyword')
+            ],
+            [
+                Button.inline('Ignore User', b'ignore_user'),
+                Button.inline('Remove Ignore', b'remove_ignore_user')
+            ]
+        ]
+
+    @staticmethod
+    def bulk_keyboard():
+        """Returns a keyboard with action buttons like like, join, block, message, comment"""
+        return [
+            [Button.inline('Like', 'like')],
+            [Button.inline('Join', 'join')],
+            [Button.inline('Block', 'block')],
+            [Button.inline('Message', 'message')],
+            [Button.inline('Comment', 'comment')]
+        ]
+
+    @staticmethod
+    def account_management_keyboard():
+        """Returns the keyboard for account management"""
+        return [
+            [Button.inline('Add Account', 'add_account')],
+            [Button.inline('Remove Account', 'remove_account')],
+            [Button.inline('List Accounts', 'list_accounts')]
+        ]
+
+    @staticmethod
+    def channel_message_keyboard(message_link, sender_id):
+        """Returns a keyboard with a 'View Message' URL button and 'Ignore' inline button"""
+        return [
+            [Button.url("View Message", url=message_link)],
+            [Button.inline("\ud83d\udeabIgnore\ud83d\udeab", data=f"ignore_{sender_id}")]
+        ]
+    
+    @staticmethod
+    def toggle_and_delete_keyboard(status, session):
+        """Returns a keyboard with 'Disable/Enable' and 'Delete' buttons"""
+        return [
+            [
+                Button.inline(
+                    "❌ Disable" if status == "🟢 Active" else "✅ Enable", 
+                    data=f"toggle_{session}"
+                ),
+                Button.inline("🗑 Delete", data=f"delete_{session}")
+            ]
+        ]
+
+    @staticmethod
+    def show_keyboard(keyboard_name, event=None):
+        """Dynamically returns and shows the requested keyboard based on its name"""
+        keyboards = {
+            'start': Keyboard.start_keyboard(),
+            'monitor': Keyboard.monitor_keyboard(),
+            'bulk': Keyboard.bulk_keyboard(),
+            'account_management': Keyboard.account_management_keyboard(),
+            'channel_message': Keyboard.channel_message_keyboard,
+            'toggle_and_delete': Keyboard.toggle_and_delete_keyboard
+        }
+
+        # Return the keyboard if it exists
+        keyboard = keyboards.get(keyboard_name, None)
+        
+        if keyboard:
+            if event:
+                return event.respond("Please choose an option:", buttons=keyboard)
+            return keyboard
+        else:
+            if event:
+                return event.respond("Sorry, the requested keyboard is not available.")
+            return None
