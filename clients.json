@@ -1,7 +1,14 @@
 {
     "TARGET_GROUPS": [],
     "KEYWORDS": [
+        "ttt",
+        "jjjj"
     ],
     "IGNORE_USERS": [],
-    "clients": {}
+    "clients": {
+        "+989396544790.session": [
+            4677166950
+        ],
+        "+989212782123_session": []
+    }
 }

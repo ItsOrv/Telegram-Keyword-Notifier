@@ -1,0 +1,115 @@
+class TelegramBot:
+    def __init__(self):
+        try:
+            self.api_id = API_ID  # اضافه کردن api_id
+            self.api_hash = API_HASH 
+            self.config_manager = ConfigManager('clients.json')
+            self.tbot = TelegramClient('bot2', API_ID, API_HASH)
+            self.active_clients = {}
+            self.config = self.config_manager.load_config()
+            self.handlers = {}
+            self._conversations = {}
+            self.client_manager = ClientManager(self.config, self.active_clients, API_ID, API_HASH)
+            self.account_handler = AccountHandler(self)
+            logger.info("Bot initialized successfully")
+        except Exception as e:
+            logger.critical(f"Error during bot initialization: {e}")
+            raise
+
+class AccountHandler:
+    """
+    Handles all account-related operations for the Telegram bot.
+    Manages account creation, authentication, and message processing.
+    """
+    
+    def __init__(self, tbot):
+        """
+        Initialize AccountHandler with bot instance.
+        
+        Args:
+            bot: Bot instance containing configuration and client management
+        """
+        self.tbot = tbot
+        self._conversations = {}
+        self.ClientManager = tbot.client_manager 
+
+class CallbackHandler:
+    def __init__(self, tbot):
+        self.tbot = tbot
+        self.account_handler = AccountHandler(self.tbot)
+        self.keyword_handler = KeywordHandler(self.tbot)
+        self.stats_handler = StatsHandler(self.tbot)
+
+        # Map callback data to handler methods
+        self.callback_actions = {
+            'add_account': self.account_handler.add_account,
+            'list_accounts': self.account_handler.show_accounts,
+            'update_groups': self.account_handler.update_groups,
+            'add_keyword': self.keyword_handler.add_keyword_handler,
+            'remove_keyword': self.keyword_handler.remove_keyword_handler,
+            'ignore_user': self.keyword_handler.ignore_user_handler,
+            'remove_ignore_user': self.keyword_handler.delete_ignore_user_handler,
+            'show_stats': self.stats_handler.show_stats,
+            'monitor_mode': self.show_monitor_keyboard,
+            'account_management': self.show_account_management_keyboard,
+            'bulk_operations': self.show_bulk_operations_keyboard,
+            'individual_keyboard': self.show_individual_keyboard,
+            'report': self.show_report_keyboard,
+            'exit':self.show_start_keyboard
+        }
+
+class CommandHandler:
+    def __init__(self, tbot):
+        self.bot = tbot
+
+
+class KeywordHandler:
+    def __init__(self, tbot):
+        self.tbot = tbot
+
+class MessageHandler:
+    def __init__(self, tbot):
+        self.tbot = tbot
+        self.account_handler = AccountHandler(tbot)
+        self.keyword_handler = KeywordHandler(tbot)
+
+class StatsHandler:
+    def __init__(self, tbot):
+        self.tbot = tbot
+
+
+class ConfigManager:
+    def __init__(self, filename: str = "config.json", config: Optional[Dict[str, Any]] = None):
+        """
+        Initialize the ConfigManager with a default configuration or load it from a file.
+        :param filename: Path to the configuration file.
+        :param config: Initial configuration dictionary (optional).
+        """
+        try:
+            self.filename = filename
+            self.default_config = {
+                "TARGET_GROUPS": [],
+                "KEYWORDS": [],
+                "IGNORE_USERS": [],
+                "clients": []
+            }
+            self.config = config if config else self.load_config()
+            logger.info("ConfigManager initialized successfully.")
+        except Exception as e:
+            logger.critical(f"Error initializing ConfigManager: {e}")
+            raise
+
+
+class ClientManager:
+    def __init__(self, config, active_clients, api_id, api_hash):
+        try:
+            self.config = config
+            self.active_clients = active_clients
+            self.api_id = api_id
+            self.api_hash = api_hash
+            self.config_manager = ConfigManager("clients.json", self.config)
+            logger.info("ClientManager initialized successfully.")
+        except Exception as e:
+            logger.critical(f"Error initializing ClientManager: {e}")
+            raise
+
