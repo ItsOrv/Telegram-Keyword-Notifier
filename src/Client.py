@@ -3,16 +3,15 @@ import logging
 import asyncio
 from telethon import TelegramClient
 from src.Config import ConfigManager
+from src.Config import API_ID, API_HASH, BOT_TOKEN
 
 logger = logging.getLogger(__name__)
 
 class ClientManager:
-    def __init__(self, config, active_clients, api_id, api_hash):
+    def __init__(self, config, active_clients):
         try:
             self.config = config
             self.active_clients = active_clients
-            self.api_id = api_id
-            self.api_hash = api_hash
             self.config_manager = ConfigManager("clients.json", self.config)
             logger.info("ClientManager initialized successfully.")
         except Exception as e:
@@ -43,7 +42,7 @@ class ClientManager:
 
             for session_name in self.config.get('clients', []):
                 try:
-                    client = TelegramClient(session_name, self.api_id, self.api_hash)
+                    client = TelegramClient(session_name, API_ID, API_HASH)
                     await client.start()
 
                     if await client.is_user_authorized():
