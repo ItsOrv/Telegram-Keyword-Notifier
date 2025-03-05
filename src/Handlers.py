@@ -8,11 +8,16 @@ from telethon.errors import SessionPasswordNeededError, FloodWaitError
 from telethon.tl.types import Channel, Chat
 from src.Config import API_ID, API_HASH, CHANNEL_ID
 from src.Client import ClientManager
-from asyncio.log import logger
 
 # Setting up the logger
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Constants
+CLIENTS_JSON_PATH = "clients.json" 
+RATE_LIMIT_SLEEP = 2
+GROUPS_BATCH_SIZE = 50
+GROUPS_UPDATE_SLEEP = 3
 
 class AccountHandler:
     """
@@ -25,7 +30,7 @@ class AccountHandler:
         Initialize AccountHandler with bot instance.
         
         Args:
-            bot: Bot instance containing configuration and client management
+            tbot: Bot instance containing configuration and client management
         """
         self.tbot = tbot
         self._conversations = {}
@@ -37,11 +42,10 @@ class AccountHandler:
         
         Args:
             event: Telegram event containing chat information
-            
         """
         logger.info("add_account in AccountHandler")
+        chat_id = event.chat_id
         try:
-            chat_id = event.chat_id
             await self.tbot.tbot.send_message(chat_id, "Please enter your phone number:")
             self.tbot._conversations[chat_id] = 'phone_number_handler'
         except Exception as e:
@@ -56,11 +60,10 @@ class AccountHandler:
             event: Telegram event containing the phone number
         """
         logger.info("phone_number_handler in AccountHandler")
+        chat_id = event.chat_id
+        phone_number = event.message.text.strip()
         try:
-            phone_number = event.message.text.strip()
-            chat_id = event.chat_id
-
-            client = TelegramClient(phone_number, self.tbot.api_id, self.tbot.api_hash)
+            client = TelegramClient(phone_number, API_ID, API_HASH)
             await client.connect()
 
             if not await client.is_user_authorized():
@@ -86,19 +89,16 @@ class AccountHandler:
             event: Telegram event containing the verification code
         """
         logger.info("code_handler in AccountHandler")
+        chat_id = event.chat_id
+        code = event.message.text.strip()
+        client = self.tbot.handlers.get('temp_client')
+        phone_number = self.tbot.handlers.get('temp_phone')
         try:
-            code = event.message.text.strip()
-            chat_id = event.chat_id
-            client = self.tbot.handlers.get('temp_client')
-            phone_number = self.tbot.handlers.get('temp_phone')
-
-            try:
-                await client.sign_in(phone_number, code)
-                await self.finalize_client_setup(client, phone_number, chat_id)
-            except SessionPasswordNeededError:
-                await self.tbot.tbot.send_message(chat_id, "Enter your 2FA password:")
-                self.tbot._conversations[chat_id] = 'password_handler'
-
+            await client.sign_in(phone_number, code)
+            await self.finalize_client_setup(client, phone_number, chat_id)
+        except SessionPasswordNeededError:
+            await self.tbot.tbot.send_message(chat_id, "Enter your 2FA password:")
+            self.tbot._conversations[chat_id] = 'password_handler'
         except Exception as e:
             logger.error(f"Error in code_handler: {e}")
             await self.tbot.tbot.send_message(chat_id, "Error occurred. Please try again.")
@@ -112,15 +112,13 @@ class AccountHandler:
             event: Telegram event containing the 2FA password
         """
         logger.info("password_handler in AccountHandler")
+        chat_id = event.chat_id
+        password = event.message.text.strip()
+        client = self.tbot.handlers.get('temp_client')
+        phone_number = self.tbot.handlers.get('temp_phone')
         try:
-            password = event.message.text.strip()
-            chat_id = event.chat_id
-            client = self.tbot.handlers.get('temp_client')
-            phone_number = self.tbot.handlers.get('temp_phone')
-
             await client.sign_in(password=password)
             await self.finalize_client_setup(client, phone_number, chat_id)
-
         except Exception as e:
             logger.error(f"Error in password_handler: {e}")
             await self.tbot.tbot.send_message(chat_id, "Error occurred. Please try again.")
@@ -140,20 +138,15 @@ class AccountHandler:
             session_name = f"{phone_number}_session"
             client.session.save()
 
-            self.tbot.config['clients'].append({
-                "phone_number": phone_number,
-                "session": session_name,
-                "groups": [],
-                "added_date": datetime.now().isoformat(),
-                "disabled": False
-            })
-            self.tbot.config_manager.save_config()
+            if not isinstance(self.tbot.config['clients'], dict):
+                logger.warning("'clients' is not a dictionary. Initializing it as an empty dictionary.")
+                self.tbot.config['clients'] = {}
+
+            self.tbot.config['clients'][session_name] = []
+            self.tbot.config_manager.save_config(self.tbot.config)
 
             self.tbot.active_clients[session_name] = client
-            client.add_event_handler(
-                self.process_message,
-                events.NewMessage()
-            )
+            client.add_event_handler(self.process_message, events.NewMessage())
 
             await self.tbot.tbot.send_message(chat_id, f"Account {phone_number} added successfully!")
             self.cleanup_temp_handlers()
@@ -169,14 +162,10 @@ class AccountHandler:
         """
         logger.info("cleanup_temp_handlers in AccountHandler")
         try:
-            if 'temp_client' in self.tbot.handlers:
-                del self.tbot.handlers['temp_client']
-            if 'temp_phone' in self.tbot.handlers:
-                del self.tbot.handlers['temp_phone']
+            self.tbot.handlers.pop('temp_client', None)
+            self.tbot.handlers.pop('temp_phone', None)
         except Exception as e:
             logger.error(f"Error in cleanup_temp_handlers: {e}")
-
-
 
     async def update_groups(self, event):
         """
@@ -186,25 +175,22 @@ class AccountHandler:
             event: Telegram event triggering the update
         """
         logger.info("Started update_groups process.")
-
         groups_per_client = {}
         self.ClientManager.detect_sessions()
 
         try:
             status_message = await event.respond("Please wait, identifying groups for each client...")
 
-            # Initialize JSON structure
             json_data = {
                 "TARGET_GROUPS": [],
                 "KEYWORDS": [],
                 "IGNORE_USERS": [],
-                "clients": {}
+                "clients": []
             }
 
-            # Load existing data
-            if os.path.exists("clients.json"):
+            if os.path.exists(CLIENTS_JSON_PATH):
                 try:
-                    with open("clients.json", "r", encoding='utf-8') as json_file:
+                    with open(CLIENTS_JSON_PATH, "r", encoding='utf-8') as json_file:
                         loaded_data = json.loads(json_file.read())
                         json_data.update(loaded_data)
                         if isinstance(json_data["clients"], list):
@@ -213,52 +199,43 @@ class AccountHandler:
                 except json.JSONDecodeError as e:
                     logger.error("Error decoding clients.json.", exc_info=True)
 
-            # Process each client
             for session_name, client in self.tbot.active_clients.items():
                 try:
                     logger.info(f"Processing client: {session_name}")
                     group_ids = set()
 
-                    try:
-                        async for dialog in client.iter_dialogs(limit=None):
-                            try:
-                                if isinstance(dialog.entity, (Chat, Channel)) and not (
-                                    isinstance(dialog.entity, Channel) and dialog.entity.broadcast
-                                ):
-                                    group_ids.add(dialog.entity.id)
+                    async for dialog in client.iter_dialogs(limit=None):
+                        try:
+                            if isinstance(dialog.entity, (Chat, Channel)) and not (
+                                isinstance(dialog.entity, Channel) and dialog.entity.broadcast
+                            ):
+                                group_ids.add(dialog.entity.id)
 
-                                if len(group_ids) % 50 == 0:
-                                    await asyncio.sleep(2)  # Rate limiting protection
+                            if len(group_ids) % GROUPS_BATCH_SIZE == 0:
+                                await asyncio.sleep(RATE_LIMIT_SLEEP)
 
-                            except Exception as e:
-                                logger.error(f"Error processing dialog for client {session_name}.", exc_info=True)
-                                continue
+                        except Exception as e:
+                            logger.error(f"Error processing dialog for client {session_name}.", exc_info=True)
+                            continue
 
-                            if len(group_ids) % 20 == 0:
-                                await status_message.edit(f"Found {len(group_ids)} groups for {session_name}...")
-
-                    except FloodWaitError as e:
-                        wait_time = e.seconds
-                        logger.warning(f"FloodWaitError: Sleeping for {wait_time} seconds for client {session_name}.")
-                        await status_message.edit(f"Rate limited. Waiting for {wait_time} seconds...")
-                        await asyncio.sleep(wait_time)
-                        continue
-
-                    except Exception as e:
-                        logger.error(f"Error iterating dialogs for client {session_name}.", exc_info=True)
-                        await status_message.edit(f"Error processing {session_name}: {str(e)}")
-                        continue
+                        if len(group_ids) % 20 == 0:
+                            await status_message.edit(f"Found {len(group_ids)} groups for {session_name}...")
 
                     groups_per_client[session_name] = list(group_ids)
                     logger.info(f"Found {len(group_ids)} groups for client {session_name}.")
                     await status_message.edit(f"Found {len(group_ids)} groups for {session_name}.")
-                    await asyncio.sleep(3)
+                    await asyncio.sleep(GROUPS_UPDATE_SLEEP)
 
+                except FloodWaitError as e:
+                    wait_time = e.seconds
+                    logger.warning(f"FloodWaitError: Sleeping for {wait_time} seconds for client {session_name}.")
+                    await status_message.edit(f"Rate limited. Waiting for {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                    continue
                 except Exception as e:
                     logger.error(f"Unexpected error while processing client {session_name}.", exc_info=True)
                     continue
 
-            # Update JSON data
             for session_name, group_ids in groups_per_client.items():
                 if session_name in json_data["clients"]:
                     existing_groups = json_data["clients"][session_name]
@@ -268,8 +245,7 @@ class AccountHandler:
                 else:
                     json_data["clients"][session_name] = group_ids
 
-            # Save updated data
-            with open("clients.json", "w", encoding='utf-8') as json_file:
+            with open(CLIENTS_JSON_PATH, "w", encoding='utf-8') as json_file:
                 json.dump(json_data, json_file, indent=4, ensure_ascii=False)
                 logger.info(f"Saved updated client data for {len(groups_per_client)} clients to clients.json.")
 
@@ -279,17 +255,12 @@ class AccountHandler:
             logger.error("Critical error in update_groups function.", exc_info=True)
             await event.respond(f"Error identifying groups: {str(e)}")
 
-
     async def process_messages_for_client(self, client):
         """
         Sets up message processing for a specific client.
 
         Args:
             client: TelegramClient instance to process messages for
-
-        # TODO: Implement message queuing system
-        # TODO: Add message deduplication
-        # TODO: Implement message filtering optimization
         """
         logger.info("Setting up message processing for client.")
 
@@ -326,15 +297,13 @@ class AccountHandler:
                 chat_title = getattr(chat, 'title', 'Unknown Chat')
                 logger.info(f"Processing message from chat: {chat_title}")
 
-                # Format message for forwarding
                 text = (
-                    f"\u2022 User: {getattr(sender, 'first_name', '')} {getattr(sender, 'last_name', '')}\n"
-                    f"\u2022 User ID: `{sender.id}`\n"
-                    f"\u2022 Chat: {chat_title}\n\n"
-                    f"\u2022 Message:\n{message}\n"
+                    f"User: {getattr(sender, 'first_name', '')} {getattr(sender, 'last_name', '')}\n"
+                    f"• User ID: `{sender.id}`\n"
+                    f"• Chat: {chat_title}\n\n"
+                    f"• Message:\n{message}\n"
                 )
 
-                # Generate message link
                 if hasattr(chat, 'username') and chat.username:
                     message_link = f"https://t.me/{chat.username}/{event.id}"
                 else:
@@ -355,29 +324,19 @@ class AccountHandler:
             except Exception as e:
                 logger.error("Error processing message.", exc_info=True)
 
-
     async def show_accounts(self, event):
         """
         Display all registered accounts with their current status and controls.
 
         Args:
             event: Telegram event triggering the account display
-
-        Returns:
-            None. Sends interactive messages to the chat with account information
-            and control buttons.
-
         """
         logger.info("Executing show_accounts method in AccountHandler")
 
         try:
-            # Retrieve client data with fallback to an empty dictionary
             clients_data = self.tbot.config.get('clients', {})
-
-            # Log client data retrieval
             logger.debug(f"Retrieved clients data: {clients_data}")
 
-            # Validate client data structure
             if not isinstance(clients_data, dict) or not clients_data:
                 await event.respond("No accounts added yet.")
                 logger.warning("No accounts found in the configuration.")
@@ -385,31 +344,25 @@ class AccountHandler:
 
             messages = []
 
-            # Process each client account
             for session, groups in clients_data.items():
                 try:
-                    # Clean up phone number display
                     phone = session.replace('.session', '') if session else 'Unknown'
                     groups_count = len(groups)
                     status = "🟢 Active" if session in self.tbot.active_clients else "🔴 Inactive"
 
                     logger.debug(f"Processing account: {session}, Status: {status}, Groups: {groups_count}")
 
-                    # Format account information message
                     text = (
                         f"• Phone: {phone}\n"
                         f"• Groups: {groups_count}\n"
                         f"• Status: {status}\n"
                     )
 
-                    # Create interactive control buttons
-                    buttons = Keyboard.toggle_and_delete_keyboard(session)
-
+                    buttons = Keyboard.toggle_and_delete_keyboard(status, session)
                     messages.append((text, buttons))
                 except Exception as e:
                     logger.error(f"Error processing account {session}: {e}", exc_info=True)
 
-            # Send each account as a separate message with its controls
             for message_text, message_buttons in messages:
                 try:
                     await event.respond(message_text, buttons=message_buttons)
@@ -421,7 +374,6 @@ class AccountHandler:
             logger.error(f"Critical error in show_accounts: {e}", exc_info=True)
             await event.respond("Error showing accounts. Please try again.")
 
-
     async def toggle_client(self, session: str, event):
         """
         Toggle the active/inactive status of a client account.
@@ -432,7 +384,6 @@ class AccountHandler:
         """
         logger.info(f"toggle_client called for session: {session}")
         try:
-            # Validate session existence
             if session not in self.tbot.config['clients']:
                 logger.warning(f"Session {session} not found in clients.")
                 await event.respond("Account not found.")
@@ -442,7 +393,6 @@ class AccountHandler:
             logger.info(f"Current status for {session}: {'Active' if currently_active else 'Inactive'}")
 
             if currently_active:
-                # Handle client disable
                 logger.info(f"Disabling client: {session}")
                 client = self.tbot.active_clients[session]
                 await client.disconnect()
@@ -450,7 +400,6 @@ class AccountHandler:
                 logger.info(f"Client {session} disabled successfully.")
                 await event.respond(f"Account {session} disabled.")
             else:
-                # Handle client enable
                 logger.info(f"Enabling client: {session}")
                 client = TelegramClient(session, API_ID, API_HASH)
                 await client.start()
@@ -458,14 +407,12 @@ class AccountHandler:
                 logger.info(f"Client {session} enabled successfully.")
                 await event.respond(f"Account {session} enabled.")
 
-            # Save updated configuration
             logger.info("Saving updated configuration.")
-            self.tbot.config_manager.save_config()
+            self.tbot.config_manager.save_config(self.tbot.config)
 
         except Exception as e:
             logger.error(f"Error toggling client {session}: {e}", exc_info=True)
             await event.respond("Error toggling account status.")
-
 
     async def delete_client(self, session: str, event):
         """
@@ -477,7 +424,6 @@ class AccountHandler:
         """
         logger.info(f"delete_client called for session: {session}")
         try:
-            # Disconnect and remove active client if exists
             if session in self.tbot.active_clients:
                 logger.info(f"Disconnecting active client: {session}")
                 client = self.tbot.active_clients[session]
@@ -485,13 +431,11 @@ class AccountHandler:
                 del self.tbot.active_clients[session]
                 logger.info(f"Client {session} disconnected and removed from active clients.")
 
-            # Remove from configuration
             if session in self.tbot.config['clients']:
                 logger.info(f"Removing session {session} from configuration.")
                 del self.tbot.config['clients'][session]
                 self.tbot.config_manager.save_config()
 
-                # Clean up session file from disk
                 session_file = f"{session}"
                 if os.path.exists(session_file):
                     logger.info(f"Deleting session file: {session_file}")
@@ -508,7 +452,6 @@ class AccountHandler:
             logger.error(f"Error deleting client {session}: {e}", exc_info=True)
             await event.respond("Error deleting account.")
 
-
 class CallbackHandler:
     def __init__(self, tbot):
         self.tbot = tbot
@@ -516,7 +459,6 @@ class CallbackHandler:
         self.keyword_handler = KeywordHandler(self.tbot)
         self.stats_handler = StatsHandler(self.tbot)
 
-        # Map callback data to handler methods
         self.callback_actions = {
             'add_account': self.account_handler.add_account,
             'list_accounts': self.account_handler.show_accounts,
@@ -531,7 +473,7 @@ class CallbackHandler:
             'bulk_operations': self.show_bulk_operations_keyboard,
             'individual_keyboard': self.show_individual_keyboard,
             'report': self.show_report_keyboard,
-            'exit':self.show_start_keyboard
+            'exit': self.show_start_keyboard
         }
 
     def show_start_keyboard(self, event):

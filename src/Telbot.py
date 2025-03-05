@@ -10,6 +10,7 @@ from src.Handlers import CommandHandler
 from src.Handlers import AccountHandler
 from src.Client import ClientManager
 
+
 # تنظیم لاگینگ
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -23,7 +24,7 @@ class TelegramBot:
             self.config = self.config_manager.load_config()
             self.handlers = {}
             self._conversations = {}
-            self.client_manager = ClientManager(self.config, self.active_clients, API_ID, API_HASH)
+            self.client_manager = ClientManager(self.config, self.active_clients)
             self.account_handler = AccountHandler(self)
             logger.info("Bot initialized successfully")
         except Exception as e:
