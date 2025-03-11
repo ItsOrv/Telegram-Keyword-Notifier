@@ -131,9 +131,3 @@ BOT_TOKEN = get_env_variable('BOT_TOKEN', default='x')
 CHANNEL_ID = get_env_variable('CHANNEL_ID', default='x')
 BOT_SESSION_NAME = get_env_variable('BOT_SESSION_NAME', default='BOT_SESSION')
 ADMIN_ID = get_env_variable('ADMIN_ID', default=0)
-
-# TODO revisit
-
-# TODO revisit
-
-# TODO revisit
