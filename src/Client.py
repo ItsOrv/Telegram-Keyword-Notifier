@@ -19,19 +19,17 @@ class ClientManager:
             raise
 
     def detect_sessions(self):
-        """Detect session files and add them to the config if not already present."""
+        """Detect and load sessions from the configuration"""
         try:
-            sessions = []
-            for filename in os.listdir('.'):
-                if filename.endswith('.session') and filename != 'bot2.session' and filename not in self.config.get('clients', []):
-                    sessions.append(filename)
+            if not isinstance(self.config['clients'], dict):
+                logger.warning("'clients' is not a dictionary. Initializing it as an empty dictionary.")
+                self.config['clients'] = {}
 
-            if sessions:
-                self.config.setdefault('clients', []).extend(sessions)
-                self.config_manager.save_config(self.config)
-                logger.info(f"Detected sessions: {sessions}")
-            else:
-                logger.info("No new sessions detected.")
+            for session_name in self.config['clients']:
+                if session_name not in self.active_clients:
+                    client = TelegramClient(session_name, API_ID, API_HASH)
+                    self.active_clients[session_name] = client
+            logger.info("Sessions detected and loaded successfully.")
         except Exception as e:
             logger.error(f"Error detecting sessions: {e}")
 
@@ -40,13 +38,16 @@ class ClientManager:
         try:
             self.detect_sessions()
 
-            for session_name in self.config.get('clients', []):
+            for session_name in self.config.get('clients', {}):
                 try:
-                    client = TelegramClient(session_name, API_ID, API_HASH)
-                    await client.start()
+                    client = self.active_clients.get(session_name)
+                    if client is None:
+                        client = TelegramClient(session_name, API_ID, API_HASH)
+                        self.active_clients[session_name] = client
+
+                    await client.connect()
 
                     if await client.is_user_authorized():
-                        self.active_clients[session_name] = client
                         logger.info(f"Started client: {session_name}")
                     else:
                         logger.warning(f"Client {session_name} is not authorized, skipping.")
