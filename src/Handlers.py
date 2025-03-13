@@ -46,7 +46,8 @@ class AccountHandler:
         logger.info("add_account in AccountHandler")
         chat_id = event.chat_id
         try:
-            await self.tbot.tbot.send_message(chat_id, "Please enter your phone number:")
+            buttons = [Button.inline("Cancel", b'cancel')]
+            await self.tbot.tbot.send_message(chat_id, "Please enter your phone number:", buttons=buttons)
             self.tbot._conversations[chat_id] = 'phone_number_handler'
         except Exception as e:
             logger.error(f"Error in add_account: {e}")
@@ -135,7 +136,7 @@ class AccountHandler:
         """
         logger.info("finalize_client_setup in AccountHandler")
         try:
-            session_name = f"{phone_number}_session"
+            session_name = f"{phone_number}"
             client.session.save()
 
             if not isinstance(self.tbot.config['clients'], dict):
@@ -452,6 +453,14 @@ class AccountHandler:
             logger.error(f"Error deleting client {session}: {e}", exc_info=True)
             await event.respond("Error deleting account.")
 
+    async def process_message(self, client):
+        """Process messages for a specific client"""
+        try:
+            # Add your message processing logic here
+            pass
+        except Exception as e:
+            logger.error(f"Error processing message for client {client}: {e}")
+
 class CallbackHandler:
     def __init__(self, tbot):
         self.tbot = tbot
@@ -505,6 +514,12 @@ class CallbackHandler:
         logger.info("callback_handler in CallbackHandler")
         try:
             data = event.data.decode()
+
+            if data == 'cancel':
+                chat_id = event.chat_id
+                self.tbot._conversations.pop(chat_id, None)
+                await event.delete()
+                return
 
             # Handle special cases (e.g., phone number request, toggle, delete, ignore)
             if data == 'request_phone_number':
@@ -567,7 +582,8 @@ class KeywordHandler:
         logger.info("add_keyword_handler in KeywordHandler")
         try:
             if isinstance(event, events.CallbackQuery.Event):
-                await event.respond("Please enter the keyword you want to add.")
+                buttons = [Button.inline("Cancel", b'cancel')]
+                await event.respond("Please enter the keyword you want to add.", buttons=buttons)
                 self.tbot._conversations[event.chat_id] = 'add_keyword_handler'
                 return
 
@@ -676,9 +692,6 @@ class KeywordHandler:
         except Exception as e:
             logger.error(f"Error ignoring user: {e}")
             await event.respond("Error ignoring user")
-
-
-
 
 
 class MessageHandler:
@@ -801,7 +814,6 @@ class Keyboard:
         """Returns the keyboard for account management"""
         return [
             [Button.inline('Add Account', 'add_account')],
-            [Button.inline('Remove Account', 'remove_account')],
             [Button.inline('List Accounts', 'list_accounts')],
             [Button.inline("Exit", 'exit')]
         ]
@@ -841,7 +853,7 @@ class Keyboard:
 
 
     @staticmethod
-    def show_keyboard(keyboard_name, event=None):
+    async def show_keyboard(keyboard_name, event=None):
         """Dynamically returns and shows the requested keyboard based on its name"""
         keyboards = {
             'start': Keyboard.start_keyboard(),
@@ -860,7 +872,8 @@ class Keyboard:
         
         if keyboard:
             if event:
-                return event.respond("Please choose an option:", buttons=keyboard)
+                # Clear the previous keyboard
+                await event.edit("Please choose an option:", buttons=keyboard)
             return keyboard
         else:
             if event:
