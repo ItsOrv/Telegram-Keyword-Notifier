@@ -823,7 +823,7 @@ class Keyboard:
         """Returns a keyboard with a 'View Message' URL button and 'Ignore' inline button"""
         return [
             [Button.url("View Message", url=message_link)],
-            [Button.inline("\ud83d\udeabIgnore\ud83d\udeab", data=f"ignore_{sender_id}")]
+            [Button.inline("❌Ignore❌", data=f"ignore_{sender_id}")]
         ]
     
     @staticmethod
