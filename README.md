@@ -133,4 +133,3 @@ The bot includes mechanisms to handle various errors:
 
 Contributions are welcome! Please submit a pull request or open an issue if you’d like to add new features or report bugs.
 
-
