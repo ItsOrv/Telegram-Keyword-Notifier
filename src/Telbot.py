@@ -9,6 +9,7 @@ from src.Handlers import CallbackHandler
 from src.Handlers import CommandHandler
 from src.Handlers import AccountHandler
 from src.Client import ClientManager
+from src.Monitor import Monitor
 
 
 # تنظیم لاگینگ
@@ -26,6 +27,7 @@ class TelegramBot:
             self._conversations = {}
             self.client_manager = ClientManager(self.config, self.active_clients)
             self.account_handler = AccountHandler(self)
+            self.monitor = Monitor(self)
             logger.info("Bot initialized successfully")
         except Exception as e:
             logger.critical(f"Error during bot initialization: {e}")
@@ -59,7 +61,7 @@ class TelegramBot:
             await self.start()
             logger.info("Bot is running...")
 
-            tasks = [self.account_handler.process_message(client) for client in self.active_clients.values()]
+            tasks = [self.monitor.process_messages_for_client(client) for client in self.active_clients.values()]
             await asyncio.gather(*tasks)
 
             await self.tbot.run_until_disconnected()
