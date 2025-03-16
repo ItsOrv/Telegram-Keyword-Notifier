@@ -61,7 +61,7 @@ class Monitor:
                 if hasattr(chat, 'username') and chat.username:
                     message_link = f"https://t.me/{chat.username}/{event.id}"
                 else:
-                    chat_id = str(event.chat_id).replace('-100', '', 1)
+                    chat_id = str(event.chat_id).replace('-100', '', 1).replace('-', '')
                     message_link = f"https://t.me/c/{chat_id}/{event.id}"
 
                 buttons = Keyboard.channel_message_keyboard(message_link, sender.id)
