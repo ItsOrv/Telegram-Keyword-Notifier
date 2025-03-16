@@ -68,5 +68,3 @@ class ClientManager:
             logger.info("All clients disconnected successfully.")
         except Exception as e:
             logger.error(f"Error disconnecting clients: {e}")
-
-print('debug')
