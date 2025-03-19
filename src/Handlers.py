@@ -8,6 +8,8 @@ from telethon.errors import SessionPasswordNeededError, FloodWaitError
 from telethon.tl.types import Channel, Chat
 from src.Config import API_ID, API_HASH, CHANNEL_ID
 from src.Client import ClientManager
+from src.Config import ADMIN_ID  # Add this import
+from src.actions import Actions
 
 # Setting up the logger
 logging.basicConfig(level=logging.INFO)
@@ -284,9 +286,12 @@ class AccountHandler:
                 sender = await event.get_sender()
                 if not sender:
                     logger.warning("Could not fetch sender information. Skipping message.")
-                    return
+                    sender_info = "Unknown Sender"
+                else:
+                    sender_info = f"User: {getattr(sender, 'first_name', '')} {getattr(sender, 'last_name', '')}\n" \
+                                  f"• User ID: `{sender.id}`\n"
 
-                if sender.id in self.tbot.config['IGNORE_USERS']:
+                if sender and sender.id in self.tbot.config['IGNORE_USERS']:
                     logger.info(f"Message from ignored user {sender.id}. Skipping.")
                     return
 
@@ -298,9 +303,11 @@ class AccountHandler:
                 chat_title = getattr(chat, 'title', 'Unknown Chat')
                 logger.info(f"Processing message from chat: {chat_title}")
 
+                account_name = client.session.filename.replace('.session', '')
+
                 text = (
-                    f"User: {getattr(sender, 'first_name', '')} {getattr(sender, 'last_name', '')}\n"
-                    f"• User ID: `{sender.id}`\n"
+                    f"Account: {account_name}\n"
+                    f"{sender_info}"
                     f"• Chat: {chat_title}\n\n"
                     f"• Message:\n{message}\n"
                 )
@@ -311,7 +318,7 @@ class AccountHandler:
                     chat_id = str(event.chat_id).replace('-100', '', 1)
                     message_link = f"https://t.me/c/{chat_id}/{event.id}"
 
-                buttons = Keyboard.channel_message_keyboard(message_link, sender.id)
+                buttons = Keyboard.channel_message_keyboard(message_link, sender.id if sender else 0)
 
                 await self.tbot.tbot.send_message(
                     CHANNEL_ID,
@@ -320,7 +327,7 @@ class AccountHandler:
                     link_preview=False
                 )
 
-                logger.info(f"Forwarded message from user {sender.id} in chat {chat_title}.")
+                logger.info(f"Forwarded message from user {sender.id if sender else 'Unknown'} in chat {chat_title}.")
 
             except Exception as e:
                 logger.error("Error processing message.", exc_info=True)
@@ -482,7 +489,7 @@ class CallbackHandler:
             'bulk_operations': self.show_bulk_operations_keyboard,
             'individual_keyboard': self.show_individual_keyboard,
             'report': self.show_report_keyboard,
-            'exit': self.show_start_keyboard
+            'exit': self.show_start_keyboard,
         }
 
     def show_start_keyboard(self, event):
@@ -513,6 +520,10 @@ class CallbackHandler:
         """Handle callback queries"""
         logger.info("callback_handler in CallbackHandler")
         try:
+            if event.sender_id != int(ADMIN_ID):
+                await event.respond("You are not the admin")
+                return
+
             data = event.data.decode()
 
             if data == 'cancel':
@@ -527,8 +538,13 @@ class CallbackHandler:
                 await event.respond("Please enter your phone number:")
                 self.tbot._conversations[event.chat_id] = 'phone_number_handler'
             elif data.startswith('ignore_'):
-                user_id = int(data.split('_')[1])
-                await self.keyword_handler.ignore_user(user_id, event)
+                parts = data.split('_')
+                if len(parts) == 2 and parts[1].isdigit():
+                    user_id = int(parts[1])
+                    await self.keyword_handler.ignore_user(user_id, event)
+                else:
+                    logger.error(f"Invalid user ID in callback data: {data}")
+                    await event.respond("Invalid user ID.")
             elif data.startswith('toggle_'):
                 session = data.replace('toggle_', '')
                 await self.account_handler.toggle_client(session, event)
@@ -560,8 +576,11 @@ class CommandHandler:
         """Handle /start command"""
         logger.info("start command in CommandHandler")
         try:
-            buttons = Keyboard.start_keyboard()
+            if event.sender_id != int(ADMIN_ID):
+                await event.respond("You are not the admin")
+                return
 
+            buttons = Keyboard.start_keyboard()
             await event.respond(
                 "Telegram Management Bot\n\n",
                 buttons=buttons
@@ -576,7 +595,6 @@ class KeywordHandler:
     def __init__(self, tbot):
         self.tbot = tbot
 
-    #PASS
     async def add_keyword_handler(self, event):
         """Add a keyword to monitor"""
         logger.info("add_keyword_handler in KeywordHandler")
@@ -602,13 +620,13 @@ class KeywordHandler:
             logger.error(f"Error adding keyword: {e}")
             await event.respond("Error adding keyword")
 
-    #PASS
     async def remove_keyword_handler(self, event):
         """Remove a keyword from monitoring"""
         logger.info("remove_keyword_handler in KeywordHandler")
         try:
             if isinstance(event, events.CallbackQuery.Event):
-                await event.respond("Please enter the keyword you want to remove.")
+                buttons = [Button.inline("Cancel", b'cancel')]
+                await event.respond("Please enter the keyword you want to remove.", buttons=buttons)
                 self.tbot._conversations[event.chat_id] = 'remove_keyword_handler'
                 return
 
@@ -627,13 +645,13 @@ class KeywordHandler:
             logger.error(f"Error removing keyword: {e}")
             await event.respond("Error removing keyword")
 
-    #PASS
     async def ignore_user_handler(self, event):
         """Ignore a user from further interaction"""
         logger.info("ignore_user_handler in KeywordHandler")
         try:
             if isinstance(event, events.CallbackQuery.Event):
-                await event.respond("Please enter the user ID you want to ignore.")
+                buttons = [Button.inline("Cancel", b'cancel')]
+                await event.respond("Please enter the user ID you want to ignore.", buttons=buttons)
                 self.tbot._conversations[event.chat_id] = 'ignore_user_handler'
                 return
 
@@ -652,13 +670,13 @@ class KeywordHandler:
             logger.error(f"Error ignoring user: {e}")
             await event.respond("Error ignoring user")
 
-    #PASS
     async def delete_ignore_user_handler(self, event):
         """Remove a user from the ignore list"""
         logger.info("delete_ignore_user_handler in KeywordHandler")
         try:
             if isinstance(event, events.CallbackQuery.Event):
-                await event.respond("Please enter the user ID you want to stop ignoring.")
+                buttons = [Button.inline("Cancel", b'cancel')]
+                await event.respond("Please enter the user ID you want to stop ignoring.", buttons=buttons)
                 self.tbot._conversations[event.chat_id] = 'delete_ignore_user_handler'
                 return
 
@@ -677,7 +695,6 @@ class KeywordHandler:
             logger.error(f"Error deleting ignored user: {e}")
             await event.respond("Error deleting ignored user")
 
-    #PASS
     async def ignore_user(self, user_id, event): # for channel button
         """Ignore a user from further interaction."""
         logger.info("ignore_user in KeywordHandler")
@@ -704,6 +721,10 @@ class MessageHandler:
     async def message_handler(self, event):
         """Handle incoming messages based on conversation state"""
         logger.info("message_handler in MessageHandler")
+
+        if event.sender_id != int(ADMIN_ID):
+            await event.respond("You are not the admin")
+            return
         
         if event.chat_id in self.tbot._conversations:
             handler_name = self.tbot._conversations[event.chat_id]
@@ -800,12 +821,12 @@ class Keyboard:
     def bulk_keyboard():
         """Returns a keyboard with action buttons like like, join, block, message, comment"""
         return [
-            [Button.inline('Reaction', 'reaction')],
-            [Button.inline('Poll', 'poll')],
-            [Button.inline('Join', 'join')],
-            [Button.inline('Block', 'block')],
-            [Button.inline('Send pv', 'send_pv')],
-            [Button.inline('Comment', 'comment')],
+            [Button.inline('Reaction', 'bulk_reaction')],
+            [Button.inline('Poll', 'bulk_poll')],
+            [Button.inline('Join', 'bulk_join')],
+            [Button.inline('Block', 'bulk_block')],
+            [Button.inline('Send pv', 'bulk_send_pv')],
+            [Button.inline('Comment', 'bulk_comment')],
             [Button.inline("Exit", 'exit')]
         ]
 
@@ -851,6 +872,13 @@ class Keyboard:
 
         ]
 
+    @staticmethod
+    def report_keyboard():
+        """Returns the keyboard for report"""
+        return [
+            [Button.inline("Show Stats", 'show_stats')],
+            [Button.inline("Exit", 'exit')]
+        ]
 
     @staticmethod
     async def show_keyboard(keyboard_name, event=None):
@@ -862,7 +890,9 @@ class Keyboard:
             'account_management': Keyboard.account_management_keyboard(),
             'channel_message': Keyboard.channel_message_keyboard,
             'toggle_and_delete': Keyboard.toggle_and_delete_keyboard,
-            'individual_keyboard': Keyboard.individual_keyboard()
+            'individual_keyboard': Keyboard.individual_keyboard(),
+            'report': Keyboard.report_keyboard(),
+            'bulk_reaction' : Actions.prompt_group_action
             
         }
     
@@ -879,3 +909,20 @@ class Keyboard:
             if event:
                 return event.respond("Sorry, the requested keyboard is not available.")
             return None
+        
+
+
+
+
+
+
+
+
+
+
+            [Button.inline('Reaction', 'bulk_reaction')],
+            [Button.inline('Poll', 'bulk_poll')],
+            [Button.inline('Join', 'bulk_join')],
+            [Button.inline('Block', 'bulk_block')],
+            [Button.inline('Send pv', 'bulk_send_pv')],
+            [Button.inline('Comment', 'bulk_comment')]

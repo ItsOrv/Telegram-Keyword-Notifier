@@ -15,6 +15,9 @@ class Monitor:
         """
         Resolve the CHANNEL_ID to a numeric ID if it's a username.
         """
+        if self.channel_id is not None:
+            return  # Channel ID already resolved
+
         if isinstance(CHANNEL_ID, str) and not CHANNEL_ID.isdigit():
             try:
                 entity = await self.tbot.tbot.get_entity(CHANNEL_ID)
@@ -54,17 +57,12 @@ class Monitor:
                     logger.debug("Message sent to the channel itself or by the bot. Ignoring to avoid loops.")
                     return
 
-                message = event.message.text
-                if not message:
-                    logger.debug("Message text is empty. Skipping.")
-                    return
-
+                message = event.message.text or "-"
                 sender = await event.get_sender()
-                if not sender:
-                    logger.warning("Could not fetch sender information. Skipping message.")
-                    return
+                sender_info = f"User: {getattr(sender, 'first_name', '-') or '-'} {getattr(sender, 'last_name', '-') or '-'}\n" \
+                              f"• User ID: `{getattr(sender, 'id', '-')}`\n" if sender else "User: -\n• User ID: -\n"
 
-                if sender.id in self.tbot.config['IGNORE_USERS']:
+                if sender and sender.id in self.tbot.config['IGNORE_USERS']:
                     logger.info(f"Message from ignored user {sender.id}. Skipping.")
                     return
 
@@ -73,18 +71,14 @@ class Monitor:
                     return
 
                 chat = await event.get_chat()
-                chat_title = getattr(chat, 'title', 'Unknown Chat')
-
-                # Check if the message is from the same username as the channel
-                if hasattr(chat, 'username') and chat.username == self.channel_username:
-                    logger.debug("Message from the same username as the channel. Ignoring to avoid loops.")
-                    return
-
+                chat_title = getattr(chat, 'title', '-') or '-'
                 logger.info(f"Processing message from chat: {chat_title}")
 
+                account_name = client.session.filename.replace('.session', '')
+
                 text = (
-                    f"• User: {getattr(sender, 'first_name', '')} {getattr(sender, 'last_name', '')}\n"
-                    f"• User ID: `{sender.id}`\n"
+                    f"Account: {account_name}\n"
+                    f"{sender_info}"
                     f"• Chat: {chat_title}\n\n"
                     f"• Message:\n{message}\n"
                 )
@@ -95,10 +89,7 @@ class Monitor:
                     chat_id = str(event.chat_id).replace('-100', '', 1).replace('-', '')
                     message_link = f"https://t.me/c/{chat_id}/{event.id}"
 
-                buttons = Keyboard.channel_message_keyboard(message_link, sender.id)
-
-                logger.debug(f"Sending message: {text}")
-                logger.debug(f"Buttons: {buttons}")
+                buttons = Keyboard.channel_message_keyboard(message_link, sender.id if sender else 0)
 
                 await self.tbot.tbot.send_message(
                     self.channel_id,
@@ -107,7 +98,7 @@ class Monitor:
                     link_preview=False
                 )
 
-                logger.info(f"Forwarded message from user {sender.id} in chat {chat_title}.")
+                logger.info(f"Forwarded message from user {getattr(sender, 'id', '-') if sender else '-'} in chat {chat_title}.")
 
             except UnicodeEncodeError as e:
                 logger.error(f"UnicodeEncodeError: {e}")
