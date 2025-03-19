@@ -10,6 +10,7 @@ from src.Handlers import CommandHandler
 from src.Handlers import AccountHandler
 from src.Client import ClientManager
 from src.Monitor import Monitor
+from src.Config import ADMIN_ID  # Add this import
 
 
 # تنظیم لاگینگ
@@ -39,6 +40,7 @@ class TelegramBot:
             await self.tbot.start(bot_token=BOT_TOKEN)
             await self.init_handlers()
             await self.client_manager.start_saved_clients()
+            await self.notify_admin("Bot started successfully and all clients have been detected. /start to begin.")
             logger.info("Bot started successfully")
         except Exception as e:
             logger.error(f"Error during bot start: {e}")
@@ -47,13 +49,22 @@ class TelegramBot:
     async def init_handlers(self):
         """Initialize all event handlers"""
         try:
-            self.tbot.add_event_handler(CommandHandler(self).start_command, events.NewMessage(pattern='/start'))
-            self.tbot.add_event_handler(CallbackHandler(self).callback_handler, events.CallbackQuery())
-            self.tbot.add_event_handler(MessageHandler(self).message_handler, events.NewMessage())
+            self.tbot.add_event_handler(self.admin_only(CommandHandler(self).start_command), events.NewMessage(pattern='/start'))
+            self.tbot.add_event_handler(self.admin_only(CallbackHandler(self).callback_handler), events.CallbackQuery())
+            self.tbot.add_event_handler(self.admin_only(MessageHandler(self).message_handler), events.NewMessage())
             logger.info("Handlers initialized successfully")
         except Exception as e:
             logger.error(f"Error initializing handlers: {e}")
             raise
+
+    def admin_only(self, handler):
+        """Decorator to ensure the handler only processes requests from the admin"""
+        async def wrapper(event):
+            if event.sender_id == int(ADMIN_ID):
+                await handler(event)
+            else:
+                await event.respond("You are not the admin")
+        return wrapper
 
     async def run(self):
         """Run the bot"""
@@ -61,9 +72,14 @@ class TelegramBot:
             await self.start()
             logger.info("Bot is running...")
 
-            tasks = [self.monitor.process_messages_for_client(client) for client in self.active_clients.values()]
-            await asyncio.gather(*tasks)
+            # Ensure process_messages_for_client is only called once per client
+            tasks = []
+            for client in self.active_clients.values():
+                if not hasattr(client, '_message_processing_set'):
+                    tasks.append(self.monitor.process_messages_for_client(client))
+                    client._message_processing_set = True
 
+            await asyncio.gather(*tasks)
             await self.tbot.run_until_disconnected()
         except asyncio.CancelledError:
             logger.warning("Bot run was cancelled")
@@ -71,6 +87,15 @@ class TelegramBot:
             logger.error(f"Error running bot: {e}")
         finally:
             await self.shutdown()
+
+    async def notify_admin(self, message):
+        """Send a notification message to the admin"""
+        try:
+            admin_id = int(ADMIN_ID)  # Ensure ADMIN_ID is an integer
+            await self.tbot.send_message(admin_id, message)
+            logger.info("Notification sent to admin.")
+        except Exception as e:
+            logger.error(f"Error sending notification to admin: {e}")
 
     async def shutdown(self):
         """Clean up resources during shutdown"""
