@@ -2,11 +2,3 @@ telethon==1.36.0
 python-dotenv==1.0.0
 aiohttp
 requests
-
-# debug
-
-# debug
-
-# debug
-
-# debug
