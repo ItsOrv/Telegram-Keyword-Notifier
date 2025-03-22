@@ -1,7 +1,7 @@
 import logging
 from telethon import TelegramClient, events, Button
 from src.Config import CHANNEL_ID
-from src.Handlers import Keyboard  # Add this import
+from src.Handlers import Keyboard
 
 logger = logging.getLogger(__name__)
 
