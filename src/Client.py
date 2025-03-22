@@ -3,7 +3,7 @@ import logging
 import asyncio
 from telethon import TelegramClient
 from src.Config import ConfigManager
-from src.Config import API_ID, API_HASH, BOT_TOKEN
+from src.Config import API_ID, API_HASH
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ class ClientManager:
                         logger.warning(f"Client {session_name} is not authorized, skipping.")
                         await client.disconnect()
 
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(3)  # Increase sleep time to avoid flood wait errors
                 except Exception as e:
                     logger.error(f"Error starting client {session_name}: {e}")
         except Exception as e:

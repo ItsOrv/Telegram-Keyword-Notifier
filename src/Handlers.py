@@ -6,9 +6,8 @@ from datetime import datetime
 from telethon import TelegramClient, events, Button
 from telethon.errors import SessionPasswordNeededError, FloodWaitError
 from telethon.tl.types import Channel, Chat
-from src.Config import API_ID, API_HASH, CHANNEL_ID
+from src.Config import API_ID, API_HASH, CHANNEL_ID, ADMIN_ID
 from src.Client import ClientManager
-from src.Config import ADMIN_ID  # Add this import
 from src.actions import Actions
 
 # Setting up the logger
