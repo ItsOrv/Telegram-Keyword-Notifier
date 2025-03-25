@@ -908,20 +908,4 @@ class Keyboard:
             if event:
                 return event.respond("Sorry, the requested keyboard is not available.")
             return None
-        
-
-
-
-
-
-
-
-
-
-
-            [Button.inline('Reaction', 'bulk_reaction')],
-            [Button.inline('Poll', 'bulk_poll')],
-            [Button.inline('Join', 'bulk_join')],
-            [Button.inline('Block', 'bulk_block')],
-            [Button.inline('Send pv', 'bulk_send_pv')],
-            [Button.inline('Comment', 'bulk_comment')]
+    
