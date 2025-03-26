@@ -2,8 +2,7 @@ import os
 import logging
 import asyncio
 from telethon import TelegramClient
-from src.Config import ConfigManager
-from src.Config import API_ID, API_HASH
+from src.Config import ConfigManager, API_ID, API_HASH, PORTS
 
 # Set up logger for the ClientManager class
 logger = logging.getLogger(__name__)
@@ -37,7 +36,7 @@ class ClientManager:
 
             for session_name in self.config['clients']:
                 if session_name not in self.active_clients:
-                    # Initialize Telegram client for the session
+                    # Initialize Telegram client for the session with the configured port
                     client = TelegramClient(session_name, API_ID, API_HASH)
                     self.active_clients[session_name] = client
             logger.info("Sessions detected and loaded successfully.")

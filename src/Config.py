@@ -139,3 +139,11 @@ BOT_TOKEN = get_env_variable('BOT_TOKEN', default='x')
 CHANNEL_ID = get_env_variable('CHANNEL_ID', default='x')
 BOT_SESSION_NAME = get_env_variable('BOT_SESSION_NAME', default='BOT_SESSION')
 ADMIN_ID = int(get_env_variable('ADMIN_ID', default=0))
+
+# Load port configurations from environment variables
+PORTS = {
+    "HTTP": int(get_env_variable('HTTP_PORT', default=80)),
+    "HTTPS": int(get_env_variable('HTTPS_PORT', default=443)),
+    "TELEGRAM": int(get_env_variable('TELEGRAM_PORT', default=443))
+}
+
