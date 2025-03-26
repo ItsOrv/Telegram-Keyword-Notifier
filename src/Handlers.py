@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
-CLIENTS_JSON_PATH = "clients.json" 
+CLIENTS_JSON_PATH = "clients.json"
 RATE_LIMIT_SLEEP = 2
 GROUPS_BATCH_SIZE = 50
 GROUPS_UPDATE_SLEEP = 3
@@ -25,22 +25,22 @@ class AccountHandler:
     Handles all account-related operations for the Telegram bot.
     Manages account creation, authentication, and message processing.
     """
-    
+
     def __init__(self, tbot):
         """
         Initialize AccountHandler with bot instance.
-        
+
         Args:
             tbot: Bot instance containing configuration and client management
         """
         self.tbot = tbot
         self._conversations = {}
-        self.ClientManager = tbot.client_manager 
+        self.ClientManager = tbot.client_manager
 
     async def add_account(self, event):
         """
         Initiates the account addition process by requesting phone number.
-        
+
         Args:
             event: Telegram event containing chat information
         """
@@ -57,7 +57,7 @@ class AccountHandler:
     async def phone_number_handler(self, event):
         """
         Handles phone number verification and initiates client connection.
-        
+
         Args:
             event: Telegram event containing the phone number
         """
@@ -86,7 +86,7 @@ class AccountHandler:
     async def code_handler(self, event):
         """
         Processes verification code and completes authentication.
-        
+
         Args:
             event: Telegram event containing the verification code
         """
@@ -109,7 +109,7 @@ class AccountHandler:
     async def password_handler(self, event):
         """
         Handles 2FA password verification if required.
-        
+
         Args:
             event: Telegram event containing the 2FA password
         """
@@ -129,7 +129,7 @@ class AccountHandler:
     async def finalize_client_setup(self, client, phone_number, chat_id):
         """
         Completes client setup and saves configuration.
-        
+
         Args:
             client: Authorized TelegramClient instance
             phone_number: User's phone number
@@ -384,7 +384,7 @@ class AccountHandler:
     async def toggle_client(self, session: str, event):
         """
         Toggle the active/inactive status of a client account.
-        
+
         Args:
             session (str): Session identifier for the account
             event: Telegram event triggering the toggle
@@ -424,7 +424,7 @@ class AccountHandler:
     async def delete_client(self, session: str, event):
         """
         Permanently delete a client account and its associated data.
-        
+
         Args:
             session (str): Session identifier for the account to delete
             event: Telegram event triggering the deletion
@@ -514,7 +514,6 @@ class CallbackHandler:
         """Handles the report keyboard display"""
         return Keyboard.show_keyboard('report', event)
 
-    
     async def callback_handler(self, event):
         """Handle callback queries"""
         logger.info("callback_handler in CallbackHandler")
@@ -564,9 +563,6 @@ class CallbackHandler:
             logger.error(f"Error in callback_handler: {e}")
             await event.respond("Error processing request. Please try again.")
 
-
-
-
 class CommandHandler:
     def __init__(self, tbot):
         self.bot = tbot
@@ -588,7 +584,6 @@ class CommandHandler:
         except Exception as e:
             logger.error(f"Error in start_command: {e}")
             await event.respond("Error showing menu. Please try again.")
-
 
 class KeywordHandler:
     def __init__(self, tbot):
@@ -709,13 +704,11 @@ class KeywordHandler:
             logger.error(f"Error ignoring user: {e}")
             await event.respond("Error ignoring user")
 
-
 class MessageHandler:
     def __init__(self, tbot):
         self.tbot = tbot
         self.account_handler = AccountHandler(tbot)
         self.keyword_handler = KeywordHandler(tbot)
-
 
     async def message_handler(self, event):
         """Handle incoming messages based on conversation state"""
@@ -724,7 +717,7 @@ class MessageHandler:
         if event.sender_id != int(ADMIN_ID):
             await event.respond("You are not the admin")
             return
-        
+
         if event.chat_id in self.tbot._conversations:
             handler_name = self.tbot._conversations[event.chat_id]
             if handler_name == 'phone_number_handler':
@@ -751,7 +744,6 @@ class MessageHandler:
 
         return False
 
-
 class StatsHandler:
     def __init__(self, tbot):
         self.tbot = tbot
@@ -777,8 +769,6 @@ class StatsHandler:
         except Exception as e:
             logger.error(f"Error showing stats: {e}")
             await event.respond("Error showing statistics")
-
-
 
 class Keyboard:
 
@@ -845,14 +835,14 @@ class Keyboard:
             [Button.url("View Message", url=message_link)],
             [Button.inline("❌Ignore❌", data=f"ignore_{sender_id}")]
         ]
-    
+
     @staticmethod
     def toggle_and_delete_keyboard(status, session):
         """Returns a keyboard with 'Disable/Enable' and 'Delete' buttons"""
         return [
             [
                 Button.inline(
-                    "❌ Disable" if status == "🟢 Active" else "✅ Enable", 
+                    "❌ Disable" if status == "🟢 Active" else "✅ Enable",
                     data=f"toggle_{session}"
                 ),
                 Button.inline("🗑 Delete", data=f"delete_{session}")
@@ -892,13 +882,12 @@ class Keyboard:
             'individual_keyboard': Keyboard.individual_keyboard(),
             'report': Keyboard.report_keyboard(),
             'bulk_reaction' : Actions.prompt_group_action
-            
+
         }
-    
 
         # Return the keyboard if it exists
         keyboard = keyboards.get(keyboard_name, None)
-        
+
         if keyboard:
             if event:
                 # Clear the previous keyboard
@@ -908,4 +897,3 @@ class Keyboard:
             if event:
                 return event.respond("Sorry, the requested keyboard is not available.")
             return None
-    
