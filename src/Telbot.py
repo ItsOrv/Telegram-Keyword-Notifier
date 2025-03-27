@@ -1,7 +1,7 @@
 import logging
 from telethon import TelegramClient, events, Button
 import asyncio
-from src.Config import API_ID, API_HASH, BOT_TOKEN, ADMIN_ID
+from src.Config import API_ID, API_HASH, BOT_TOKEN, ADMIN_ID, PORTS
 from src.Config import ConfigManager
 from src.Logger import setup_logging
 from src.Handlers import MessageHandler, CallbackHandler, CommandHandler, AccountHandler
