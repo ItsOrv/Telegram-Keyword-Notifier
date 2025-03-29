@@ -103,6 +103,11 @@ To install manually without Docker, follow these steps:
    API_HASH=your_api_hash
    BOT_TOKEN=your_bot_token
    CHANNEL_ID=your_channel_id
+   ADMIN_ID=admin_id
+   BOT_SESSION_NAME=BOT_SESSION
+   HTTP_PORT=http_port
+   HTTPS_PORT=https_port
+   TELEGRAM_PORT=telegram_port
    ```
 
 ## Usage
