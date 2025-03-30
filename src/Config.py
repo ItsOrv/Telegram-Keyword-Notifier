@@ -25,7 +25,7 @@ class ConfigManager:
                 "clients": []         # List of client configurations
             }
             # Load existing configuration or use the provided one
-            self.config = config if config else self.load_config()
+            self.config = config if config else self.load_config()  # type: Dict[str, Any]
             logger.info("ConfigManager initialized successfully.")
         except Exception as e:
             logger.critical(f"Error initializing ConfigManager: {e}")
@@ -110,7 +110,6 @@ class ConfigManager:
             logger.error(f"Error retrieving config key '{key}': {e}")
             return None
 
-
 # Load environment variables from .env file
 load_dotenv()
 
@@ -131,7 +130,6 @@ def get_env_variable(name: str, default: Optional[Any] = None) -> Any:
         logger.error(f"Error retrieving environment variable '{name}': {e}")
         return default
 
-
 # Load essential configuration values from environment variables
 API_ID = int(get_env_variable('API_ID', default=0))
 API_HASH = get_env_variable('API_HASH', default='x')
@@ -139,6 +137,10 @@ BOT_TOKEN = get_env_variable('BOT_TOKEN', default='x')
 CHANNEL_ID = get_env_variable('CHANNEL_ID', default='x')
 BOT_SESSION_NAME = get_env_variable('BOT_SESSION_NAME', default='BOT_SESSION')
 ADMIN_ID = int(get_env_variable('ADMIN_ID', default=0))
+CLIENTS_JSON_PATH = str(get_env_variable('CLIENTS_JSON_PATH', default='clients.json'))
+RATE_LIMIT_SLEEP = int(get_env_variable('RATE_LIMIT_SLEEP', default=60))
+GROUPS_BATCH_SIZE = int(get_env_variable('GROUPS_BATCH_SIZE', default=10))
+GROUPS_UPDATE_SLEEP = int(get_env_variable('GROUPS_UPDATE_SLEEP', default=60))
 
 # Load port configurations from environment variables
 PORTS = {
