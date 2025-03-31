@@ -5,7 +5,7 @@ from src.Config import API_ID, API_HASH, BOT_TOKEN, ADMIN_ID, PORTS
 from src.Config import ConfigManager
 from src.Logger import setup_logging
 from src.Handlers import MessageHandler, CallbackHandler, CommandHandler, AccountHandler
-from src.Client import ClientManager
+from src.Client import SessionManager
 from src.Monitor import Monitor
 
 # تنظیم لاگینگ
@@ -18,14 +18,13 @@ class TelegramBot:
         Initialize the TelegramBot class with necessary components.
         """
         try:
-            # بارگذاری فایل پیکربندی و مقداردهی اولیه متغیرها
             self.config_manager = ConfigManager('clients.json')
             self.config = self.config_manager.load_config()
             self.tbot = TelegramClient('bot2', API_ID, API_HASH)
             self.active_clients = {}
             self.handlers = {}
             self._conversations = {}
-            self.client_manager = ClientManager(self.config, self.active_clients)
+            self.client_manager = SessionManager(self.config, self.active_clients, self.tbot)
             self.account_handler = AccountHandler(self)
             self.monitor = Monitor(self)
 
@@ -53,7 +52,6 @@ class TelegramBot:
         Initialize all event handlers for the bot.
         """
         try:
-            # افزودن هندلرها با محدودیت دسترسی ادمین
             self.tbot.add_event_handler(self.admin_only(CommandHandler(self).start_command), events.NewMessage(pattern='/start'))
             self.tbot.add_event_handler(self.admin_only(CallbackHandler(self).callback_handler), events.CallbackQuery())
             self.tbot.add_event_handler(self.admin_only(MessageHandler(self).message_handler), events.NewMessage())
