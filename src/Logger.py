@@ -21,4 +21,3 @@ def setup_logging(log_filename: str = "bot.log") -> None:
             logging.StreamHandler()
         ]
     )
-print('debug')
