@@ -1,14 +1,8 @@
 # Ignored files
-bot.session
-session_name.session
-session_name.session-journal
+*.session
 .env
 __pycache__/
 *.pyc
 *.pyo
 .vscode/
 venv
-krtkmahan.session
-krtkmahan2.session
-bot2.session
-bot.session
