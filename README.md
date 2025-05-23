@@ -3,143 +3,135 @@
 ××××
 
 
-# Telegram Panel
+# Telegram Chain Store Bot
 
-Telegram Panel is a comprehensive tool designed to manage multiple Telegram accounts, monitor groups or channels, and automate messaging operations based on predefined rules. This project provides a robust bot that can monitor specific groups or channels for messages containing keywords, automatically forward them to designated channels, exclude specific users, and manage various messaging automation features. 
+This Telegram bot acts as a decentralized chain store with support for anonymous payments, product management, and a location-based delivery system.
 
 ## Features
 
-### Core Functionality
-- **Multi-Account Management**: Manages multiple Telegram accounts, enabling batch operations on a large scale.
-- **Keyword Monitoring**: Monitors specified Telegram groups or channels for user-defined keywords.
-- **Message Forwarding**: Automatically forwards detected messages containing keywords to pre-configured channels based on category.
-- **User Exclusion**: Ignores messages from specific users by their Telegram user ID, ensuring irrelevant messages are not forwarded.
-- **Logging and Error Handling**: Provides detailed logs for easier debugging and efficient monitoring. Handles common errors, including two-factor authentication (2FA) prompts and general message processing issues.
-- **Automated Post-Liking**: (soon) Synchronize all accounts within the panel to like a specific post, enabling quick engagement for promoting specific posts or advertisements.
-- **Channel Joining for All Accounts**: (soon) Enroll multiple accounts into one or more Telegram channels simultaneously.
-- **User Blocking**: (soon) Block specific users across all managed accounts by providing a list of user IDs.
-- **Mass Advertising via Direct Messages**: (soon) Select from a list of advertising messages stored in a .txt file within the bot. The bot sends these messages to targeted users either based on user ID or by finding users within mutual groups.
-- **Auto-Reply for Customer Support**: (soon) Accounts can automatically respond to incoming messages.
-- **Account Activity Monitoring and Analytics**: (soon) A dashboard provides insights into each account's activity, including group memberships, messages sent, and user interactions, helping with performance and engagement tracking.
+### Role-Based System
 
-- **Automated Direct Messages**: When a keyword is detected, the bot can send a message from one of the managed accounts to the message sender.
-- **User Detection and ID Management**: (soon)
-  - If the sender’s ID is available, selects an account not already in a group with the user to send a message.
-  - If the ID is unavailable, selects an account within the same group as the user to send a message.
+* **Buyer**: Browse and purchase products, pay via wallet or direct payment.
 
-- **Categorized Keyword Monitoring**: (soon) Allows monitoring with multiple keyword categories, each linked to a specific channel for forwarding, making it possible to track multiple topics or products simultaneously.
+* **Seller**: Add products, handle the first step of payment approval, and manage deliveries at random public locations in the destination city using a full-featured control keyboard.
 
-### Docker Integration with CLI
-- **Containerized Environment**: (soon) This bot runs within a Docker container for consistency and easier deployment.
-- **CLI Command Control**: (soon) With the `tmm` command, you can start, stop, restart, and update the bot easily within the Docker environment. You can also manage configurations and check for updates directly from the CLI.
+* **Cardholder**: Manually verify payments and wallet top-ups. Share payment methods (bank card or wallet address) for user payouts and profits.
 
-## Prerequisites
+* **Admin**: Final payment approval, location and user management, and full system control.
 
-- Python 3.12.1
-- Telegram account(s) with Bot API token(s)
-- Docker and Docker Compose (recommended for deployment)
+### Secure Two-Step Payment Process
 
-## Installation (NOT READY, INSTALL MANUALLY)
+1. Buyer makes a payment.
+2. Cardholder verifies the payment.
+3. Admin confirms the payment.
+4. Funds are released.
 
-### Automated Installation (Docker)
-For Docker installation, execute the following command:
+### Location-Based Delivery System
 
-```bash
-bash <(curl -s https://raw.githubusercontent.com/ItsOrv/Telegram-Panel/main/install.sh)
-```
+* Admin defines safe public drop-off locations per city.
+* Sellers deliver products to the assigned locations.
+* Buyers receive location details 15 minutes after drop-off.
+* Delivery is validated using a secure code.
 
-This script will:
-- Install Docker and Docker Compose
-- Clone the project repository
-- Prompt for required environment variables
-- Configure the environment and create a `.env` file
-- Build and deploy the Docker container
-- Add the `tmm` command for managing the bot
+### Wallet System
 
-### Environment Variables
+* Users can top up their wallet.
+* All wallet operations are protected with two-step verification.
+* Secure balance management for every role.
 
-During the installation, you’ll need to provide the following environment variables:
+### Security Features
 
-```bash
-API_ID=your_api_id
-API_HASH=your_api_hash
-BOT_TOKEN=your_bot_token
-CHANNEL_ID=your_channel_id
-```
+* Manual two-step payment verification
+* Delivery code validation
+* Role-based access control
+* Input validation and sanitization
+* Error handling and logging
+* API rate limiting
 
-- **API_ID** and **API_HASH**: Obtain these from [my.telegram.org](https://my.telegram.org).
-- **BOT_TOKEN**: Generated via BotFather on Telegram.
-- **CHANNEL_ID**: ID of the target channel for forwarding messages.
+---
 
-### Using the `tmm` Command
+## Setup Instructions
 
-The `tmm` command allows you to manage the Docker container. Options include:
-1. **Start**: Starts the container if it’s not already running.
-2. **Stop**: Stops the container if it’s currently running.
-3. **Restart**: Restarts the container and checks for correct installation.
-4. **Update**: Pulls the latest changes from GitHub and rebuilds the container.
-5. **Uninstall**: Stops and removes the Docker container, project files, and `tmm` command.
+### Prerequisites
 
-### Manual Installation
+* Python 3.8+
+* MySQL or SQLite
+* Redis (for caching and session management)
 
-To install manually without Docker, follow these steps:
+### Local Setup
 
 1. Clone the repository:
-   ```bash
-   git clone https://github.com/ItsOrv/Telegram-Panel.git
-   cd Telegram-Panel
-   ```
 
-2. Set up a virtual environment (optional but recommended):
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Configure the environment:
-   Create a `.env` file with the following details:
-   ```bash
-   API_ID=your_api_id
-   API_HASH=your_api_hash
-   BOT_TOKEN=your_bot_token
-   CHANNEL_ID=your_channel_id
-   ADMIN_ID=admin_id
-   BOT_SESSION_NAME=BOT_SESSION
-   HTTP_PORT=http_port
-   HTTPS_PORT=https_port
-   TELEGRAM_PORT=telegram_port
-   ```
-
-## Usage
-
-To start the bot manually, use:
 ```bash
-python3 src/main.py
+git clone https://github.com/yourusername/telegram-chain-store.git
+cd telegram-chain-store
 ```
 
-The bot will monitor specified Telegram groups or channels, forwarding detected messages to designated channels, and managing automated messaging based on predefined rules.
+2. Install dependencies:
 
-## Future Updates
+```bash
+pip install -r requirements.txt
+```
 
-### Planned Features
-- **Automated Message Sending**: A feature to send predefined messages directly to users who trigger keywords. This can be configured with specific messages stored in a text file and set to automatically send when triggered.
-- **Enhanced Multi-Category Monitoring**: Support for multiple keyword categories with each category linked to a unique destination channel, simplifying multi-topic tracking.
-- **Real-Time Monitoring with Prioritization**: Fine-tune keyword monitoring to prioritize urgent messages or topics.
-- **Advanced Analytics and Logging**: Improved logging for detailed performance insights, error tracking, and usage analytics.
+3. Configure environment variables:
 
-## Error Handling
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+```
 
-The bot includes mechanisms to handle various errors:
-- **Two-Factor Authentication (2FA)**: Prompts for a second factor if 2FA is enabled on any account.
-- **Client Authorization**: Checks for client authorization and skips unauthorized accounts.
-- **Connection Issues**: Logs and retries for connectivity issues, ensuring reliability across multiple accounts.
+4. Run database migrations:
 
-## Contributing
+```bash
+alembic upgrade head
+```
 
-Contributions are welcome! Please submit a pull request or open an issue if you’d like to add new features or report bugs.
+5. Start the database manually (optional for SQLite):
+
+```bash
+python -m src.core.database
+```
+
+6. Run the bot:
+
+```bash
+python -m src.main
+```
+
+---
+
+## Docker Setup
+
+You can also run the bot using Docker for easier deployment.
+
+### 1. Build and Run
+
+```bash
+docker-compose up --build
+```
+
+This will:
+
+* Build the application image
+* Start the database and Redis containers
+* Start the bot service
+
+### 2. Configuration
+
+* Rename and configure the `.env` file:
+
+```bash
+cp .env.example .env
+# Edit .env with your environment variables
+```
+
+### 3. Run Database Migrations
+
+After containers are up, run:
+
+```bash
+docker exec -it <app_container_name> alembic upgrade head
+```
+
+(Replace `<app_container_name>` with your actual container name, usually something like `telegram-chain-store-app-1`)
 
