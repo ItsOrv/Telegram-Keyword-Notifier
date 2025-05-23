@@ -149,5 +149,3 @@ PORTS = {
     "TELEGRAM": int(get_env_variable('TELEGRAM_PORT', default=443))
 }
 
-
-print('debug')
