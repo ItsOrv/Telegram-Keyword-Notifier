@@ -1,8 +1,46 @@
-# Ignored files
-*.session
+# Environment variables and secrets
 .env
+*.session
+*.session-journal
+
+# Python cache and compiled files
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE and editor files
 .vscode/
-venv
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/*.log
+*.log
+
+# Configuration files (may contain sensitive data)
+clients.json
+config.json
+
+# Build and distribution
+build/
+dist/
+*.egg-info/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS specific
+Thumbs.db
