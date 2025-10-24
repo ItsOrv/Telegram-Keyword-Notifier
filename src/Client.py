@@ -1,19 +1,14 @@
 import os
 import logging
 import asyncio
-from telethon import TelegramClient, events, Button
-from src.Config import ConfigManager, API_ID, API_HASH, PORTS, ADMIN_ID
-from src.Config import API_ID, API_HASH, CHANNEL_ID, ADMIN_ID ,CLIENTS_JSON_PATH, RATE_LIMIT_SLEEP, GROUPS_BATCH_SIZE, GROUPS_UPDATE_SLEEP
-
-import os
-import logging
-import asyncio
 import json
 from datetime import datetime
 from telethon import TelegramClient, events, Button
 from telethon.errors import SessionPasswordNeededError, FloodWaitError
 from telethon.tl.types import Channel, Chat
+from src.Config import ConfigManager, API_ID, API_HASH, PORTS, ADMIN_ID, CHANNEL_ID, CLIENTS_JSON_PATH, RATE_LIMIT_SLEEP, GROUPS_BATCH_SIZE, GROUPS_UPDATE_SLEEP
 from src.Keyboards import Keyboard
+from src.Validation import InputValidator
 
 
 # Set up logger for the SessionManager class
@@ -199,6 +194,13 @@ class AccountHandler:
         logger.info("phone_number_handler in AccountHandler")
         chat_id = event.chat_id
         phone_number = event.message.text.strip()
+        
+        # Validate phone number
+        is_valid, error_msg = InputValidator.validate_phone_number(phone_number)
+        if not is_valid:
+            await self.tbot.tbot.send_message(chat_id, f"❌ {error_msg}\nPlease try again.")
+            return
+        
         try:
             client = TelegramClient(phone_number, API_ID, API_HASH)
             await client.connect()
@@ -282,8 +284,14 @@ class AccountHandler:
             self.tbot.config['clients'][session_name] = []
             self.tbot.config_manager.save_config(self.tbot.config)
 
-            self.tbot.active_clients[session_name] = client
-            client.add_event_handler(self.process_message, events.NewMessage())
+            # Use lock when modifying active_clients
+            async with self.tbot.active_clients_lock:
+                self.tbot.active_clients[session_name] = client
+            
+            # Set up message monitoring for this new client
+            if not hasattr(client, '_message_processing_set'):
+                await self.tbot.monitor.process_messages_for_client(client)
+                client._message_processing_set = True
 
             await self.tbot.tbot.send_message(chat_id, f"Account {phone_number} added successfully!")
             self.cleanup_temp_handlers()
@@ -392,79 +400,6 @@ class AccountHandler:
             logger.error("Critical error in update_groups function.", exc_info=True)
             await event.respond(f"Error identifying groups: {str(e)}")
 
-    async def process_messages_for_client(self, client):
-        """
-        Sets up message processing for a specific client.
-
-        Args:
-            client: TelegramClient instance to process messages for
-        """
-        logger.info("Setting up message processing for client.")
-
-        @client.on(events.NewMessage)
-        async def process_message(event):
-            """
-            Processes and forwards new messages based on configured filters.
-
-            Args:
-                event: NewMessage event from Telegram
-            """
-            try:
-                logger.debug("Received new message event.")
-
-                message = event.message.text
-                if not message:
-                    logger.debug("Message text is empty. Skipping.")
-                    return
-
-                sender = await event.get_sender()
-                if not sender:
-                    logger.warning("Could not fetch sender information. Skipping message.")
-                    sender_info = "Unknown Sender"
-                else:
-                    sender_info = f"User: {getattr(sender, 'first_name', '')} {getattr(sender, 'last_name', '')}\n" \
-                                  f"• User ID: `{sender.id}`\n"
-
-                if sender and sender.id in self.tbot.config['IGNORE_USERS']:
-                    logger.info(f"Message from ignored user {sender.id}. Skipping.")
-                    return
-
-                if not any(keyword.lower() in message.lower() for keyword in self.tbot.config['KEYWORDS']):
-                    logger.debug("Message does not contain any configured keywords. Skipping.")
-                    return
-
-                chat = await event.get_chat()
-                chat_title = getattr(chat, 'title', 'Unknown Chat')
-                logger.info(f"Processing message from chat: {chat_title}")
-
-                account_name = client.session.filename.replace('.session', '')
-
-                text = (
-                    f"Account: {account_name}\n"
-                    f"{sender_info}"
-                    f"• Chat: {chat_title}\n\n"
-                    f"• Message:\n{message}\n"
-                )
-
-                if hasattr(chat, 'username') and chat.username:
-                    message_link = f"https://t.me/{chat.username}/{event.id}"
-                else:
-                    chat_id = str(event.chat_id).replace('-100', '', 1)
-                    message_link = f"https://t.me/c/{chat_id}/{event.id}"
-
-                buttons = Keyboard.channel_message_keyboard(message_link, sender.id if sender else 0)
-
-                await self.tbot.tbot.send_message(
-                    CHANNEL_ID,
-                    text,
-                    buttons=buttons,
-                    link_preview=False
-                )
-
-                logger.info(f"Forwarded message from user {sender.id if sender else 'Unknown'} in chat {chat_title}.")
-
-            except Exception as e:
-                logger.error("Error processing message.", exc_info=True)
 
     async def show_accounts(self, event):
         """
@@ -536,16 +471,20 @@ class AccountHandler:
 
             if currently_active:
                 logger.info(f"Disabling client: {session}")
-                client = self.tbot.active_clients[session]
-                await client.disconnect()
-                del self.tbot.active_clients[session]
+                # Use lock when modifying active_clients
+                async with self.tbot.active_clients_lock:
+                    client = self.tbot.active_clients[session]
+                    await client.disconnect()
+                    del self.tbot.active_clients[session]
                 logger.info(f"Client {session} disabled successfully.")
                 await event.respond(f"Account {session} disabled.")
             else:
                 logger.info(f"Enabling client: {session}")
                 client = TelegramClient(session, API_ID, API_HASH)
                 await client.start()
-                self.tbot.active_clients[session] = client
+                # Use lock when modifying active_clients
+                async with self.tbot.active_clients_lock:
+                    self.tbot.active_clients[session] = client
                 logger.info(f"Client {session} enabled successfully.")
                 await event.respond(f"Account {session} enabled.")
 
@@ -568,9 +507,11 @@ class AccountHandler:
         try:
             if session in self.tbot.active_clients:
                 logger.info(f"Disconnecting active client: {session}")
-                client = self.tbot.active_clients[session]
-                await client.disconnect()
-                del self.tbot.active_clients[session]
+                # Use lock when modifying active_clients
+                async with self.tbot.active_clients_lock:
+                    client = self.tbot.active_clients[session]
+                    await client.disconnect()
+                    del self.tbot.active_clients[session]
                 logger.info(f"Client {session} disconnected and removed from active clients.")
 
             if session in self.tbot.config['clients']:
@@ -594,10 +535,3 @@ class AccountHandler:
             logger.error(f"Error deleting client {session}: {e}", exc_info=True)
             await event.respond("Error deleting account.")
 
-    async def process_message(self, client):
-        """Process messages for a specific client"""
-        try:
-            # Add your message processing logic here
-            pass
-        except Exception as e:
-            logger.error(f"Error processing message for client {client}: {e}")
