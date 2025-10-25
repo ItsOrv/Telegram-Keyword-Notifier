@@ -1,16 +1,5 @@
+import logging
 from telethon import Button
-import logging
-
-from src.actions import Actions
-import os
-import logging
-import asyncio
-import json
-from datetime import datetime
-from telethon import TelegramClient, events, Button
-from telethon.errors import SessionPasswordNeededError, FloodWaitError
-from telethon.tl.types import Channel, Chat
-from src.Config import API_ID, API_HASH, CHANNEL_ID, ADMIN_ID
 
 logger = logging.getLogger(__name__)
 
@@ -123,8 +112,7 @@ class Keyboard:
             'channel_message': Keyboard.channel_message_keyboard,
             'toggle_and_delete': Keyboard.toggle_and_delete_keyboard,
             'individual_keyboard': Keyboard.individual_keyboard(),
-            'report': Keyboard.report_keyboard(),
-            'bulk_reaction': Actions.prompt_group_action
+            'report': Keyboard.report_keyboard()
         }
 
         # Return the keyboard if it exists
