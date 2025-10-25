@@ -48,6 +48,11 @@ class Monitor:
         """
         logger.info("Setting up message processing for client.")
         await self.resolve_channel_id()  # Ensure channel ID is resolved
+        
+        # Capture self references to avoid scope issues in nested function
+        channel_id = self.channel_id
+        tbot_instance = self.tbot.tbot
+        config = self.tbot.config
 
         @client.on(events.NewMessage)
         async def process_message(event):
@@ -60,7 +65,7 @@ class Monitor:
                 logger.debug("Received new message event.")
 
                 # Ignore messages sent to the monitored channel or by the bot itself
-                if event.chat_id == self.channel_id or event.out:
+                if event.chat_id == channel_id or event.out:
                     logger.debug("Message sent to the channel itself or by the bot. Ignoring to avoid loops.")
                     return
 
@@ -74,12 +79,12 @@ class Monitor:
                 )
 
                 # Ignore messages from users listed in the IGNORE_USERS configuration
-                if sender and sender.id in self.tbot.config['IGNORE_USERS']:
+                if sender and sender.id in config['IGNORE_USERS']:
                     logger.info(f"Message from ignored user {sender.id}. Skipping.")
                     return
 
                 # Check if the message contains any of the configured keywords
-                if not any(keyword.lower() in message.lower() for keyword in self.tbot.config['KEYWORDS']):
+                if not any(keyword.lower() in message.lower() for keyword in config['KEYWORDS']):
                     logger.debug("Message does not contain any configured keywords. Skipping.")
                     return
 
@@ -110,8 +115,8 @@ class Monitor:
                 buttons = Keyboard.channel_message_keyboard(message_link, sender.id if sender else 0)
 
                 # Forward the message to the configured channel
-                await self.tbot.tbot.send_message(
-                    self.channel_id,
+                await tbot_instance.send_message(
+                    channel_id,
                     text,
                     buttons=buttons,
                     link_preview=False
@@ -123,8 +128,8 @@ class Monitor:
                 # Handle encoding errors gracefully
                 logger.error(f"UnicodeEncodeError: {e}")
                 logger.error(f"Failed text: {text}")
-                await self.tbot.tbot.send_message(
-                    self.channel_id,
+                await tbot_instance.send_message(
+                    channel_id,
                     "Error processing message due to encoding issues.",
                     link_preview=False
                 )
