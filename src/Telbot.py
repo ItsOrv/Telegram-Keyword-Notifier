@@ -22,6 +22,7 @@ class TelegramBot:
             self.config = self.config_manager.load_config()
             self.tbot = TelegramClient('bot2', API_ID, API_HASH)
             self.active_clients = {}
+            self.active_clients_lock = asyncio.Lock()  # Protection against race conditions
             self.handlers = {}
             self._conversations = {}
             self.client_manager = SessionManager(self.config, self.active_clients, self.tbot)
@@ -83,12 +84,19 @@ class TelegramBot:
 
             # Start monitoring messages for all active clients (only once per client)
             tasks = []
-            for client in self.active_clients.values():
-                if not hasattr(client, '_message_processing_set'):
-                    tasks.append(self.monitor.process_messages_for_client(client))
-                    client._message_processing_set = True
+            async with self.active_clients_lock:
+                for client in self.active_clients.values():
+                    if not hasattr(client, '_message_processing_set'):
+                        tasks.append(self.monitor.process_messages_for_client(client))
+                        client._message_processing_set = True
 
-            await asyncio.gather(*tasks)
+            # Use return_exceptions to prevent one failed task from cancelling others
+            if tasks:
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                for i, result in enumerate(results):
+                    if isinstance(result, Exception):
+                        logger.error(f"Task {i} failed with error: {result}")
+            
             await self.tbot.run_until_disconnected()
         except asyncio.CancelledError:
             logger.warning("Bot run was cancelled")
