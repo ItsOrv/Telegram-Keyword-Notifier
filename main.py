@@ -16,7 +16,3 @@ def main():
 if __name__ == '__main__':
     setup_logging()
     main()
-
-print('debug')
-
-print('debug')
