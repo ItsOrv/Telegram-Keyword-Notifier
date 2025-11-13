@@ -138,3 +138,5 @@ class Monitor:
                 logger.error("Error processing message.", exc_info=True)
 
 print('debug')
+
+print('debug')
