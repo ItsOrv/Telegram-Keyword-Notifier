@@ -136,7 +136,3 @@ class Monitor:
             except Exception as e:
                 # Handle any unexpected errors during message processing
                 logger.error("Error processing message.", exc_info=True)
-
-print('debug')
-
-print('debug')
