@@ -90,5 +90,3 @@ All notable changes to the Telegram Management Bot Panel will be documented in t
 - Keyboard layouts
 - Basic handlers structure
 
-
-
