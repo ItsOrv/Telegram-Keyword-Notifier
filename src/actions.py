@@ -4,6 +4,7 @@ import asyncio
 from telethon import TelegramClient, events, Button
 from telethon.tl.functions.messages import SendVoteRequest
 from src.Config import CHANNEL_ID
+from src.Validation import InputValidator
 
 logger = logging.getLogger(__name__)
 
