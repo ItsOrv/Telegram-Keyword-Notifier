@@ -192,7 +192,13 @@ class Actions:
         Handle the poll option selection.
         """
         try:
-            option = int(event.message.text.strip()) - 1  # Convert to 0-based index
+            # Validate poll option
+            is_valid, error_msg, option_num = InputValidator.validate_poll_option(event.message.text.strip())
+            if not is_valid:
+                await event.respond(f"❌ {error_msg}\nPlease try again.")
+                return
+            
+            option = option_num - 1  # Convert to 0-based index
             account = self.tbot.handlers.get('poll_account')
             link = self.tbot.handlers.get('poll_link')
             
