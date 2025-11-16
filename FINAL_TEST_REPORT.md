@@ -345,9 +345,3 @@ tail -f logs/bot.log
 **تست شده توسط:** AI Comprehensive Testing System  
 **تاریخ:** 2025-10-21  
 **کیفیت:** ⭐⭐⭐⭐⭐ (5/5)
-
-<!-- wip
-
-<!-- wip
-
-<!-- wip
