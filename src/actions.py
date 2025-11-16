@@ -176,6 +176,13 @@ class Actions:
         Handle the poll link input.
         """
         link = event.message.text.strip()
+        
+        # Validate link
+        is_valid, error_msg = InputValidator.validate_telegram_link(link)
+        if not is_valid:
+            await event.respond(f"❌ {error_msg}\nPlease try again.")
+            return
+        
         self.tbot.handlers['poll_link'] = link
         await event.respond("Please enter the option number you want to vote for (e.g., 1, 2, 3):")
         self.tbot._conversations[event.chat_id] = 'poll_option_handler'
