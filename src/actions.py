@@ -76,6 +76,13 @@ class Actions:
         Handle the link input for the reaction action.
         """
         link = event.message.text.strip()
+        
+        # Validate link
+        is_valid, error_msg = InputValidator.validate_telegram_link(link)
+        if not is_valid:
+            await event.respond(f"❌ {error_msg}\nPlease try again.")
+            return
+        
         await event.respond("Please select a reaction:", buttons=[
             Button.inline("👍", b'reaction_thumbsup'),
             Button.inline("❤️", b'reaction_heart'),
