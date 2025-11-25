@@ -128,5 +128,3 @@ class Keyboard:
                 return event.respond("Sorry, the requested keyboard is not available.")
             return None
 
-
-
