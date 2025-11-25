@@ -248,6 +248,13 @@ class Actions:
         """
         try:
             link = event.message.text.strip()
+            
+            # Validate link
+            is_valid, error_msg = InputValidator.validate_telegram_link(link)
+            if not is_valid:
+                await event.respond(f"❌ {error_msg}")
+                return
+            
             account = self.tbot.handlers.get('join_account')
             
             # Join the group/channel
