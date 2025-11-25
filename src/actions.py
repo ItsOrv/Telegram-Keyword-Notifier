@@ -361,6 +361,13 @@ class Actions:
         """
         try:
             message = event.message.text.strip()
+            
+            # Validate message text
+            is_valid, error_msg = InputValidator.validate_message_text(message)
+            if not is_valid:
+                await event.respond(f"❌ {error_msg}\nPlease try again.")
+                return
+            
             account = self.tbot.handlers.get('send_pv_account')
             user_input = self.tbot.handlers.get('send_pv_user')
             
