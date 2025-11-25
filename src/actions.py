@@ -399,6 +399,13 @@ class Actions:
         Handle the comment link input.
         """
         link = event.message.text.strip()
+        
+        # Validate link
+        is_valid, error_msg = InputValidator.validate_telegram_link(link)
+        if not is_valid:
+            await event.respond(f"❌ {error_msg}\nPlease try again.")
+            return
+        
         self.tbot.handlers['comment_link'] = link
         await event.respond("Please enter your comment:")
         self.tbot._conversations[event.chat_id] = 'comment_text_handler'
