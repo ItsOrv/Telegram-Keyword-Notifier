@@ -416,6 +416,13 @@ class Actions:
         """
         try:
             comment_text = event.message.text.strip()
+            
+            # Validate comment text
+            is_valid, error_msg = InputValidator.validate_message_text(comment_text)
+            if not is_valid:
+                await event.respond(f"❌ {error_msg}\nPlease try again.")
+                return
+            
             account = self.tbot.handlers.get('comment_account')
             link = self.tbot.handlers.get('comment_link')
             
