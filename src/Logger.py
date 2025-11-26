@@ -1,6 +1,5 @@
 import logging
 import os
-from asyncio.log import logger
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
