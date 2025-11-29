@@ -292,9 +292,12 @@ class StatsHandler:
         """Show bot statistics"""
         logger.info("show_stats in StatsHandler")
         try:
+            async with self.tbot.active_clients_lock:
+                active_count = len(self.tbot.active_clients)
+            
             stats = {
                 "Total Accounts": len(self.tbot.config['clients']),
-                "Active Accounts": len(self.tbot.active_clients),
+                "Active Accounts": active_count,
                 "Keywords": len(self.tbot.config['KEYWORDS']),
                 "Ignored Users": len(self.tbot.config['IGNORE_USERS'])
             }
@@ -544,8 +547,10 @@ class CallbackHandler:
                     # Check if it's an individual operation with session name
                     elif action_name in ['send_pv', 'join', 'left', 'comment']:
                         session = value
-                        if session in self.tbot.active_clients:
-                            account = self.tbot.active_clients[session]
+                        async with self.tbot.active_clients_lock:
+                            account = self.tbot.active_clients.get(session)
+                        
+                        if account:
                             await getattr(self.actions, action_name)(account, event)
                         else:
                             await event.respond(f"Account {session} not found.")
