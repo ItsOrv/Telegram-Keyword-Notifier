@@ -6,7 +6,7 @@ from datetime import datetime
 from telethon import TelegramClient, events, Button
 from telethon.errors import SessionPasswordNeededError, FloodWaitError
 from telethon.tl.types import Channel, Chat
-from src.Config import ConfigManager, API_ID, API_HASH, PORTS, ADMIN_ID, CHANNEL_ID, CLIENTS_JSON_PATH, RATE_LIMIT_SLEEP, GROUPS_BATCH_SIZE, GROUPS_UPDATE_SLEEP
+from src.Config import ConfigManager, API_ID, API_HASH, ADMIN_ID, CHANNEL_ID, CLIENTS_JSON_PATH, RATE_LIMIT_SLEEP, GROUPS_BATCH_SIZE, GROUPS_UPDATE_SLEEP
 from src.Keyboards import Keyboard
 from src.Validation import InputValidator
 
@@ -33,21 +33,32 @@ class SessionManager:
             logger.critical(f"Error initializing SessionManager: {e}")
             raise
 
-    def detect_sessions(self):
+    async def detect_sessions(self):
         """
         Detect and load Telegram client sessions from the configuration.
         Adds sessions to `active_clients` if they are not already active.
+        Note: This method is now async to support proper locking.
         """
         try:
             if not isinstance(self.config.get('clients', {}), dict):
                 logger.warning("'clients' is not a dictionary. Initializing it as an empty dictionary.")
                 self.config['clients'] = {}
 
-            for session_name in list(self.config['clients']):
-                if session_name not in self.active_clients:
-                    # Initialize Telegram client for the session with the configured port
-                    client = TelegramClient(session_name, API_ID, API_HASH)
-                    self.active_clients[session_name] = client
+            # If tbot has active_clients_lock, use it for thread-safety
+            if hasattr(self.tbot, 'active_clients_lock'):
+                async with self.tbot.active_clients_lock:
+                    for session_name in list(self.config['clients']):
+                        if session_name not in self.active_clients:
+                            # Initialize Telegram client for the session
+                            client = TelegramClient(session_name, API_ID, API_HASH)
+                            self.active_clients[session_name] = client
+            else:
+                # Fallback if lock is not available (shouldn't happen in production)
+                for session_name in list(self.config['clients']):
+                    if session_name not in self.active_clients:
+                        client = TelegramClient(session_name, API_ID, API_HASH)
+                        self.active_clients[session_name] = client
+            
             logger.info("Sessions detected and loaded successfully.")
         except Exception as e:
             logger.error(f"Error detecting sessions: {e}")
@@ -59,7 +70,7 @@ class SessionManager:
         """
         try:
             # Load session information into active_clients
-            self.detect_sessions()
+            await self.detect_sessions()
 
             for session_name, client in list(self.active_clients.items()):
                 try:
@@ -134,7 +145,7 @@ class SessionManager:
                 del self.config['clients'][session_name]
                 self.config_manager.save_config(self.config)
 
-                session_file = os.path.join("..", f"{session_name}.session")
+                session_file = f"{session_name}.session"
                 if os.path.exists(session_file):
                     os.remove(session_file)
                     logger.info(f"Session file {session_file} deleted successfully.")
@@ -321,7 +332,7 @@ class AccountHandler:
         """
         logger.info("Started update_groups process.")
         groups_per_client = {}
-        self.SessionManager.detect_sessions()
+        await self.SessionManager.detect_sessions()
 
         try:
             status_message = await event.respond("Please wait, identifying groups for each client...")
@@ -344,7 +355,11 @@ class AccountHandler:
                 except json.JSONDecodeError as e:
                     logger.error("Error decoding clients.json.", exc_info=True)
 
-            for session_name, client in self.tbot.active_clients.items():
+            # Get a snapshot of active clients to avoid holding the lock during long operations
+            async with self.tbot.active_clients_lock:
+                active_clients_snapshot = list(self.tbot.active_clients.items())
+            
+            for session_name, client in active_clients_snapshot:
                 try:
                     logger.info(f"Processing client: {session_name}")
                     group_ids = set()
@@ -420,12 +435,16 @@ class AccountHandler:
                 return
 
             messages = []
+            
+            # Get active clients snapshot
+            async with self.tbot.active_clients_lock:
+                active_sessions = set(self.tbot.active_clients.keys())
 
             for session, groups in clients_data.items():
                 try:
                     phone = session.replace('.session', '') if session else 'Unknown'
                     groups_count = len(groups)
-                    status = "🟢 Active" if session in self.tbot.active_clients else "🔴 Inactive"
+                    status = "🟢 Active" if session in active_sessions else "🔴 Inactive"
 
                     logger.debug(f"Processing account: {session}, Status: {status}, Groups: {groups_count}")
 
@@ -466,7 +485,10 @@ class AccountHandler:
                 await event.respond("Account not found.")
                 return
 
-            currently_active = session in self.tbot.active_clients
+            # Check current status with lock
+            async with self.tbot.active_clients_lock:
+                currently_active = session in self.tbot.active_clients
+            
             logger.info(f"Current status for {session}: {'Active' if currently_active else 'Inactive'}")
 
             if currently_active:
@@ -505,7 +527,11 @@ class AccountHandler:
         """
         logger.info(f"delete_client called for session: {session}")
         try:
-            if session in self.tbot.active_clients:
+            # Check if client is active with lock
+            async with self.tbot.active_clients_lock:
+                is_active = session in self.tbot.active_clients
+            
+            if is_active:
                 logger.info(f"Disconnecting active client: {session}")
                 # Use lock when modifying active_clients
                 async with self.tbot.active_clients_lock:
@@ -519,7 +545,7 @@ class AccountHandler:
                 del self.tbot.config['clients'][session]
                 self.tbot.config_manager.save_config(self.tbot.config)
 
-                session_file = f"{session}"
+                session_file = f"{session}.session"
                 if os.path.exists(session_file):
                     logger.info(f"Deleting session file: {session_file}")
                     os.remove(session_file)
