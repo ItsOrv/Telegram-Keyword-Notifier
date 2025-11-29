@@ -113,6 +113,45 @@ class ConfigManager:
 # Load environment variables from .env file
 load_dotenv()
 
+def validate_env_file() -> None:
+    """
+    Validate that all required environment variables are set.
+    Raises ValueError if any required variable is missing or invalid.
+    """
+    required_vars = {
+        'API_ID': 'Telegram API ID (get from https://my.telegram.org/apps)',
+        'API_HASH': 'Telegram API Hash (get from https://my.telegram.org/apps)',
+        'BOT_TOKEN': 'Bot Token (get from @BotFather)',
+        'ADMIN_ID': 'Your Telegram User ID (get from @userinfobot)',
+        'CHANNEL_ID': 'Channel ID or username for forwarding messages'
+    }
+    
+    missing_vars = []
+    invalid_vars = []
+    
+    for var_name, description in required_vars.items():
+        value = os.getenv(var_name)
+        
+        if not value or value in ['x', 'your_api_id_here', 'your_api_hash_here', 
+                                    'your_bot_token_here', 'your_admin_user_id_here',
+                                    'your_channel_id_or_username', '0']:
+            missing_vars.append(f"  • {var_name}: {description}")
+    
+    if missing_vars:
+        error_msg = (
+            "\n❌ Environment Configuration Error!\n\n"
+            "The following required environment variables are missing or invalid:\n"
+            + "\n".join(missing_vars) +
+            "\n\nPlease:\n"
+            "1. Copy env.example to .env: cp env.example .env\n"
+            "2. Edit .env and fill in your actual credentials\n"
+            "3. Restart the bot\n"
+        )
+        logger.critical(error_msg)
+        raise ValueError(error_msg)
+    
+    logger.info("✓ All required environment variables are configured")
+
 def get_env_variable(name: str, default: Optional[Any] = None) -> Any:
     """
     Retrieve an environment variable with an optional default value.
@@ -148,4 +187,11 @@ PORTS = {
     "HTTPS": int(get_env_variable('HTTPS_PORT', default=443)),
     "TELEGRAM": int(get_env_variable('TELEGRAM_PORT', default=443))
 }
+
+# Validate environment configuration on module import
+try:
+    validate_env_file()
+except ValueError as e:
+    # Re-raise to prevent bot from starting with invalid configuration
+    raise SystemExit(str(e))
 
