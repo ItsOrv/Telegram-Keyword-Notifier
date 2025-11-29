@@ -20,7 +20,9 @@ class Actions:
         """
         Prompt the user to enter the number of accounts to be used for the group action.
         """
-        total_accounts = len(self.tbot.active_clients)
+        async with self.tbot.active_clients_lock:
+            total_accounts = len(self.tbot.active_clients)
+        
         message = f"There are {total_accounts} accounts available. Please choose how many accounts (from 1 to {total_accounts}) will perform the {action_name} action."
         buttons = [Button.inline(str(i), f"{action_name}_{i}") for i in range(1, total_accounts + 1)]
         await event.respond(message, buttons=buttons)
@@ -29,7 +31,10 @@ class Actions:
         """
         Show a list of account names as clickable buttons and prompt the user to select which account should perform the action.
         """
-        buttons = [Button.inline(session, f"{action_name}_{session}") for session in self.tbot.active_clients.keys()]
+        async with self.tbot.active_clients_lock:
+            sessions = list(self.tbot.active_clients.keys())
+        
+        buttons = [Button.inline(session, f"{action_name}_{session}") for session in sessions]
         await event.respond("Please select an account to perform the action:", buttons=buttons)
 
     async def handle_group_action(self, event, action_name, num_accounts):
@@ -37,7 +42,8 @@ class Actions:
         Handle the group action by calling the respective function for all selected accounts.
         Uses semaphore to limit concurrent operations and avoid rate limiting.
         """
-        accounts = list(self.tbot.active_clients.values())[:num_accounts]
+        async with self.tbot.active_clients_lock:
+            accounts = list(self.tbot.active_clients.values())[:num_accounts]
         
         async def execute_action(account):
             """Execute action with concurrency limit"""
@@ -57,7 +63,9 @@ class Actions:
         """
         Handle the individual action by calling the respective function for the selected account.
         """
-        account = self.tbot.active_clients.get(session)
+        async with self.tbot.active_clients_lock:
+            account = self.tbot.active_clients.get(session)
+        
         if account:
             await getattr(self, action_name)(account, event)
         else:
@@ -75,24 +83,30 @@ class Actions:
         """
         Handle the link input for the reaction action.
         """
-        link = event.message.text.strip()
-        
-        # Validate link
-        is_valid, error_msg = InputValidator.validate_telegram_link(link)
-        if not is_valid:
-            await event.respond(f"❌ {error_msg}\nPlease try again.")
-            return
-        
-        await event.respond("Please select a reaction:", buttons=[
-            Button.inline("👍", b'reaction_thumbsup'),
-            Button.inline("❤️", b'reaction_heart'),
-            Button.inline("😂", b'reaction_laugh'),
-            Button.inline("😮", b'reaction_wow'),
-            Button.inline("😢", b'reaction_sad'),
-            Button.inline("😡", b'reaction_angry')
-        ])
-        self.tbot._conversations[event.chat_id] = 'reaction_select_handler'
-        self.tbot.handlers['reaction_link'] = link
+        try:
+            link = event.message.text.strip()
+            
+            # Validate link
+            is_valid, error_msg = InputValidator.validate_telegram_link(link)
+            if not is_valid:
+                await event.respond(f"❌ {error_msg}\nPlease try again.")
+                return
+            
+            await event.respond("Please select a reaction:", buttons=[
+                Button.inline("👍", b'reaction_thumbsup'),
+                Button.inline("❤️", b'reaction_heart'),
+                Button.inline("😂", b'reaction_laugh'),
+                Button.inline("😮", b'reaction_wow'),
+                Button.inline("😢", b'reaction_sad'),
+                Button.inline("😡", b'reaction_angry')
+            ])
+            self.tbot._conversations[event.chat_id] = 'reaction_select_handler'
+            self.tbot.handlers['reaction_link'] = link
+        except Exception as e:
+            logger.error(f"Error in reaction_link_handler: {e}")
+            await event.respond("Error processing link. Please try again.")
+            self.tbot._conversations.pop(event.chat_id, None)
+            self.tbot.handlers.pop('reaction_link', None)
 
     async def reaction_select_handler(self, event):
         """
@@ -112,7 +126,9 @@ class Actions:
         data = event.data.decode() if hasattr(event, 'data') else event.message.text.strip()
         reaction = reaction_map.get(data, data)
         
-        total_accounts = len(self.tbot.active_clients)
+        async with self.tbot.active_clients_lock:
+            total_accounts = len(self.tbot.active_clients)
+        
         await event.respond(f"Please specify the number of reactions (from 1 to {total_accounts}):")
         self.tbot._conversations[event.chat_id] = 'reaction_count_handler'
         self.tbot.handlers['reaction'] = reaction
@@ -123,11 +139,15 @@ class Actions:
         """
         try:
             count = int(event.message.text.strip())
-            if count < 1 or count > len(self.tbot.active_clients):
-                raise ValueError("Invalid number of reactions.")
+            
+            async with self.tbot.active_clients_lock:
+                total_clients = len(self.tbot.active_clients)
+                if count < 1 or count > total_clients:
+                    raise ValueError(f"Invalid number of reactions. Must be between 1 and {total_clients}.")
+                accounts = list(self.tbot.active_clients.values())[:count]
+            
             link = self.tbot.handlers['reaction_link']
             reaction = self.tbot.handlers['reaction']
-            accounts = list(self.tbot.active_clients.values())[:count]
             
             # Use semaphore to limit concurrent reactions
             async def apply_reaction_with_limit(account):
@@ -175,17 +195,24 @@ class Actions:
         """
         Handle the poll link input.
         """
-        link = event.message.text.strip()
-        
-        # Validate link
-        is_valid, error_msg = InputValidator.validate_telegram_link(link)
-        if not is_valid:
-            await event.respond(f"❌ {error_msg}\nPlease try again.")
-            return
-        
-        self.tbot.handlers['poll_link'] = link
-        await event.respond("Please enter the option number you want to vote for (e.g., 1, 2, 3):")
-        self.tbot._conversations[event.chat_id] = 'poll_option_handler'
+        try:
+            link = event.message.text.strip()
+            
+            # Validate link
+            is_valid, error_msg = InputValidator.validate_telegram_link(link)
+            if not is_valid:
+                await event.respond(f"❌ {error_msg}\nPlease try again.")
+                return
+            
+            self.tbot.handlers['poll_link'] = link
+            await event.respond("Please enter the option number you want to vote for (e.g., 1, 2, 3):")
+            self.tbot._conversations[event.chat_id] = 'poll_option_handler'
+        except Exception as e:
+            logger.error(f"Error in poll_link_handler: {e}")
+            await event.respond("Error processing link. Please try again.")
+            self.tbot._conversations.pop(event.chat_id, None)
+            self.tbot.handlers.pop('poll_account', None)
+            self.tbot.handlers.pop('poll_link', None)
 
     async def poll_option_handler(self, event):
         """
@@ -350,10 +377,17 @@ class Actions:
         """
         Handle the send_pv user input.
         """
-        user_input = event.message.text.strip()
-        self.tbot.handlers['send_pv_user'] = user_input
-        await event.respond("Please enter the message you want to send:")
-        self.tbot._conversations[event.chat_id] = 'send_pv_message_handler'
+        try:
+            user_input = event.message.text.strip()
+            self.tbot.handlers['send_pv_user'] = user_input
+            await event.respond("Please enter the message you want to send:")
+            self.tbot._conversations[event.chat_id] = 'send_pv_message_handler'
+        except Exception as e:
+            logger.error(f"Error in send_pv_user_handler: {e}")
+            await event.respond("Error processing user input. Please try again.")
+            self.tbot._conversations.pop(event.chat_id, None)
+            self.tbot.handlers.pop('send_pv_account', None)
+            self.tbot.handlers.pop('send_pv_user', None)
 
     async def send_pv_message_handler(self, event):
         """
@@ -398,17 +432,24 @@ class Actions:
         """
         Handle the comment link input.
         """
-        link = event.message.text.strip()
-        
-        # Validate link
-        is_valid, error_msg = InputValidator.validate_telegram_link(link)
-        if not is_valid:
-            await event.respond(f"❌ {error_msg}\nPlease try again.")
-            return
-        
-        self.tbot.handlers['comment_link'] = link
-        await event.respond("Please enter your comment:")
-        self.tbot._conversations[event.chat_id] = 'comment_text_handler'
+        try:
+            link = event.message.text.strip()
+            
+            # Validate link
+            is_valid, error_msg = InputValidator.validate_telegram_link(link)
+            if not is_valid:
+                await event.respond(f"❌ {error_msg}\nPlease try again.")
+                return
+            
+            self.tbot.handlers['comment_link'] = link
+            await event.respond("Please enter your comment:")
+            self.tbot._conversations[event.chat_id] = 'comment_text_handler'
+        except Exception as e:
+            logger.error(f"Error in comment_link_handler: {e}")
+            await event.respond("Error processing link. Please try again.")
+            self.tbot._conversations.pop(event.chat_id, None)
+            self.tbot.handlers.pop('comment_account', None)
+            self.tbot.handlers.pop('comment_link', None)
 
     async def comment_text_handler(self, event):
         """
