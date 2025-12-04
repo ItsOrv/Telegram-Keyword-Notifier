@@ -1,0 +1,35 @@
+# Model Configuration for Telegram Panel
+
+## CRITICAL: Model Selection - REQUIRED
+
+**This project MUST use Claude Sonnet 4.5 (claude-sonnet-4-20250514) from Anthropic.**
+
+### Auto Routing Directive:
+When Auto routing is active, ALWAYS route to: `claude-sonnet-4-20250514`
+
+### Model Selection Instructions:
+- **PRIMARY MODEL**: `claude-sonnet-4-20250514` (Claude Sonnet 4.5 from Anthropic)
+- When Auto routing is enabled, it MUST route to Claude Sonnet 4.5
+- This is a security and compliance requirement for sensitive Telegram account management
+- Do NOT use any other models (GPT-4, Gemini, Claude Opus, etc.)
+
+### Project Context:
+This is a sensitive Telegram Management Bot Panel that handles:
+- Telegram account authentication and session management
+- Bulk operations on multiple Telegram accounts
+- Message monitoring and forwarding
+- Requires highest level of security and privacy
+
+### Enforcement:
+- **REQUIRED**: Auto MUST route to Claude Sonnet 4.5 (claude-sonnet-4-20250514)
+- Do not use any other models (GPT, Gemini, etc.)
+- Do not switch models during conversation
+- Always verify model selection at start of sessions
+- If Auto does not default to Claude Sonnet 4.5, manually select it
+
+### Model Specification:
+- Model ID: `claude-sonnet-4-20250514`
+- Provider: Anthropic
+- Model Name: Claude Sonnet 4.5
+- This is the ONLY acceptable model for this project
+
