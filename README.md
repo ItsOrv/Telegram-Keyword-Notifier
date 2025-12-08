@@ -264,6 +264,41 @@ For issues, questions, or suggestions:
 - Check logs in `logs/bot.log` for error details
 - Refer to Telethon documentation: https://docs.telethon.dev/
 
+## Testing
+
+This project includes comprehensive tests covering all flows and functionality.
+
+### Running Tests
+
+```bash
+# Install test dependencies
+pip install -r requirements.txt
+
+# Run all tests
+pytest tests/
+
+# Run with coverage report
+pytest tests/ --cov=src --cov-report=html
+
+# Run specific test categories
+pytest tests/test_unit_*.py          # Unit tests
+pytest tests/test_flows_*.py         # Flow tests
+pytest tests/test_integration_*.py   # Integration tests
+
+# Or use the test runner script
+python tests/run_tests.py
+```
+
+### Test Coverage
+
+The test suite includes:
+- ✅ Unit tests for all components (Validation, Config, Keyboards, Handlers)
+- ✅ Complete flow tests for all user workflows
+- ✅ Integration tests for component interactions
+- ✅ Edge case and error handling tests
+
+See `tests/README.md` for detailed documentation.
+
 ## Disclaimer
 
 This bot is for educational and legitimate purposes only. Users are responsible for complying with Telegram's Terms of Service and applicable laws. Misuse of this tool may result in account bans or legal consequences.
