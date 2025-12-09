@@ -50,8 +50,9 @@ class KeywordHandler:
         try:
             if isinstance(event, events.CallbackQuery.Event):
                 buttons = [Button.inline("Cancel", b'cancel')]
-                await event.respond("Please enter the keyword you want to add.", buttons=buttons)
-                self.tbot._conversations[event.chat_id] = 'add_keyword_handler'
+                await event.respond("لطفاً کلمه کلیدی که می‌خواهید اضافه کنید را وارد کنید.", buttons=buttons)
+                async with self.tbot._conversations_lock:
+                    self.tbot._conversations[event.chat_id] = 'add_keyword_handler'
                 return
 
             keyword = str(event.message.text.strip())
@@ -73,12 +74,14 @@ class KeywordHandler:
             await event.respond(f"📝 Current keywords: {keywords}")
             
             # Cleanup conversation state
-            self.tbot._conversations.pop(event.chat_id, None)
+            async with self.tbot._conversations_lock:
+                self.tbot._conversations.pop(event.chat_id, None)
 
         except Exception as e:
             logger.error(f"Error adding keyword: {e}")
-            await event.respond("Error adding keyword")
-            self.tbot._conversations.pop(event.chat_id, None)
+            await event.respond("❌ خطا در اضافه کردن کلمه کلیدی")
+            async with self.tbot._conversations_lock:
+                self.tbot._conversations.pop(event.chat_id, None)
 
     async def remove_keyword_handler(self, event):
         """Remove a keyword from monitoring"""
@@ -86,8 +89,9 @@ class KeywordHandler:
         try:
             if isinstance(event, events.CallbackQuery.Event):
                 buttons = [Button.inline("Cancel", b'cancel')]
-                await event.respond("Please enter the keyword you want to remove.", buttons=buttons)
-                self.tbot._conversations[event.chat_id] = 'remove_keyword_handler'
+                await event.respond("لطفاً کلمه کلیدی که می‌خواهید حذف کنید را وارد کنید.", buttons=buttons)
+                async with self.tbot._conversations_lock:
+                    self.tbot._conversations[event.chat_id] = 'remove_keyword_handler'
                 return
 
             keyword = str(event.message.text.strip())
@@ -102,12 +106,14 @@ class KeywordHandler:
             await event.respond(f"Current keywords: {keywords}")
             
             # Cleanup conversation state
-            self.tbot._conversations.pop(event.chat_id, None)
+            async with self.tbot._conversations_lock:
+                self.tbot._conversations.pop(event.chat_id, None)
 
         except Exception as e:
             logger.error(f"Error removing keyword: {e}")
-            await event.respond("Error removing keyword")
-            self.tbot._conversations.pop(event.chat_id, None)
+            await event.respond("❌ خطا در حذف کلمه کلیدی")
+            async with self.tbot._conversations_lock:
+                self.tbot._conversations.pop(event.chat_id, None)
 
     async def ignore_user_handler(self, event):
         """Ignore a user from further interaction"""
@@ -115,8 +121,9 @@ class KeywordHandler:
         try:
             if isinstance(event, events.CallbackQuery.Event):
                 buttons = [Button.inline("Cancel", b'cancel')]
-                await event.respond("Please enter the user ID you want to ignore.", buttons=buttons)
-                self.tbot._conversations[event.chat_id] = 'ignore_user_handler'
+                await event.respond("لطفاً شناسه کاربری که می‌خواهید نادیده گرفته شود را وارد کنید.", buttons=buttons)
+                async with self.tbot._conversations_lock:
+                    self.tbot._conversations[event.chat_id] = 'ignore_user_handler'
                 return
 
             # Validate and parse user ID
@@ -136,12 +143,14 @@ class KeywordHandler:
             await event.respond(f"Ignored users: {ignored_users}")
             
             # Cleanup conversation state
-            self.tbot._conversations.pop(event.chat_id, None)
+            async with self.tbot._conversations_lock:
+                self.tbot._conversations.pop(event.chat_id, None)
 
         except Exception as e:
             logger.error(f"Error ignoring user: {e}")
-            await event.respond("Error ignoring user")
-            self.tbot._conversations.pop(event.chat_id, None)
+            await event.respond("❌ خطا در نادیده گرفتن کاربر")
+            async with self.tbot._conversations_lock:
+                self.tbot._conversations.pop(event.chat_id, None)
 
     async def delete_ignore_user_handler(self, event):
         """Remove a user from the ignore list"""
@@ -149,8 +158,9 @@ class KeywordHandler:
         try:
             if isinstance(event, events.CallbackQuery.Event):
                 buttons = [Button.inline("Cancel", b'cancel')]
-                await event.respond("Please enter the user ID you want to stop ignoring.", buttons=buttons)
-                self.tbot._conversations[event.chat_id] = 'delete_ignore_user_handler'
+                await event.respond("لطفاً شناسه کاربری که می‌خواهید از لیست نادیده گرفته‌شده حذف کنید را وارد کنید.", buttons=buttons)
+                async with self.tbot._conversations_lock:
+                    self.tbot._conversations[event.chat_id] = 'delete_ignore_user_handler'
                 return
 
             # Validate and parse user ID
@@ -170,12 +180,14 @@ class KeywordHandler:
             await event.respond(f"Ignored users: {ignored_users}")
             
             # Cleanup conversation state
-            self.tbot._conversations.pop(event.chat_id, None)
+            async with self.tbot._conversations_lock:
+                self.tbot._conversations.pop(event.chat_id, None)
 
         except Exception as e:
             logger.error(f"Error deleting ignored user: {e}")
-            await event.respond("Error deleting ignored user")
-            self.tbot._conversations.pop(event.chat_id, None)
+            await event.respond("❌ خطا در حذف کاربر از لیست نادیده گرفته‌شده")
+            async with self.tbot._conversations_lock:
+                self.tbot._conversations.pop(event.chat_id, None)
 
     async def ignore_user(self, user_id, event): # for channel button
         """Ignore a user from further interaction."""
@@ -397,7 +409,7 @@ class CallbackHandler:
             'remove_ignore_user': self.keyword_handler.delete_ignore_user_handler,
             'show_stats': self.stats_handler.show_stats,
             'show_groups': self.stats_handler.show_groups,
-            'Show_keyword': self.stats_handler.show_keywords,
+            'show_keyword': self.stats_handler.show_keywords,
             'show_ignores': self.stats_handler.show_ignores,
             'monitor_mode': self.show_monitor_keyboard,
             'account_management': self.show_account_management_keyboard,
@@ -506,7 +518,8 @@ class CallbackHandler:
 
             if data == 'cancel':
                 chat_id = event.chat_id
-                self.tbot._conversations.pop(chat_id, None)
+                async with self.tbot._conversations_lock:
+                    self.tbot._conversations.pop(chat_id, None)
                 await event.delete()
                 return
 

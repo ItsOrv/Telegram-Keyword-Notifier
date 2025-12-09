@@ -54,7 +54,7 @@ class Monitor:
         tbot_instance = self.tbot.tbot
         config = self.tbot.config
 
-        @client.on(events.NewMessage)
+        # Define the handler function BEFORE decorating to enable cleanup
         async def process_message(event):
             """
             Handle and process new messages received by the client.
@@ -70,13 +70,19 @@ class Monitor:
                     return
 
                 # Extract message text or set a placeholder if empty
-                message = event.message.text or "-"
+                raw_message = event.message.text or "-"
+                # Sanitize message text to prevent injection attacks
+                from src.Validation import InputValidator
+                message = InputValidator.sanitize_input(raw_message, max_length=4000)
                 sender = await event.get_sender()
-                sender_info = (
-                    f"User: {getattr(sender, 'first_name', '-') or '-'} {getattr(sender, 'last_name', '-') or '-'}\n"
-                    f"• User ID: `{getattr(sender, 'id', '-')}`\n"
-                    if sender else "User: -\n• User ID: -\n"
-                )
+                if sender:
+                    # Safely extract and sanitize sender info
+                    first_name = InputValidator.sanitize_input(getattr(sender, 'first_name', '') or '', max_length=50)
+                    last_name = InputValidator.sanitize_input(getattr(sender, 'last_name', '') or '', max_length=50)
+                    sender_id = getattr(sender, 'id', 0)
+                    sender_info = f"User: {first_name} {last_name}\n• User ID: `{sender_id}`\n"
+                else:
+                    sender_info = "User: -\n• User ID: -\n"
 
                 # Ignore messages from users listed in the IGNORE_USERS configuration
                 if sender and sender.id in config['IGNORE_USERS']:
@@ -90,7 +96,8 @@ class Monitor:
 
                 # Extract chat information
                 chat = await event.get_chat()
-                chat_title = getattr(chat, 'title', '-') or '-'
+                raw_chat_title = getattr(chat, 'title', '') or ''
+                chat_title = InputValidator.sanitize_input(raw_chat_title, max_length=100) or '-'
                 logger.info(f"Processing message from chat: {chat_title}")
 
                 # Extract session name from the client's session file
@@ -146,3 +153,31 @@ class Monitor:
             except Exception as e:
                 # Handle any unexpected errors during message processing
                 logger.error("Error processing message.", exc_info=True)
+        
+        # Register the event handler
+        handler = client.on(events.NewMessage)(process_message)
+        
+        # Store handler reference for cleanup
+        if not hasattr(client, '_registered_handlers'):
+            client._registered_handlers = []
+        client._registered_handlers.append(handler)
+        
+        logger.info(f"Message processing handler registered for client {client.session.filename if hasattr(client, 'session') else 'Unknown'}")
+    
+    def cleanup_client_handlers(self, client):
+        """
+        Remove all event handlers for a client to prevent memory leaks.
+        
+        :param client: TelegramClient instance to clean up handlers for.
+        """
+        try:
+            if hasattr(client, '_registered_handlers'):
+                for handler in client._registered_handlers:
+                    try:
+                        client.remove_event_handler(handler)
+                    except Exception as e:
+                        logger.warning(f"Error removing event handler: {e}")
+                client._registered_handlers.clear()
+                logger.info(f"Cleaned up handlers for client {client.session.filename if hasattr(client, 'session') else 'Unknown'}")
+        except Exception as e:
+            logger.error(f"Error during handler cleanup: {e}")

@@ -25,6 +25,7 @@ class TelegramBot:
             self.active_clients_lock = asyncio.Lock()  # Protection against race conditions
             self.handlers = {}
             self._conversations = {}
+            self._conversations_lock = asyncio.Lock()  # Protection for conversation state
             self.client_manager = SessionManager(self.config, self.active_clients, self.tbot)
             self.account_handler = AccountHandler(self)
             self.monitor = Monitor(self)

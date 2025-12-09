@@ -33,7 +33,7 @@ class Keyboard:
             [Button.inline("Update Groups", b'update_groups')],
             [
                 Button.inline('Show Groups', b'show_groups'),
-                Button.inline('Show Keyword', b'Show_keyword')
+                Button.inline('Show Keyword', b'show_keyword')
             ],
             [Button.inline("Show Ignores", b'show_ignores')],
             [Button.inline("Exit", 'exit')]
@@ -86,6 +86,7 @@ class Keyboard:
     def individual_keyboard():
         """Returns the keyboard for individual operations"""
         return [
+            [Button.inline("Reaction", 'reaction')],
             [Button.inline("Send PV", 'send_pv')],
             [Button.inline("Join", 'join')],
             [Button.inline("Left", 'left')],

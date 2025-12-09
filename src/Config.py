@@ -17,6 +17,11 @@ class ConfigManager:
         :param config: Initial configuration dictionary (optional).
         """
         try:
+            # Sanitize filename to prevent path traversal
+            import re
+            filename = re.sub(r'[^\w\-_\.]', '', os.path.basename(filename))
+            if not filename.endswith('.json'):
+                filename = "config.json"
             self.filename = filename
             self.default_config = {
                 "TARGET_GROUPS": [],  # List of target groups for the bot

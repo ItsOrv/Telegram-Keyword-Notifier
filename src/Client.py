@@ -100,6 +100,9 @@ class SessionManager:
         try:
             for session_name, client in list(self.active_clients.items()):
                 try:
+                    # Cleanup handlers before disconnecting to prevent memory leaks
+                    if hasattr(self.tbot, 'monitor'):
+                        self.tbot.monitor.cleanup_client_handlers(client)
                     await client.disconnect()
                     logger.info(f"Client {session_name} disconnected successfully.")
                 except Exception as e:
@@ -137,6 +140,9 @@ class SessionManager:
         try:
             if session_name in self.active_clients:
                 client = self.active_clients[session_name]
+                # Cleanup handlers before disconnecting
+                if hasattr(self.tbot, 'monitor'):
+                    self.tbot.monitor.cleanup_client_handlers(client)
                 await client.disconnect()
                 del self.active_clients[session_name]
                 logger.info(f"Client {session_name} disconnected and removed from active clients.")
@@ -190,7 +196,8 @@ class AccountHandler:
         try:
             buttons = [Button.inline("Cancel", b'cancel')]
             await self.tbot.tbot.send_message(chat_id, "Please enter your phone number:", buttons=buttons)
-            self.tbot._conversations[chat_id] = 'phone_number_handler'
+            async with self.tbot._conversations_lock:
+                self.tbot._conversations[chat_id] = 'phone_number_handler'
         except Exception as e:
             logger.error(f"Error in add_account: {e}")
             await self.tbot.tbot.send_message(chat_id, "Error occurred while adding account. Please try again.")
@@ -220,7 +227,8 @@ class AccountHandler:
                 await self.tbot.tbot.send_message(chat_id, "Authorizing...")
                 await client.send_code_request(phone_number)
                 await self.tbot.tbot.send_message(chat_id, "Enter the verification code:")
-                self.tbot._conversations[chat_id] = 'code_handler'
+                async with self.tbot._conversations_lock:
+                    self.tbot._conversations[chat_id] = 'code_handler'
                 self.tbot.handlers['temp_client'] = client
                 self.tbot.handlers['temp_phone'] = phone_number
             else:
@@ -248,7 +256,8 @@ class AccountHandler:
             await self.finalize_client_setup(client, phone_number, chat_id)
         except SessionPasswordNeededError:
             await self.tbot.tbot.send_message(chat_id, "Enter your 2FA password:")
-            self.tbot._conversations[chat_id] = 'password_handler'
+            async with self.tbot._conversations_lock:
+                self.tbot._conversations[chat_id] = 'password_handler'
         except Exception as e:
             logger.error(f"Error in code_handler: {e}")
             await self.tbot.tbot.send_message(chat_id, "Error occurred. Please try again.")
@@ -364,22 +373,29 @@ class AccountHandler:
                     logger.info(f"Processing client: {session_name}")
                     group_ids = set()
 
-                    async for dialog in client.iter_dialogs(limit=None):
+                    # Process dialogs in batches for better performance
+                    batch_count = 0
+                    dialog_limit = 5000  # Reasonable limit to prevent excessive processing
+                    
+                    async for dialog in client.iter_dialogs(limit=dialog_limit):
                         try:
                             if isinstance(dialog.entity, (Chat, Channel)) and not (
                                 isinstance(dialog.entity, Channel) and dialog.entity.broadcast
                             ):
                                 group_ids.add(dialog.entity.id)
-
-                            if len(group_ids) % GROUPS_BATCH_SIZE == 0:
-                                await asyncio.sleep(RATE_LIMIT_SLEEP)
-
+                            
+                            batch_count += 1
+                            
+                            # Rate limiting and progress updates
+                            if batch_count % GROUPS_BATCH_SIZE == 0:
+                                await asyncio.sleep(1)  # Shorter sleep for better responsiveness
+                                
+                            if len(group_ids) % 20 == 0:
+                                await status_message.edit(f"Found {len(group_ids)} groups for {session_name}...")
+                                
                         except Exception as e:
                             logger.error(f"Error processing dialog for client {session_name}.", exc_info=True)
                             continue
-
-                        if len(group_ids) % 20 == 0:
-                            await status_message.edit(f"Found {len(group_ids)} groups for {session_name}...")
 
                     groups_per_client[session_name] = list(group_ids)
                     logger.info(f"Found {len(group_ids)} groups for client {session_name}.")
@@ -496,6 +512,9 @@ class AccountHandler:
                 # Use lock when modifying active_clients
                 async with self.tbot.active_clients_lock:
                     client = self.tbot.active_clients[session]
+                    # Cleanup handlers before disconnecting
+                    if hasattr(self.tbot, 'monitor'):
+                        self.tbot.monitor.cleanup_client_handlers(client)
                     await client.disconnect()
                     del self.tbot.active_clients[session]
                 logger.info(f"Client {session} disabled successfully.")
@@ -507,8 +526,14 @@ class AccountHandler:
                 # Use lock when modifying active_clients
                 async with self.tbot.active_clients_lock:
                     self.tbot.active_clients[session] = client
+                
+                # Set up message monitoring for this newly enabled client
+                if not hasattr(client, '_message_processing_set'):
+                    await self.tbot.monitor.process_messages_for_client(client)
+                    client._message_processing_set = True
+                
                 logger.info(f"Client {session} enabled successfully.")
-                await event.respond(f"Account {session} enabled.")
+                await event.respond(f"✅ حساب {session} فعال شد.")
 
             logger.info("Saving updated configuration.")
             self.tbot.config_manager.save_config(self.tbot.config)
@@ -536,6 +561,9 @@ class AccountHandler:
                 # Use lock when modifying active_clients
                 async with self.tbot.active_clients_lock:
                     client = self.tbot.active_clients[session]
+                    # Cleanup handlers before disconnecting
+                    if hasattr(self.tbot, 'monitor'):
+                        self.tbot.monitor.cleanup_client_handlers(client)
                     await client.disconnect()
                     del self.tbot.active_clients[session]
                 logger.info(f"Client {session} disconnected and removed from active clients.")
