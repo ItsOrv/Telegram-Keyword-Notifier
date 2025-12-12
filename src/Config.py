@@ -127,8 +127,12 @@ def validate_env_file() -> None:
         'API_ID': 'Telegram API ID (get from https://my.telegram.org/apps)',
         'API_HASH': 'Telegram API Hash (get from https://my.telegram.org/apps)',
         'BOT_TOKEN': 'Bot Token (get from @BotFather)',
-        'ADMIN_ID': 'Your Telegram User ID (get from @userinfobot)',
-        'CHANNEL_ID': 'Channel ID or username for forwarding messages'
+        'ADMIN_ID': 'Your Telegram User ID (get from @userinfobot)'
+    }
+    
+    # CHANNEL_ID is optional - can be set later
+    optional_vars = {
+        'CHANNEL_ID': 'Channel ID or username for forwarding messages (optional)'
     }
     
     missing_vars = []
@@ -141,6 +145,12 @@ def validate_env_file() -> None:
                                     'your_bot_token_here', 'your_admin_user_id_here',
                                     'your_channel_id_or_username', '0']:
             missing_vars.append(f"  • {var_name}: {description}")
+    
+    # Check optional vars but don't fail validation
+    for var_name, description in optional_vars.items():
+        value = os.getenv(var_name)
+        if not value or value in ['x', 'your_channel_id_or_username', '0']:
+            logger.warning(f"Optional variable '{var_name}' not set: {description}")
     
     if missing_vars:
         error_msg = (

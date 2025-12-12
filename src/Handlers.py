@@ -6,7 +6,7 @@ from datetime import datetime
 from telethon import TelegramClient, events, Button
 from telethon.errors import SessionPasswordNeededError, FloodWaitError
 from telethon.tl.types import Channel, Chat
-from src.Config import API_ID, API_HASH, CHANNEL_ID, ADMIN_ID ,CLIENTS_JSON_PATH, RATE_LIMIT_SLEEP, GROUPS_BATCH_SIZE, GROUPS_UPDATE_SLEEP
+from src.Config import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID, ADMIN_ID ,CLIENTS_JSON_PATH, RATE_LIMIT_SLEEP, GROUPS_BATCH_SIZE, GROUPS_UPDATE_SLEEP
 from src.Client import SessionManager ,AccountHandler
 from src.Keyboards import Keyboard
 from src.actions import Actions
@@ -24,21 +24,29 @@ class CommandHandler:
 
     async def start_command(self, event):
         """Handle /start command"""
-        logger.info("start command in CommandHandler")
+        logger.info(f"start command in CommandHandler - sender_id: {event.sender_id}")
         try:
+            # Admin check is already done in admin_only wrapper, but keeping for safety
             if event.sender_id != int(ADMIN_ID):
+                logger.warning(f"Unauthorized /start from {event.sender_id}")
                 await event.respond("You are not the admin")
                 return
 
+            logger.info("Creating start keyboard...")
             buttons = Keyboard.start_keyboard()
+            logger.info("Sending start message with keyboard...")
             await event.respond(
                 "Telegram Management Bot\n\n",
                 buttons=buttons
             )
+            logger.info("Start command completed successfully")
 
         except Exception as e:
-            logger.error(f"Error in start_command: {e}")
-            await event.respond("Error showing menu. Please try again.")
+            logger.error(f"Error in start_command: {e}", exc_info=True)
+            try:
+                await event.respond("Error showing menu. Please try again.")
+            except Exception as e2:
+                logger.error(f"Error sending error message: {e2}")
 
 class KeywordHandler:
     def __init__(self, tbot):
@@ -213,11 +221,24 @@ class MessageHandler:
 
     async def message_handler(self, event):
         """Handle incoming messages based on conversation state"""
-        logger.info("message_handler in MessageHandler")
+        logger.info(f"message_handler in MessageHandler - message: {event.message.text}")
 
+        # Skip messages from the bot itself
+        bot_user_id = int(BOT_TOKEN.split(':')[0])  # Extract bot ID from token
+        if event.sender_id == bot_user_id:
+            logger.debug(f"Ignoring message from bot itself (ID: {bot_user_id})")
+            return False
+
+        # Skip if this is a command (should be handled by command handler)
+        if event.message.text and event.message.text.startswith('/'):
+            logger.debug(f"Skipping command message: {event.message.text}")
+            return False
+
+        # Allow admin user to continue conversations
         if event.sender_id != int(ADMIN_ID):
+            logger.warning(f"Non-admin message from {event.sender_id}: {event.message.text[:50]}...")
             await event.respond("You are not the admin")
-            return
+            return False
 
         if event.chat_id in self.tbot._conversations:
             handler_name = self.tbot._conversations[event.chat_id]
@@ -284,6 +305,15 @@ class MessageHandler:
                 return True
             elif handler_name == 'send_pv_message_handler':
                 await self.actions.send_pv_message_handler(event)
+                return True
+            elif handler_name == 'bulk_send_pv_account_count_handler':
+                await self.actions.bulk_send_pv_account_count_handler(event)
+                return True
+            elif handler_name == 'bulk_send_pv_user_handler':
+                await self.actions.bulk_send_pv_user_handler(event)
+                return True
+            elif handler_name == 'bulk_send_pv_message_handler':
+                await self.actions.bulk_send_pv_message_handler(event)
                 return True
             
             # Action handlers - Comment
@@ -402,6 +432,7 @@ class CallbackHandler:
         self.callback_actions = {
             'add_account': self.account_handler.add_account,
             'list_accounts': self.account_handler.show_accounts,
+            'inactive_accounts': self.tbot.client_manager.show_inactive_accounts,
             'update_groups': self.account_handler.update_groups,
             'add_keyword': self.keyword_handler.add_keyword_handler,
             'remove_keyword': self.keyword_handler.remove_keyword_handler,
@@ -431,28 +462,29 @@ class CallbackHandler:
             'comment': self.handle_individual_comment,
         }
 
-    def show_start_keyboard(self, event):
-        return Keyboard.show_keyboard('start', event)
+    async def show_start_keyboard(self, event):
+        """Handles the start keyboard display"""
+        await Keyboard.show_keyboard('start', event)
 
-    def show_monitor_keyboard(self, event):
+    async def show_monitor_keyboard(self, event):
         """Handles the monitor mode keyboard display"""
-        return Keyboard.show_keyboard('monitor', event)
+        await Keyboard.show_keyboard('monitor', event)
 
-    def show_account_management_keyboard(self, event):
+    async def show_account_management_keyboard(self, event):
         """Handles the account management keyboard display"""
-        return Keyboard.show_keyboard('account_management', event)
+        await Keyboard.show_keyboard('account_management', event)
 
-    def show_bulk_operations_keyboard(self, event):
+    async def show_bulk_operations_keyboard(self, event):
         """Handles the bulk operations keyboard display"""
-        return Keyboard.show_keyboard('bulk', event)
+        await Keyboard.show_keyboard('bulk', event)
 
-    def show_individual_keyboard(self, event):
+    async def show_individual_keyboard(self, event):
         """Handles the individual operations keyboard display"""
-        return Keyboard.show_keyboard('individual_keyboard', event)
+        await Keyboard.show_keyboard('individual_keyboard', event)
 
-    def show_report_keyboard(self, event):
+    async def show_report_keyboard(self, event):
         """Handles the report keyboard display"""
-        return Keyboard.show_keyboard('report', event)
+        await Keyboard.show_keyboard('report', event)
 
     # Bulk operation handlers
     async def handle_bulk_reaction(self, event):
@@ -463,7 +495,12 @@ class CallbackHandler:
     async def handle_bulk_poll(self, event):
         """Handle bulk poll operation"""
         logger.info("handle_bulk_poll in CallbackHandler")
-        await self.actions.prompt_group_action(event, 'poll')
+        async with self.tbot.active_clients_lock:
+            total_accounts = len(self.tbot.active_clients)
+        if total_accounts == 0:
+            await event.respond("❌ هیچ حسابی برای عملیات موجود نیست.")
+            return
+        await self.actions.bulk_poll(event, total_accounts)
 
     async def handle_bulk_join(self, event):
         """Handle bulk join operation"""
@@ -478,7 +515,35 @@ class CallbackHandler:
     async def handle_bulk_send_pv(self, event):
         """Handle bulk send_pv operation"""
         logger.info("handle_bulk_send_pv in CallbackHandler")
-        await self.actions.prompt_group_action(event, 'send_pv')
+
+        # Answer the callback query first
+        try:
+            await event.answer()
+            logger.info("Callback query answered")
+        except Exception as e:
+            logger.warning(f"Failed to answer callback: {e}")
+
+        async with self.tbot.active_clients_lock:
+            total_accounts = len(self.tbot.active_clients)
+        logger.info(f"Total accounts available: {total_accounts}")
+        if total_accounts == 0:
+            await event.respond("❌ No accounts available for this operation.")
+            return
+
+        # Ask user to specify how many accounts they want to use
+        message = f"You currently have {total_accounts} accounts available.\n\nHow many accounts do you want to use for this task?\n\nPlease send a number between 1 and {total_accounts}:"
+        logger.info(f"Sending message to user: {message[:50]}...")
+        try:
+            await event.respond(message)
+            logger.info("Message sent successfully")
+        except Exception as e:
+            logger.error(f"Failed to send message: {e}")
+            return
+
+        # Set up conversation to receive the number of accounts
+        async with self.tbot._conversations_lock:
+            self.tbot._conversations[event.chat_id] = 'bulk_send_pv_account_count_handler'
+        logger.info("Conversation state set to bulk_send_pv_account_count_handler")
 
     async def handle_bulk_comment(self, event):
         """Handle bulk comment operation"""
@@ -510,6 +575,18 @@ class CallbackHandler:
         """Handle callback queries"""
         logger.info("callback_handler in CallbackHandler")
         try:
+            # Skip callbacks from the bot itself
+            bot_user_id = int(BOT_TOKEN.split(':')[0])  # Extract bot ID from token
+            if event.sender_id == bot_user_id:
+                logger.debug(f"Ignoring callback from bot itself (ID: {bot_user_id})")
+                return
+
+            # Answer the callback query first to remove loading state
+            try:
+                await event.answer()
+            except Exception as e:
+                logger.warning(f"Error answering callback query: {e}")
+
             if event.sender_id != int(ADMIN_ID):
                 await event.respond("You are not the admin")
                 return
@@ -541,7 +618,12 @@ class CallbackHandler:
                 await self.account_handler.toggle_client(session, event)
             elif data.startswith('delete_'):
                 session = data.replace('delete_', '')
-                await self.tbot.client_manager.delete_session(session)
+                try:
+                    await self.tbot.client_manager.delete_session(session)
+                    await event.respond(f"✅ حساب {session} با موفقیت حذف شد.")
+                except Exception as e:
+                    logger.error(f"Error deleting session {session}: {e}")
+                    await event.respond(f"❌ خطا در حذف حساب {session}.")
             # Handle reaction button selections
             elif data.startswith('reaction_') and data != 'reaction_link_handler':
                 # Check if it's a reaction emoji selection (not a number)
@@ -554,7 +636,7 @@ class CallbackHandler:
                 if len(parts) == 2:
                     action_name, value = parts
                     # Check if it's a bulk operation with number of accounts
-                    if value.isdigit() and action_name in ['reaction', 'poll', 'join', 'block', 'send_pv', 'comment']:
+                    if value.isdigit() and action_name in ['reaction', 'join', 'block', 'comment', 'send_pv']:
                         num_accounts = int(value)
                         await self.actions.handle_group_action(event, action_name, num_accounts)
                     # Check if it's an individual operation with session name
