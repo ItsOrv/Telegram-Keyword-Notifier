@@ -108,21 +108,63 @@ class Actions:
         Handle the group action by calling the respective function for all selected accounts.
         Uses semaphore to limit concurrent operations and avoid rate limiting.
         """
+        # Get valid accounts - check if they're still connected and authorized
+        valid_accounts = []
+        invalid_sessions = []
+
         async with self.tbot.active_clients_lock:
-            accounts = list(self.tbot.active_clients.values())[:num_accounts]
-        
-        async def execute_action(account):
+            for session_name, client in list(self.tbot.active_clients.items())[:num_accounts]:
+                try:
+                    # Check if client is connected and authorized
+                    if not client.is_connected():
+                        await client.connect()
+
+                    if await client.is_user_authorized():
+                        valid_accounts.append((session_name, client))
+                    else:
+                        invalid_sessions.append(session_name)
+                        logger.warning(f"Client {session_name} is not authorized, removing from active clients")
+                        # Remove invalid client from active_clients
+                        del self.tbot.active_clients[session_name]
+                except Exception as e:
+                    logger.error(f"Error validating client {session_name}: {e}")
+                    invalid_sessions.append(session_name)
+                    # Remove invalid client from active_clients
+                    if session_name in self.tbot.active_clients:
+                        del self.tbot.active_clients[session_name]
+
+        # If we have invalid sessions, notify user
+        if invalid_sessions:
+            await event.respond(f"⚠️ {len(invalid_sessions)} حساب نامعتبر شناسایی شد و از لیست حذف شدند.")
+
+        # If no valid accounts, stop
+        if not valid_accounts:
+            await event.respond("❌ هیچ حساب معتبری برای اجرای عملیات یافت نشد.")
+            return
+
+        async def execute_action(session_name, account):
             """Execute action with concurrency limit"""
             async with self.operation_semaphore:
                 try:
+                    # Standard bulk operations
                     await getattr(self, action_name)(account, event)
                     # Add delay between operations to avoid rate limiting
                     await asyncio.sleep(random.uniform(1, 3))
                 except Exception as e:
-                    logger.error(f"Error executing {action_name} for account {account.session.filename}: {e}")
-        
+                    error_msg = str(e)
+                    logger.error(f"Error executing {action_name} for account {session_name}: {error_msg}")
+
+                    # If session is revoked, remove it from active clients
+                    if "SessionRevokedError" in error_msg or "not logged in" in error_msg.lower():
+                        async with self.tbot.active_clients_lock:
+                            if session_name in self.tbot.active_clients:
+                                logger.warning(f"Removing revoked session: {session_name}")
+                                del self.tbot.active_clients[session_name]
+
         # Execute all actions concurrently with semaphore limiting
-        tasks = [execute_action(account) for account in accounts]
+        # Use only valid accounts
+        accounts_to_use = valid_accounts[:num_accounts]
+        tasks = [execute_action(session_name, account) for session_name, account in accounts_to_use]
         await asyncio.gather(*tasks, return_exceptions=True)
 
     async def handle_individual_action(self, event, action_name, session):
@@ -206,26 +248,73 @@ class Actions:
         try:
             count = int(event.message.text.strip())
             
+            # Get valid accounts - check if they're still connected and authorized
+            valid_accounts = []
+            invalid_sessions = []
+
             async with self.tbot.active_clients_lock:
                 total_clients = len(self.tbot.active_clients)
                 if count < 1 or count > total_clients:
                     raise ValueError(f"Invalid number of reactions. Must be between 1 and {total_clients}.")
-                accounts = list(self.tbot.active_clients.values())[:count]
-            
+
+                for session_name, client in list(self.tbot.active_clients.items())[:count]:
+                    try:
+                        # Check if client is connected and authorized
+                        if not client.is_connected():
+                            await client.connect()
+
+                        if await client.is_user_authorized():
+                            valid_accounts.append((session_name, client))
+                        else:
+                            invalid_sessions.append(session_name)
+                            logger.warning(f"Client {session_name} is not authorized, removing from active clients")
+                            # Remove invalid client from active_clients
+                            del self.tbot.active_clients[session_name]
+                    except Exception as e:
+                        logger.error(f"Error validating client {session_name}: {e}")
+                        invalid_sessions.append(session_name)
+                        # Remove invalid client from active_clients
+                        if session_name in self.tbot.active_clients:
+                            del self.tbot.active_clients[session_name]
+
+            # If we have invalid sessions, notify user
+            if invalid_sessions:
+                await event.respond(f"⚠️ {len(invalid_sessions)} حساب نامعتبر شناسایی شد و از لیست حذف شدند.")
+
+            # If no valid accounts, stop
+            if not valid_accounts:
+                await event.respond("❌ هیچ حساب معتبری برای ارسال واکنش یافت نشد.")
+                # Cleanup
+                self.tbot.handlers.pop('reaction_link', None)
+                self.tbot.handlers.pop('reaction', None)
+                async with self.tbot._conversations_lock:
+                    self.tbot._conversations.pop(event.chat_id, None)
+                return
+
             link = self.tbot.handlers['reaction_link']
             reaction = self.tbot.handlers['reaction']
-            
+
             # Use semaphore to limit concurrent reactions
-            async def apply_reaction_with_limit(account):
+            async def apply_reaction_with_limit(session_name, account):
                 async with self.operation_semaphore:
                     try:
                         await self.apply_reaction(account, link, reaction)
                         await asyncio.sleep(random.uniform(2, 5))
                     except Exception as e:
-                        logger.error(f"Error applying reaction with account {account.session.filename}: {e}")
-            
+                        error_msg = str(e)
+                        logger.error(f"Error applying reaction with account {session_name}: {error_msg}")
+
+                        # If session is revoked, remove it from active clients
+                        if "SessionRevokedError" in error_msg or "not logged in" in error_msg.lower():
+                            async with self.tbot.active_clients_lock:
+                                if session_name in self.tbot.active_clients:
+                                    logger.warning(f"Removing revoked session: {session_name}")
+                                    del self.tbot.active_clients[session_name]
+
             # Execute all reactions with concurrency control
-            tasks = [apply_reaction_with_limit(account) for account in accounts]
+            # Use only valid accounts
+            accounts_to_use = valid_accounts[:count]
+            tasks = [apply_reaction_with_limit(session_name, account) for session_name, account in accounts_to_use]
             await asyncio.gather(*tasks, return_exceptions=True)
             
             await event.respond(f"Applied {reaction} reaction using {count} accounts.")
@@ -462,60 +551,6 @@ class Actions:
             await event.respond(f"Error blocking user: {str(e)}")
             self.tbot._conversations.pop(event.chat_id, None)
 
-    async def send_pv(self, account, event):
-        """
-        Perform the send_pv action - send a private message to a user.
-        """
-        await event.respond("Please provide the user ID or username to send a message to:")
-        self.tbot._conversations[event.chat_id] = 'send_pv_user_handler'
-        self.tbot.handlers['send_pv_account'] = account
-
-    async def send_pv_user_handler(self, event):
-        """
-        Handle the send_pv user input.
-        """
-        try:
-            user_input = event.message.text.strip()
-            self.tbot.handlers['send_pv_user'] = user_input
-            await event.respond("Please enter the message you want to send:")
-            self.tbot._conversations[event.chat_id] = 'send_pv_message_handler'
-        except Exception as e:
-            logger.error(f"Error in send_pv_user_handler: {e}")
-            await event.respond("Error processing user input. Please try again.")
-            self.tbot._conversations.pop(event.chat_id, None)
-            self.tbot.handlers.pop('send_pv_account', None)
-            self.tbot.handlers.pop('send_pv_user', None)
-
-    async def send_pv_message_handler(self, event):
-        """
-        Handle the send_pv message input.
-        """
-        try:
-            message = event.message.text.strip()
-            
-            # Validate message text
-            is_valid, error_msg = InputValidator.validate_message_text(message)
-            if not is_valid:
-                await event.respond(f"❌ {error_msg}\nPlease try again.")
-                return
-            
-            account = self.tbot.handlers.get('send_pv_account')
-            user_input = self.tbot.handlers.get('send_pv_user')
-            
-            # Send the private message
-            entity = await account.get_entity(user_input)
-            await account.send_message(entity, message)
-            await event.respond(f"Successfully sent message to {user_input} using account {account.session.filename}")
-            
-            # Cleanup
-            self.tbot.handlers.pop('send_pv_account', None)
-            self.tbot.handlers.pop('send_pv_user', None)
-            self.tbot._conversations.pop(event.chat_id, None)
-            
-        except Exception as e:
-            logger.error(f"Error sending private message: {e}")
-            await event.respond(f"Error sending private message: {str(e)}")
-            self.tbot._conversations.pop(event.chat_id, None)
 
     async def comment(self, account, event):
         """
@@ -587,102 +622,6 @@ class Actions:
             logger.error(f"Error posting comment: {e}")
             await event.respond(f"Error posting comment: {str(e)}")
             self.tbot._conversations.pop(event.chat_id, None)
-
-
-                    self.tbot.handlers.pop('poll_link', None)
-                    self.tbot.handlers.pop('poll_num_accounts', None)
-                    self.tbot.handlers.pop('poll_is_bulk', None)
-                    async with self.tbot._conversations_lock:
-                        self.tbot._conversations.pop(event.chat_id, None)
-                    return
-                
-                # Vote with all accounts
-                success_count = 0
-                error_count = 0
-                
-                async def vote_with_account(acc):
-                    nonlocal success_count, error_count
-                    async with self.operation_semaphore:
-                        try:
-                            # Resolve entity if needed
-                            peer = chat_entity
-                            if isinstance(peer, str):
-                                peer = await acc.get_entity(peer)
-                            elif isinstance(peer, int) and peer < 0:
-                                peer = await acc.get_entity(peer)
-                            
-                            await acc(SendVoteRequest(
-                                peer=peer,
-                                msg_id=message_id,
-                                options=[bytes([option])]
-                            ))
-                            success_count += 1
-                            await asyncio.sleep(random.uniform(2, 5))
-                        except Exception as e:
-                            error_count += 1
-                            logger.error(f"Error voting on poll with account {acc.session.filename if hasattr(acc, 'session') else 'Unknown'}: {e}")
-                
-                tasks = [vote_with_account(acc) for acc in accounts]
-                await asyncio.gather(*tasks, return_exceptions=True)
-                
-                # Report results
-                if error_count == 0:
-                    await event.respond(f"✅ با موفقیت به گزینه {option_num} با {success_count} حساب رای داده شد.")
-                else:
-                    await event.respond(f"⚠️ به گزینه {option_num} با {success_count} حساب رای داده شد. {error_count} حساب با خطا مواجه شد.")
-                
-                # Cleanup
-                self.tbot.handlers.pop('poll_link', None)
-                self.tbot.handlers.pop('poll_num_accounts', None)
-                self.tbot.handlers.pop('poll_is_bulk', None)
-            else:
-                # Individual operation
-                chat_entity, message_id = await self.parse_telegram_link(link, account)
-                
-                if chat_entity is None or message_id is None:
-                    raise ValueError(f"Failed to parse poll link: {link}")
-                
-                # Resolve entity if needed
-                if isinstance(chat_entity, str):
-                    chat_entity = await account.get_entity(chat_entity)
-                
-                # Get the poll message
-                message = await account.get_messages(chat_entity, ids=message_id)
-                if message.poll:
-                    await account(SendVoteRequest(
-                        peer=chat_entity,
-                        msg_id=message_id,
-                        options=[bytes([option])]
-                    ))
-                    await event.respond(f"✅ با موفقیت به گزینه {option_num} رای داده شد.")
-                else:
-                    await event.respond("❌ لینک ارائه شده به یک نظرسنجی اشاره نمی‌کند.")
-            
-            # Cleanup
-            self.tbot.handlers.pop('poll_account', None)
-            self.tbot.handlers.pop('poll_link', None)
-            async with self.tbot._conversations_lock:
-                self.tbot._conversations.pop(event.chat_id, None)
-            
-        except Exception as e:
-            logger.error(f"Error voting on poll: {e}")
-            await event.respond(f"❌ خطا در رای دادن به نظرسنجی: {str(e)}")
-            async with self.tbot._conversations_lock:
-                self.tbot._conversations.pop(event.chat_id, None)
-            # Cleanup
-            self.tbot.handlers.pop('poll_account', None)
-            self.tbot.handlers.pop('poll_link', None)
-            self.tbot.handlers.pop('poll_num_accounts', None)
-            self.tbot.handlers.pop('poll_is_bulk', None)
-
-    async def join(self, account, event):
-        """
-        Perform the join action - join a group or channel.
-        """
-        await event.respond("لطفاً لینک یا نام کاربری گروه/کانال را برای عضویت ارسال کنید:")
-        async with self.tbot._conversations_lock:
-            self.tbot._conversations[event.chat_id] = 'join_link_handler'
-        self.tbot.handlers['join_account'] = account
 
     async def join_link_handler(self, event):
         """
@@ -915,20 +854,58 @@ class Actions:
             if is_bulk:
                 # This is a bulk operation
                 num_accounts = self.tbot.handlers.get('comment_num_accounts')
+
+                # Get valid accounts - check if they're still connected and authorized
+                valid_accounts = []
+                invalid_sessions = []
+
                 async with self.tbot.active_clients_lock:
-                    accounts = list(self.tbot.active_clients.values())[:num_accounts]
-                
+                    for session_name, client in list(self.tbot.active_clients.items())[:num_accounts]:
+                        try:
+                            # Check if client is connected and authorized
+                            if not client.is_connected():
+                                await client.connect()
+
+                            if await client.is_user_authorized():
+                                valid_accounts.append((session_name, client))
+                            else:
+                                invalid_sessions.append(session_name)
+                                logger.warning(f"Client {session_name} is not authorized, removing from active clients")
+                                # Remove invalid client from active_clients
+                                del self.tbot.active_clients[session_name]
+                        except Exception as e:
+                            logger.error(f"Error validating client {session_name}: {e}")
+                            invalid_sessions.append(session_name)
+                            # Remove invalid client from active_clients
+                            if session_name in self.tbot.active_clients:
+                                del self.tbot.active_clients[session_name]
+
+                # If we have invalid sessions, notify user
+                if invalid_sessions:
+                    await event.respond(f"⚠️ {len(invalid_sessions)} حساب نامعتبر شناسایی شد و از لیست حذف شدند.")
+
+                # If no valid accounts, stop
+                if not valid_accounts:
+                    await event.respond("❌ هیچ حساب معتبری برای کامنت یافت نشد.")
+                    # Cleanup
+                    self.tbot.handlers.pop('comment_num_accounts', None)
+                    self.tbot.handlers.pop('comment_link', None)
+                    self.tbot.handlers.pop('comment_is_bulk', None)
+                    async with self.tbot._conversations_lock:
+                        self.tbot._conversations.pop(event.chat_id, None)
+                    return
+
                 # Parse link once
-                chat_entity, message_id = await self.parse_telegram_link(link, accounts[0] if accounts else None)
-                
+                chat_entity, message_id = await self.parse_telegram_link(link, valid_accounts[0][1] if valid_accounts else None)
+
                 if chat_entity is None or message_id is None:
                     raise ValueError(f"Failed to parse comment link: {link}")
-                
+
                 # Comment with all accounts
                 success_count = 0
                 error_count = 0
                 
-                async def comment_with_account(acc):
+                async def comment_with_account(session_name, acc):
                     nonlocal success_count, error_count
                     async with self.operation_semaphore:
                         try:
@@ -938,15 +915,25 @@ class Actions:
                                 peer = await acc.get_entity(peer)
                             elif isinstance(peer, int) and peer < 0:
                                 peer = await acc.get_entity(peer)
-                            
+
                             await acc.send_message(peer, comment_text, reply_to=message_id)
                             success_count += 1
                             await asyncio.sleep(random.uniform(2, 5))
                         except Exception as e:
                             error_count += 1
-                            logger.error(f"Error posting comment with account {acc.session.filename if hasattr(acc, 'session') else 'Unknown'}: {e}")
-                
-                tasks = [comment_with_account(acc) for acc in accounts]
+                            error_msg = str(e)
+                            logger.error(f"Error posting comment with account {session_name}: {error_msg}")
+
+                            # If session is revoked, remove it from active clients
+                            if "SessionRevokedError" in error_msg or "not logged in" in error_msg.lower():
+                                async with self.tbot.active_clients_lock:
+                                    if session_name in self.tbot.active_clients:
+                                        logger.warning(f"Removing revoked session: {session_name}")
+                                        del self.tbot.active_clients[session_name]
+
+                # Use only valid accounts
+                accounts_to_use = valid_accounts[:num_accounts]
+                tasks = [comment_with_account(session_name, acc) for session_name, acc in accounts_to_use]
                 await asyncio.gather(*tasks, return_exceptions=True)
                 
                 # Report results
@@ -1040,13 +1027,49 @@ class Actions:
                 return
             
             num_accounts = self.tbot.handlers.get('join_num_accounts')
+
+            # Get valid accounts - check if they're still connected and authorized
+            valid_accounts = []
+            invalid_sessions = []
+
             async with self.tbot.active_clients_lock:
-                accounts = list(self.tbot.active_clients.values())[:num_accounts]
-            
+                for session_name, client in list(self.tbot.active_clients.items())[:num_accounts]:
+                    try:
+                        # Check if client is connected and authorized
+                        if not client.is_connected():
+                            await client.connect()
+
+                        if await client.is_user_authorized():
+                            valid_accounts.append((session_name, client))
+                        else:
+                            invalid_sessions.append(session_name)
+                            logger.warning(f"Client {session_name} is not authorized, removing from active clients")
+                            # Remove invalid client from active_clients
+                            del self.tbot.active_clients[session_name]
+                    except Exception as e:
+                        logger.error(f"Error validating client {session_name}: {e}")
+                        invalid_sessions.append(session_name)
+                        # Remove invalid client from active_clients
+                        if session_name in self.tbot.active_clients:
+                            del self.tbot.active_clients[session_name]
+
+            # If we have invalid sessions, notify user
+            if invalid_sessions:
+                await event.respond(f"⚠️ {len(invalid_sessions)} حساب نامعتبر شناسایی شد و از لیست حذف شدند.")
+
+            # If no valid accounts, stop
+            if not valid_accounts:
+                await event.respond("❌ هیچ حساب معتبری برای عضویت یافت نشد.")
+                # Cleanup
+                self.tbot.handlers.pop('join_num_accounts', None)
+                async with self.tbot._conversations_lock:
+                    self.tbot._conversations.pop(event.chat_id, None)
+                return
+
             success_count = 0
             error_count = 0
-            
-            async def join_with_account(acc):
+
+            async def join_with_account(session_name, acc):
                 nonlocal success_count, error_count
                 async with self.operation_semaphore:
                     try:
@@ -1055,9 +1078,19 @@ class Actions:
                         await asyncio.sleep(random.uniform(2, 5))
                     except Exception as e:
                         error_count += 1
-                        logger.error(f"Error joining with account {acc.session.filename if hasattr(acc, 'session') else 'Unknown'}: {e}")
+                        error_msg = str(e)
+                        logger.error(f"Error joining with account {session_name}: {error_msg}")
+
+                        # If session is revoked, remove it from active clients
+                        if "SessionRevokedError" in error_msg or "not logged in" in error_msg.lower():
+                            async with self.tbot.active_clients_lock:
+                                if session_name in self.tbot.active_clients:
+                                    logger.warning(f"Removing revoked session: {session_name}")
+                                    del self.tbot.active_clients[session_name]
             
-            tasks = [join_with_account(acc) for acc in accounts]
+            # Use only valid accounts
+            accounts_to_use = valid_accounts[:num_accounts]
+            tasks = [join_with_account(session_name, acc) for session_name, acc in accounts_to_use]
             await asyncio.gather(*tasks, return_exceptions=True)
             
             # Report results
@@ -1100,13 +1133,49 @@ class Actions:
             user_input = event.message.text.strip()
             
             num_accounts = self.tbot.handlers.get('block_num_accounts')
+
+            # Get valid accounts - check if they're still connected and authorized
+            valid_accounts = []
+            invalid_sessions = []
+
             async with self.tbot.active_clients_lock:
-                accounts = list(self.tbot.active_clients.values())[:num_accounts]
-            
+                for session_name, client in list(self.tbot.active_clients.items())[:num_accounts]:
+                    try:
+                        # Check if client is connected and authorized
+                        if not client.is_connected():
+                            await client.connect()
+
+                        if await client.is_user_authorized():
+                            valid_accounts.append((session_name, client))
+                        else:
+                            invalid_sessions.append(session_name)
+                            logger.warning(f"Client {session_name} is not authorized, removing from active clients")
+                            # Remove invalid client from active_clients
+                            del self.tbot.active_clients[session_name]
+                    except Exception as e:
+                        logger.error(f"Error validating client {session_name}: {e}")
+                        invalid_sessions.append(session_name)
+                        # Remove invalid client from active_clients
+                        if session_name in self.tbot.active_clients:
+                            del self.tbot.active_clients[session_name]
+
+            # If we have invalid sessions, notify user
+            if invalid_sessions:
+                await event.respond(f"⚠️ {len(invalid_sessions)} حساب نامعتبر شناسایی شد و از لیست حذف شدند.")
+
+            # If no valid accounts, stop
+            if not valid_accounts:
+                await event.respond("❌ هیچ حساب معتبری برای بلاک کردن یافت نشد.")
+                # Cleanup
+                self.tbot.handlers.pop('block_num_accounts', None)
+                async with self.tbot._conversations_lock:
+                    self.tbot._conversations.pop(event.chat_id, None)
+                return
+
             success_count = 0
             error_count = 0
-            
-            async def block_with_account(acc):
+
+            async def block_with_account(session_name, acc):
                 nonlocal success_count, error_count
                 async with self.operation_semaphore:
                     try:
@@ -1117,9 +1186,19 @@ class Actions:
                         await asyncio.sleep(random.uniform(2, 5))
                     except Exception as e:
                         error_count += 1
-                        logger.error(f"Error blocking user with account {acc.session.filename if hasattr(acc, 'session') else 'Unknown'}: {e}")
+                        error_msg = str(e)
+                        logger.error(f"Error blocking user with account {session_name}: {error_msg}")
+
+                        # If session is revoked, remove it from active clients
+                        if "SessionRevokedError" in error_msg or "not logged in" in error_msg.lower():
+                            async with self.tbot.active_clients_lock:
+                                if session_name in self.tbot.active_clients:
+                                    logger.warning(f"Removing revoked session: {session_name}")
+                                    del self.tbot.active_clients[session_name]
             
-            tasks = [block_with_account(acc) for acc in accounts]
+            # Use only valid accounts
+            accounts_to_use = valid_accounts[:num_accounts]
+            tasks = [block_with_account(session_name, acc) for session_name, acc in accounts_to_use]
             await asyncio.gather(*tasks, return_exceptions=True)
             
             # Report results
@@ -1140,18 +1219,61 @@ class Actions:
                 self.tbot._conversations.pop(event.chat_id, None)
             self.tbot.handlers.pop('block_num_accounts', None)
     
+    async def bulk_send_pv_account_count_handler(self, event):
+        """
+        Handle bulk send_pv account count input.
+        """
+        logger.info("bulk_send_pv_account_count_handler called")
+        try:
+            user_input = event.message.text.strip()
+            logger.info(f"User input for account count: '{user_input}'")
+
+            # Get total available accounts
+            async with self.tbot.active_clients_lock:
+                total_accounts = len(self.tbot.active_clients)
+            logger.info(f"Total available accounts: {total_accounts}")
+
+            # Validate input is a number
+            if not user_input.isdigit():
+                logger.warning(f"Invalid input: '{user_input}' is not a digit")
+                await event.respond(f"❌ Please enter a valid number between 1 and {total_accounts}.")
+                return
+
+            num_accounts = int(user_input)
+            logger.info(f"Parsed number: {num_accounts}")
+
+            # Validate range
+            if num_accounts < 1 or num_accounts > total_accounts:
+                logger.warning(f"Number {num_accounts} is out of range 1-{total_accounts}")
+                await event.respond(f"❌ Please enter a number between 1 and {total_accounts}.")
+                return
+
+            # Store the number and proceed to ask for username
+            logger.info("Proceeding to ask for username")
+            await event.respond("Please provide the user ID or username to send a message to:")
+            async with self.tbot._conversations_lock:
+                self.tbot._conversations[event.chat_id] = 'bulk_send_pv_user_handler'
+            self.tbot.handlers['send_pv_num_accounts'] = num_accounts
+            logger.info("Conversation state updated and handlers set")
+
+        except Exception as e:
+            logger.error(f"Error in bulk_send_pv_account_count_handler: {e}")
+            await event.respond("❌ An error occurred. Please try again.")
+            async with self.tbot._conversations_lock:
+                self.tbot._conversations.pop(event.chat_id, None)
+
     async def bulk_send_pv(self, event, num_accounts):
         """
         Handle bulk send_pv operation - ask for user and message once, then send with all accounts.
         """
         try:
-            await event.respond("لطفاً شناسه کاربری یا نام کاربری فرد مورد نظر را برای ارسال پیام ارسال کنید:")
+            await event.respond("Please provide the user ID or username to send a message to:")
             async with self.tbot._conversations_lock:
                 self.tbot._conversations[event.chat_id] = 'bulk_send_pv_user_handler'
             self.tbot.handlers['send_pv_num_accounts'] = num_accounts
         except Exception as e:
             logger.error(f"Error in bulk_send_pv: {e}")
-            await event.respond("❌ خطا در شروع عملیات bulk send_pv.")
+            await event.respond("❌ Error starting bulk send_pv operation.")
             self.tbot.handlers.pop('send_pv_num_accounts', None)
     
     async def bulk_send_pv_user_handler(self, event):
@@ -1161,68 +1283,245 @@ class Actions:
         try:
             user_input = event.message.text.strip()
             self.tbot.handlers['send_pv_user'] = user_input
-            await event.respond("لطفاً متن پیام مورد نظر را ارسال کنید:")
+            await event.respond("Please send the message you want to send:")
             async with self.tbot._conversations_lock:
                 self.tbot._conversations[event.chat_id] = 'bulk_send_pv_message_handler'
         except Exception as e:
             logger.error(f"Error in bulk_send_pv_user_handler: {e}")
-            await event.respond("❌ خطا در پردازش اطلاعات کاربر. لطفاً دوباره تلاش کنید.")
+            await event.respond("❌ Error processing user information. Please try again.")
             async with self.tbot._conversations_lock:
                 self.tbot._conversations.pop(event.chat_id, None)
             self.tbot.handlers.pop('send_pv_num_accounts', None)
             self.tbot.handlers.pop('send_pv_user', None)
-    
+
+    def _is_config_message(self, message):
+        """
+        Check if a message looks like a configuration/command message rather than actual content.
+        """
+        if not message:
+            return True
+
+        # Check if it's just a number (account count)
+        if message.isdigit():
+            return True
+
+        # Check if it's just usernames (contains @)
+        words = message.split()
+        username_count = 0
+        for word in words:
+            if word.startswith('@'):
+                username_count += 1
+            elif not word.replace(' ', '').isalnum():
+                # If it contains non-alphanumeric characters (except spaces), it's probably content
+                break
+        else:
+            # If all words are either usernames or simple alphanumeric, check if it's mostly usernames
+            if username_count > 0 and username_count >= len(words) * 0.7:  # 70% or more are usernames
+                return len(words) <= 10  # Reasonable limit for username list
+
+        # Check for very short messages that might be commands
+        if len(message) < 3:
+            return True
+
+        # Check for messages that look like bot commands
+        if message.startswith('/') or message.startswith('!') or message.startswith('.'):
+            return True
+
+        # If message is longer than 15 characters and contains normal text, it's definitely content
+        if len(message) > 15 and any(char.isalpha() for char in message):
+            return False
+
+        # Messages between 3-15 characters are ambiguous, check for meaningful content
+        if 3 <= len(message) <= 15:
+            # If it has punctuation or multiple words, it's probably content
+            if any(char in message for char in '.,!?;:') or ' ' in message:
+                return False
+            # Single words that are not obvious commands
+            if len(message.split()) == 1 and not message.isupper():
+                return False
+
+        return False
+
     async def bulk_send_pv_message_handler(self, event):
         """
-        Handle bulk send_pv message input.
+        Handle bulk send_pv message input with account limits (max 2 users per account).
         """
         try:
             message = event.message.text.strip()
-            
+
+            # Check if this message is actually a command/configuration message, not the final message
+            # If it's just a number, usernames, or short text, it's likely a config message
+            if self._is_config_message(message):
+                logger.info(f"Ignoring config-like message: '{message}'")
+                await event.respond("❌ Please send the actual message you want to send to users.")
+                return
+
             # Validate message text
             is_valid, error_msg = InputValidator.validate_message_text(message)
             if not is_valid:
-                await event.respond(f"❌ {error_msg}\nلطفاً دوباره تلاش کنید.")
+                await event.respond(f"❌ {error_msg}\nPlease try again.")
                 return
-            
+
             user_input = self.tbot.handlers.get('send_pv_user')
             num_accounts = self.tbot.handlers.get('send_pv_num_accounts')
+
+            # Check if we have the required configuration
+            if not user_input or not num_accounts:
+                await event.respond("❌ Configuration incomplete. Please start over with Bulk -> Send PV.")
+                # Cleanup
+                self.tbot.handlers.pop('send_pv_num_accounts', None)
+                self.tbot.handlers.pop('send_pv_user', None)
+                async with self.tbot._conversations_lock:
+                    self.tbot._conversations.pop(event.chat_id, None)
+                return
+
+            # Get valid accounts - check if they're still connected and authorized
+            valid_accounts = []
+            invalid_sessions = []
+
             async with self.tbot.active_clients_lock:
-                accounts = list(self.tbot.active_clients.values())[:num_accounts]
-            
+                for session_name, client in list(self.tbot.active_clients.items())[:num_accounts]:
+                    try:
+                        # Check if client is connected and authorized
+                        if not client.is_connected():
+                            await client.connect()
+
+                        if await client.is_user_authorized():
+                            valid_accounts.append((session_name, client))
+                        else:
+                            invalid_sessions.append(session_name)
+                            logger.warning(f"Client {session_name} is not authorized, removing from active clients")
+                            del self.tbot.active_clients[session_name]
+                    except Exception as e:
+                        logger.error(f"Error validating client {session_name}: {e}")
+                        invalid_sessions.append(session_name)
+                        if session_name in self.tbot.active_clients:
+                            del self.tbot.active_clients[session_name]
+
+            # If we have invalid sessions, notify user
+            if invalid_sessions:
+                await event.respond(f"⚠️ {len(invalid_sessions)} invalid accounts detected and removed.")
+
+            # If no valid accounts, stop
+            if not valid_accounts:
+                await event.respond("❌ No valid accounts found for sending messages.")
+                # Cleanup
+                self.tbot.handlers.pop('send_pv_num_accounts', None)
+                self.tbot.handlers.pop('send_pv_user', None)
+                async with self.tbot._conversations_lock:
+                    self.tbot._conversations.pop(event.chat_id, None)
+                return
+
+            # Parse user list from input
+            user_list = []
+            for user in user_input.split():
+                user = user.strip()
+                if user.startswith('@'):
+                    user_list.append(user[1:])  # Remove @ prefix
+                else:
+                    user_list.append(user)
+
+            logger.info(f"Parsed {len(user_list)} users: {user_list}")
+
+            if not user_list:
+                await event.respond("❌ No valid usernames provided.")
+                # Cleanup
+                self.tbot.handlers.pop('send_pv_num_accounts', None)
+                self.tbot.handlers.pop('send_pv_user', None)
+                async with self.tbot._conversations_lock:
+                    self.tbot._conversations.pop(event.chat_id, None)
+                return
+
+            # Distribute users among accounts with limit of 2 users per account
+            account_assignments = []
+
+            for user_index, target_user in enumerate(user_list):
+                # Cycle through accounts, each account gets max 2 users
+                # Use modulo to cycle through accounts: 0,1,0,1,0,1,...
+                account_index = (user_index // 2) % len(valid_accounts)
+                session_name, account = valid_accounts[account_index]
+
+                account_assignments.append((session_name, account, target_user))
+
+            logger.info(f"Account assignments created: {len(account_assignments)} total assignments")
+
+            # Start sending messages
             success_count = 0
             error_count = 0
-            
-            async def send_pv_with_account(acc):
-                nonlocal success_count, error_count
-                async with self.operation_semaphore:
-                    try:
-                        entity = await acc.get_entity(user_input)
-                        await acc.send_message(entity, message)
-                        success_count += 1
-                        await asyncio.sleep(random.uniform(2, 5))
-                    except Exception as e:
-                        error_count += 1
-                        logger.error(f"Error sending private message with account {acc.session.filename if hasattr(acc, 'session') else 'Unknown'}: {e}")
-            
-            tasks = [send_pv_with_account(acc) for acc in accounts]
-            await asyncio.gather(*tasks, return_exceptions=True)
-            
+
+            async def send_pv_with_account(session_name, account, target_user, message_text):
+                """Send private message with specific account"""
+                try:
+                    await account.send_message(target_user, message_text)
+                    logger.info(f"Successfully sent message to {target_user} with account {session_name}")
+                    return True
+                except Exception as e:
+                    error_msg = str(e)
+                    logger.error(f"Error sending private message with account {session_name}: {error_msg}")
+
+                    if "SessionRevokedError" in error_msg or "not logged in" in error_msg.lower():
+                        async with self.tbot.active_clients_lock:
+                            if session_name in self.tbot.active_clients:
+                                logger.warning(f"Removing revoked session: {session_name}")
+                                del self.tbot.active_clients[session_name]
+
+                    return False
+
+            # Execute all tasks with concurrency control but limit concurrent operations
+            semaphore = asyncio.Semaphore(3)  # Limit to 3 concurrent operations for better stability
+
+            async def send_with_semaphore(session_name, account, target_user, message_text):
+                async with semaphore:
+                    return await send_pv_with_account(session_name, account, target_user, message_text)
+
+            # Create tasks for all assignments
+            tasks = []
+            for session_name, account, target_user in account_assignments:
+                task = send_with_semaphore(session_name, account, target_user, message)
+                tasks.append(task)
+
+            # Execute all tasks
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    error_count += 1
+                    logger.error(f"Task {i} failed: {result}")
+                elif result:
+                    success_count += 1
+                else:
+                    error_count += 1
+
             # Report results
+            total_users = len(user_list)
             if error_count == 0:
-                await event.respond(f"✅ با موفقیت پیام با {success_count} حساب ارسال شد.")
+                await event.respond(f"✅ Message successfully sent to all {success_count} users using account rotation.")
             else:
-                await event.respond(f"⚠️ پیام با {success_count} حساب ارسال شد. {error_count} حساب با خطا مواجه شد.")
-            
+                await event.respond(f"⚠️ Message sent to {success_count} users, {error_count} failed. Total users: {total_users}")
+
+            # Show account usage summary
+            account_usage = {}
+            for session_name, _, _ in account_assignments:
+                account_usage[session_name] = account_usage.get(session_name, 0) + 1
+
+            usage_summary = "📊 Account Usage Summary:\n"
+            for account_name, count in account_usage.items():
+                usage_summary += f"• {account_name}: {count} messages sent\n"
+
+            await event.respond(usage_summary)
+
             # Cleanup
             self.tbot.handlers.pop('send_pv_num_accounts', None)
             self.tbot.handlers.pop('send_pv_user', None)
             async with self.tbot._conversations_lock:
                 self.tbot._conversations.pop(event.chat_id, None)
-            
+
         except Exception as e:
             logger.error(f"Error in bulk_send_pv_message_handler: {e}")
-            await event.respond(f"❌ خطا در ارسال پیام خصوصی: {str(e)}")
+            await event.respond("❌ An error occurred during message sending.")
+            # Cleanup
+            self.tbot.handlers.pop('send_pv_num_accounts', None)
+            self.tbot.handlers.pop('send_pv_user', None)
             async with self.tbot._conversations_lock:
                 self.tbot._conversations.pop(event.chat_id, None)
             self.tbot.handlers.pop('send_pv_num_accounts', None)

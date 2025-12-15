@@ -20,15 +20,17 @@ class TelegramBot:
         try:
             self.config_manager = ConfigManager('clients.json')
             self.config = self.config_manager.load_config()
-            self.tbot = TelegramClient('bot2', API_ID, API_HASH)
+            # Don't create TelegramClient here - it needs an event loop
+            # Will be created in start() method when we're in async context
+            self.tbot = None
             self.active_clients = {}
-            self.active_clients_lock = asyncio.Lock()  # Protection against race conditions
+            self.active_clients_lock = None  # Will be created in async context
             self.handlers = {}
             self._conversations = {}
-            self._conversations_lock = asyncio.Lock()  # Protection for conversation state
-            self.client_manager = SessionManager(self.config, self.active_clients, self.tbot)
-            self.account_handler = AccountHandler(self)
-            self.monitor = Monitor(self)
+            self._conversations_lock = None  # Will be created in async context
+            self.client_manager = None  # Will be initialized in start()
+            self.account_handler = None  # Will be initialized in start()
+            self.monitor = None  # Will be initialized in start()
 
             logger.info("Bot initialized successfully")
         except Exception as e:
@@ -40,13 +42,45 @@ class TelegramBot:
         Start the bot and initialize all components.
         """
         try:
+            # Create TelegramClient now that we're in an async context
+            if self.tbot is None:
+                self.tbot = TelegramClient('bot2', API_ID, API_HASH)
+                logger.info("TelegramClient created")
+            
+            # Initialize async components now that we're in an async context
+            if self.active_clients_lock is None:
+                self.active_clients_lock = asyncio.Lock()
+            if self._conversations_lock is None:
+                self._conversations_lock = asyncio.Lock()
+            
+            # Initialize managers now that we have locks and client
+            if self.client_manager is None:
+                self.client_manager = SessionManager(self.config, self.active_clients, self.tbot)
+            if self.account_handler is None:
+                self.account_handler = AccountHandler(self)
+            if self.monitor is None:
+                self.monitor = Monitor(self)
+            
+            logger.info("Starting bot connection...")
             await self.tbot.start(bot_token=BOT_TOKEN)
+            logger.info("Bot connected to Telegram")
+            
             await self.init_handlers()
+            logger.info("Handlers initialized")
+            
             await self.client_manager.start_saved_clients()
-            await self.notify_admin("Bot started successfully and all clients have been detected. Use /start to begin.")
+            logger.info("Saved clients started")
+            
+            try:
+                await self.notify_admin("Bot started successfully and all clients have been detected. Use /start to begin.")
+                logger.info("Admin notification sent")
+            except Exception as e:
+                logger.warning(f"Failed to send admin notification: {e}")
+                # Don't fail startup if notification fails
+            
             logger.info("Bot started successfully")
         except Exception as e:
-            logger.error(f"Error during bot start: {e}")
+            logger.error(f"Error during bot start: {e}", exc_info=True)
             raise
 
     async def init_handlers(self):
@@ -54,9 +88,31 @@ class TelegramBot:
         Initialize all event handlers for the bot.
         """
         try:
-            self.tbot.add_event_handler(self.admin_only(CommandHandler(self).start_command), events.NewMessage(pattern='/start'))
-            self.tbot.add_event_handler(self.admin_only(CallbackHandler(self).callback_handler), events.CallbackQuery())
-            self.tbot.add_event_handler(self.admin_only(MessageHandler(self).message_handler), events.NewMessage())
+            # Register command handler first (with pattern) - this will catch /start before generic handler
+            command_handler = CommandHandler(self)
+            self.tbot.add_event_handler(
+                self.admin_only(command_handler.start_command), 
+                events.NewMessage(pattern='^/start$')
+            )
+            logger.info("Registered /start command handler")
+            
+            # Register callback handler for button clicks
+            callback_handler = CallbackHandler(self)
+            self.tbot.add_event_handler(
+                callback_handler.callback_handler,
+                events.CallbackQuery()
+            )
+            logger.info("Registered callback query handler")
+
+            # Register generic message handler last (for conversation states)
+            # This should NOT catch /start because it's already handled above
+            message_handler = MessageHandler(self)
+            self.tbot.add_event_handler(
+                message_handler.message_handler,
+                events.NewMessage()
+            )
+            logger.info("Registered generic message handler")
+            
             logger.info("Handlers initialized successfully")
         except Exception as e:
             logger.error(f"Error initializing handlers: {e}")
@@ -69,10 +125,20 @@ class TelegramBot:
         :param handler: The handler function to wrap.
         """
         async def wrapper(event):
-            if event.sender_id == int(ADMIN_ID):
-                await handler(event)
-            else:
-                await event.respond("You are not the admin")
+            try:
+                sender_id = event.sender_id
+                logger.debug(f"admin_only check: sender_id={sender_id}, ADMIN_ID={ADMIN_ID}")
+                if sender_id == int(ADMIN_ID):
+                    await handler(event)
+                else:
+                    logger.warning(f"Unauthorized access attempt from user {sender_id}")
+                    await event.respond("You are not the admin")
+            except Exception as e:
+                logger.error(f"Error in admin_only wrapper: {e}", exc_info=True)
+                try:
+                    await event.respond("An error occurred. Please try again.")
+                except:
+                    pass
         return wrapper
 
     async def run(self):

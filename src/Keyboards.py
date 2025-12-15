@@ -58,6 +58,7 @@ class Keyboard:
         return [
             [Button.inline('Add Account', 'add_account')],
             [Button.inline('List Accounts', 'list_accounts')],
+            [Button.inline('Inactive Accounts', 'inactive_accounts')],
             [Button.inline("Exit", 'exit')]
         ]
 
@@ -121,11 +122,19 @@ class Keyboard:
 
         if keyboard:
             if event:
-                # Clear the previous keyboard
-                await event.edit("Please choose an option:", buttons=keyboard)
+                try:
+                    # For callback queries, answer first and then edit
+                    if hasattr(event, 'answer'):
+                        await event.answer()
+                    # Clear the previous keyboard
+                    await event.edit("Please choose an option:", buttons=keyboard)
+                except Exception as e:
+                    logger.error(f"Error showing keyboard {keyboard_name}: {e}")
+                    # If edit fails, try responding
+                    await event.respond("Please choose an option:", buttons=keyboard)
             return keyboard
         else:
             if event:
-                return event.respond("Sorry, the requested keyboard is not available.")
+                await event.respond("Sorry, the requested keyboard is not available.")
             return None
 
