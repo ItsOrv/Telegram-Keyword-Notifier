@@ -464,27 +464,27 @@ class CallbackHandler:
 
     async def show_start_keyboard(self, event):
         """Handles the start keyboard display"""
-        await Keyboard.show_keyboard('start', event)
+        await Keyboard.show_keyboard('start', event, self.tbot)
 
     async def show_monitor_keyboard(self, event):
         """Handles the monitor mode keyboard display"""
-        await Keyboard.show_keyboard('monitor', event)
+        await Keyboard.show_keyboard('monitor', event, self.tbot)
 
     async def show_account_management_keyboard(self, event):
         """Handles the account management keyboard display"""
-        await Keyboard.show_keyboard('account_management', event)
+        await Keyboard.show_keyboard('account_management', event, self.tbot)
 
     async def show_bulk_operations_keyboard(self, event):
         """Handles the bulk operations keyboard display"""
-        await Keyboard.show_keyboard('bulk', event)
+        await Keyboard.show_keyboard('bulk', event, self.tbot)
 
     async def show_individual_keyboard(self, event):
         """Handles the individual operations keyboard display"""
-        await Keyboard.show_keyboard('individual_keyboard', event)
+        await Keyboard.show_keyboard('individual_keyboard', event, self.tbot)
 
     async def show_report_keyboard(self, event):
         """Handles the report keyboard display"""
-        await Keyboard.show_keyboard('report', event)
+        await Keyboard.show_keyboard('report', event, self.tbot)
 
     # Bulk operation handlers
     async def handle_bulk_reaction(self, event):
