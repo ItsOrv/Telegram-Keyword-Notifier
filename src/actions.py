@@ -108,34 +108,41 @@ class Actions:
         Handle the group action by calling the respective function for all selected accounts.
         Uses semaphore to limit concurrent operations and avoid rate limiting.
         """
-        # Get valid accounts - check if they're still connected and authorized
-        valid_accounts = []
-        invalid_sessions = []
+            # Get available accounts - DO NOT automatically remove unauthorized accounts during bulk operations
+            # According to user requirements, accounts should only be removed if truly revoked by Telegram
+            available_accounts = []
+            unavailable_sessions = []
 
-        async with self.tbot.active_clients_lock:
-            for session_name, client in list(self.tbot.active_clients.items())[:num_accounts]:
-                try:
-                    # Check if client is connected and authorized
-                    if not client.is_connected():
-                        await client.connect()
+            async with self.tbot.active_clients_lock:
+                for session_name, client in list(self.tbot.active_clients.items())[:num_accounts]:
+                    try:
+                        # Check if client is connected and authorized
+                        if not client.is_connected():
+                            await client.connect()
 
-                    if await client.is_user_authorized():
-                        valid_accounts.append((session_name, client))
-                    else:
-                        invalid_sessions.append(session_name)
-                        logger.warning(f"Client {session_name} is not authorized, removing from active clients")
-                        # Remove invalid client from active_clients
-                        del self.tbot.active_clients[session_name]
-                except Exception as e:
-                    logger.error(f"Error validating client {session_name}: {e}")
-                    invalid_sessions.append(session_name)
-                    # Remove invalid client from active_clients
-                    if session_name in self.tbot.active_clients:
-                        del self.tbot.active_clients[session_name]
+                        if await client.is_user_authorized():
+                            available_accounts.append((session_name, client))
+                        else:
+                            # Account is not authorized, but DO NOT remove it from active clients
+                            # Just mark it as unavailable for this operation
+                            unavailable_sessions.append(session_name)
+                            logger.warning(f"Client {session_name} is currently not authorized (temporary issue), keeping in active list")
+                    except Exception as e:
+                        logger.error(f"Error validating client {session_name}: {e}")
+                        unavailable_sessions.append(session_name)
+                        # DO NOT remove from active clients due to temporary errors
 
-        # If we have invalid sessions, notify user
-        if invalid_sessions:
-            await event.respond(f"⚠️ {len(invalid_sessions)} حساب نامعتبر شناسایی شد و از لیست حذف شدند.")
+        # If we have unavailable sessions, notify user but DON'T remove them
+        if unavailable_sessions:
+            await event.respond(f"⚠️ {len(unavailable_sessions)} accounts are currently unavailable (temporary connectivity issues). Using remaining accounts.")
+
+        # If no available accounts, stop
+        if not available_accounts:
+            await event.respond("❌ No accounts are currently available for this operation. Please check account status or try again later.")
+            return
+
+        # Use available_accounts instead of valid_accounts
+        valid_accounts = available_accounts
 
         # If no valid accounts, stop
         if not valid_accounts:
@@ -248,9 +255,10 @@ class Actions:
         try:
             count = int(event.message.text.strip())
             
-            # Get valid accounts - check if they're still connected and authorized
-            valid_accounts = []
-            invalid_sessions = []
+            # Get available accounts - DO NOT automatically remove unauthorized accounts during bulk operations
+            # According to user requirements, accounts should only be removed if truly revoked by Telegram
+            available_accounts = []
+            unavailable_sessions = []
 
             async with self.tbot.active_clients_lock:
                 total_clients = len(self.tbot.active_clients)
@@ -264,32 +272,33 @@ class Actions:
                             await client.connect()
 
                         if await client.is_user_authorized():
-                            valid_accounts.append((session_name, client))
+                            available_accounts.append((session_name, client))
                         else:
-                            invalid_sessions.append(session_name)
-                            logger.warning(f"Client {session_name} is not authorized, removing from active clients")
-                            # Remove invalid client from active_clients
-                            del self.tbot.active_clients[session_name]
+                            # Account is not authorized, but DO NOT remove it from active clients
+                            # Just mark it as unavailable for this operation
+                            unavailable_sessions.append(session_name)
+                            logger.warning(f"Client {session_name} is currently not authorized (temporary issue), keeping in active list")
                     except Exception as e:
                         logger.error(f"Error validating client {session_name}: {e}")
-                        invalid_sessions.append(session_name)
-                        # Remove invalid client from active_clients
-                        if session_name in self.tbot.active_clients:
-                            del self.tbot.active_clients[session_name]
+                        unavailable_sessions.append(session_name)
+                        # DO NOT remove from active clients due to temporary errors
 
-            # If we have invalid sessions, notify user
-            if invalid_sessions:
-                await event.respond(f"⚠️ {len(invalid_sessions)} حساب نامعتبر شناسایی شد و از لیست حذف شدند.")
+            # If we have unavailable sessions, notify user but DON'T remove them
+            if unavailable_sessions:
+                await event.respond(f"⚠️ {len(unavailable_sessions)} accounts are currently unavailable (temporary connectivity issues). Using remaining accounts.")
 
-            # If no valid accounts, stop
-            if not valid_accounts:
-                await event.respond("❌ هیچ حساب معتبری برای ارسال واکنش یافت نشد.")
+            # If no available accounts, stop
+            if not available_accounts:
+                await event.respond("❌ No accounts are currently available for sending reactions. Please check account status or try again later.")
                 # Cleanup
                 self.tbot.handlers.pop('reaction_link', None)
                 self.tbot.handlers.pop('reaction', None)
                 async with self.tbot._conversations_lock:
                     self.tbot._conversations.pop(event.chat_id, None)
                 return
+
+            # Use available_accounts instead of valid_accounts
+            valid_accounts = available_accounts
 
             link = self.tbot.handlers['reaction_link']
             reaction = self.tbot.handlers['reaction']
@@ -855,34 +864,41 @@ class Actions:
                 # This is a bulk operation
                 num_accounts = self.tbot.handlers.get('comment_num_accounts')
 
-                # Get valid accounts - check if they're still connected and authorized
-                valid_accounts = []
-                invalid_sessions = []
+            # Get available accounts - DO NOT automatically remove unauthorized accounts during bulk operations
+            # According to user requirements, accounts should only be removed if truly revoked by Telegram
+            available_accounts = []
+            unavailable_sessions = []
 
-                async with self.tbot.active_clients_lock:
-                    for session_name, client in list(self.tbot.active_clients.items())[:num_accounts]:
-                        try:
-                            # Check if client is connected and authorized
-                            if not client.is_connected():
-                                await client.connect()
+            async with self.tbot.active_clients_lock:
+                for session_name, client in list(self.tbot.active_clients.items())[:num_accounts]:
+                    try:
+                        # Check if client is connected and authorized
+                        if not client.is_connected():
+                            await client.connect()
 
-                            if await client.is_user_authorized():
-                                valid_accounts.append((session_name, client))
-                            else:
-                                invalid_sessions.append(session_name)
-                                logger.warning(f"Client {session_name} is not authorized, removing from active clients")
-                                # Remove invalid client from active_clients
-                                del self.tbot.active_clients[session_name]
-                        except Exception as e:
-                            logger.error(f"Error validating client {session_name}: {e}")
-                            invalid_sessions.append(session_name)
-                            # Remove invalid client from active_clients
-                            if session_name in self.tbot.active_clients:
-                                del self.tbot.active_clients[session_name]
+                        if await client.is_user_authorized():
+                            available_accounts.append((session_name, client))
+                        else:
+                            # Account is not authorized, but DO NOT remove it from active clients
+                            # Just mark it as unavailable for this operation
+                            unavailable_sessions.append(session_name)
+                            logger.warning(f"Client {session_name} is currently not authorized (temporary issue), keeping in active list")
+                    except Exception as e:
+                        logger.error(f"Error validating client {session_name}: {e}")
+                        unavailable_sessions.append(session_name)
+                        # DO NOT remove from active clients due to temporary errors
 
-                # If we have invalid sessions, notify user
-                if invalid_sessions:
-                    await event.respond(f"⚠️ {len(invalid_sessions)} حساب نامعتبر شناسایی شد و از لیست حذف شدند.")
+        # If we have unavailable sessions, notify user but DON'T remove them
+        if unavailable_sessions:
+            await event.respond(f"⚠️ {len(unavailable_sessions)} accounts are currently unavailable (temporary connectivity issues). Using remaining accounts.")
+
+        # If no available accounts, stop
+        if not available_accounts:
+            await event.respond("❌ No accounts are currently available for this operation. Please check account status or try again later.")
+            return
+
+        # Use available_accounts instead of valid_accounts
+        valid_accounts = available_accounts
 
                 # If no valid accounts, stop
                 if not valid_accounts:
@@ -1028,9 +1044,10 @@ class Actions:
             
             num_accounts = self.tbot.handlers.get('join_num_accounts')
 
-            # Get valid accounts - check if they're still connected and authorized
-            valid_accounts = []
-            invalid_sessions = []
+            # Get available accounts - DO NOT automatically remove unauthorized accounts during bulk operations
+            # According to user requirements, accounts should only be removed if truly revoked by Telegram
+            available_accounts = []
+            unavailable_sessions = []
 
             async with self.tbot.active_clients_lock:
                 for session_name, client in list(self.tbot.active_clients.items())[:num_accounts]:
@@ -1040,22 +1057,28 @@ class Actions:
                             await client.connect()
 
                         if await client.is_user_authorized():
-                            valid_accounts.append((session_name, client))
+                            available_accounts.append((session_name, client))
                         else:
-                            invalid_sessions.append(session_name)
-                            logger.warning(f"Client {session_name} is not authorized, removing from active clients")
-                            # Remove invalid client from active_clients
-                            del self.tbot.active_clients[session_name]
+                            # Account is not authorized, but DO NOT remove it from active clients
+                            # Just mark it as unavailable for this operation
+                            unavailable_sessions.append(session_name)
+                            logger.warning(f"Client {session_name} is currently not authorized (temporary issue), keeping in active list")
                     except Exception as e:
                         logger.error(f"Error validating client {session_name}: {e}")
-                        invalid_sessions.append(session_name)
-                        # Remove invalid client from active_clients
-                        if session_name in self.tbot.active_clients:
-                            del self.tbot.active_clients[session_name]
+                        unavailable_sessions.append(session_name)
+                        # DO NOT remove from active clients due to temporary errors
 
-            # If we have invalid sessions, notify user
-            if invalid_sessions:
-                await event.respond(f"⚠️ {len(invalid_sessions)} حساب نامعتبر شناسایی شد و از لیست حذف شدند.")
+        # If we have unavailable sessions, notify user but DON'T remove them
+        if unavailable_sessions:
+            await event.respond(f"⚠️ {len(unavailable_sessions)} accounts are currently unavailable (temporary connectivity issues). Using remaining accounts.")
+
+        # If no available accounts, stop
+        if not available_accounts:
+            await event.respond("❌ No accounts are currently available for this operation. Please check account status or try again later.")
+            return
+
+        # Use available_accounts instead of valid_accounts
+        valid_accounts = available_accounts
 
             # If no valid accounts, stop
             if not valid_accounts:
@@ -1134,9 +1157,10 @@ class Actions:
             
             num_accounts = self.tbot.handlers.get('block_num_accounts')
 
-            # Get valid accounts - check if they're still connected and authorized
-            valid_accounts = []
-            invalid_sessions = []
+            # Get available accounts - DO NOT automatically remove unauthorized accounts during bulk operations
+            # According to user requirements, accounts should only be removed if truly revoked by Telegram
+            available_accounts = []
+            unavailable_sessions = []
 
             async with self.tbot.active_clients_lock:
                 for session_name, client in list(self.tbot.active_clients.items())[:num_accounts]:
@@ -1146,22 +1170,28 @@ class Actions:
                             await client.connect()
 
                         if await client.is_user_authorized():
-                            valid_accounts.append((session_name, client))
+                            available_accounts.append((session_name, client))
                         else:
-                            invalid_sessions.append(session_name)
-                            logger.warning(f"Client {session_name} is not authorized, removing from active clients")
-                            # Remove invalid client from active_clients
-                            del self.tbot.active_clients[session_name]
+                            # Account is not authorized, but DO NOT remove it from active clients
+                            # Just mark it as unavailable for this operation
+                            unavailable_sessions.append(session_name)
+                            logger.warning(f"Client {session_name} is currently not authorized (temporary issue), keeping in active list")
                     except Exception as e:
                         logger.error(f"Error validating client {session_name}: {e}")
-                        invalid_sessions.append(session_name)
-                        # Remove invalid client from active_clients
-                        if session_name in self.tbot.active_clients:
-                            del self.tbot.active_clients[session_name]
+                        unavailable_sessions.append(session_name)
+                        # DO NOT remove from active clients due to temporary errors
 
-            # If we have invalid sessions, notify user
-            if invalid_sessions:
-                await event.respond(f"⚠️ {len(invalid_sessions)} حساب نامعتبر شناسایی شد و از لیست حذف شدند.")
+        # If we have unavailable sessions, notify user but DON'T remove them
+        if unavailable_sessions:
+            await event.respond(f"⚠️ {len(unavailable_sessions)} accounts are currently unavailable (temporary connectivity issues). Using remaining accounts.")
+
+        # If no available accounts, stop
+        if not available_accounts:
+            await event.respond("❌ No accounts are currently available for this operation. Please check account status or try again later.")
+            return
+
+        # Use available_accounts instead of valid_accounts
+        valid_accounts = available_accounts
 
             # If no valid accounts, stop
             if not valid_accounts:
@@ -1375,9 +1405,10 @@ class Actions:
                     self.tbot._conversations.pop(event.chat_id, None)
                 return
 
-            # Get valid accounts - check if they're still connected and authorized
-            valid_accounts = []
-            invalid_sessions = []
+            # Get available accounts - DO NOT automatically remove unauthorized accounts during bulk operations
+            # According to user requirements, accounts should only be removed if truly revoked by Telegram
+            available_accounts = []
+            unavailable_sessions = []
 
             async with self.tbot.active_clients_lock:
                 for session_name, client in list(self.tbot.active_clients.items())[:num_accounts]:
@@ -1387,30 +1418,33 @@ class Actions:
                             await client.connect()
 
                         if await client.is_user_authorized():
-                            valid_accounts.append((session_name, client))
+                            available_accounts.append((session_name, client))
                         else:
-                            invalid_sessions.append(session_name)
-                            logger.warning(f"Client {session_name} is not authorized, removing from active clients")
-                            del self.tbot.active_clients[session_name]
+                            # Account is not authorized, but DO NOT remove it from active clients
+                            # Just mark it as unavailable for this operation
+                            unavailable_sessions.append(session_name)
+                            logger.warning(f"Client {session_name} is currently not authorized (temporary issue), keeping in active list")
                     except Exception as e:
                         logger.error(f"Error validating client {session_name}: {e}")
-                        invalid_sessions.append(session_name)
-                        if session_name in self.tbot.active_clients:
-                            del self.tbot.active_clients[session_name]
+                        unavailable_sessions.append(session_name)
+                        # DO NOT remove from active clients due to temporary errors
 
-            # If we have invalid sessions, notify user
-            if invalid_sessions:
-                await event.respond(f"⚠️ {len(invalid_sessions)} invalid accounts detected and removed.")
+            # If we have unavailable sessions, notify user but DON'T remove them
+            if unavailable_sessions:
+                await event.respond(f"⚠️ {len(unavailable_sessions)} accounts are currently unavailable (temporary connectivity issues). Using remaining accounts.")
 
-            # If no valid accounts, stop
-            if not valid_accounts:
-                await event.respond("❌ No valid accounts found for sending messages.")
+            # If no available accounts, stop
+            if not available_accounts:
+                await event.respond("❌ No accounts are currently available for sending messages. Please check account status or try again later.")
                 # Cleanup
                 self.tbot.handlers.pop('send_pv_num_accounts', None)
                 self.tbot.handlers.pop('send_pv_user', None)
                 async with self.tbot._conversations_lock:
                     self.tbot._conversations.pop(event.chat_id, None)
                 return
+
+            # Use available_accounts instead of valid_accounts
+            valid_accounts = available_accounts
 
             # Parse user list from input
             user_list = []
