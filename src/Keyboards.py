@@ -53,24 +53,13 @@ class Keyboard:
         ]
 
     @staticmethod
-    def account_management_keyboard(tbot=None, chat_id=None):
+    def account_management_keyboard():
         """Returns the keyboard for account management"""
-        buttons = [
+        return [
             [Button.inline('Add Account', 'add_account')],
             [Button.inline('List Accounts', 'list_accounts')],
-            [Button.inline('Inactive Accounts', 'inactive_accounts')],
             [Button.inline("Exit", 'exit')]
         ]
-
-        # If user is in an active conversation, hide certain buttons
-        if tbot and chat_id and chat_id in tbot._conversations:
-            conversation_state = tbot._conversations[chat_id]
-            # Hide list_accounts button during bulk operations
-            if conversation_state.startswith('bulk_send_pv') or conversation_state.startswith('bulk_poll'):
-                # Remove the list_accounts button (second row)
-                buttons.pop(1)
-
-        return buttons
 
     @staticmethod
     def channel_message_keyboard(message_link, sender_id):
@@ -114,15 +103,13 @@ class Keyboard:
         ]
 
     @staticmethod
-    async def show_keyboard(keyboard_name, event=None, tbot=None):
+    async def show_keyboard(keyboard_name, event=None):
         """Dynamically returns and shows the requested keyboard based on its name"""
-        chat_id = event.chat_id if event else None
-
         keyboards = {
             'start': Keyboard.start_keyboard(),
             'monitor': Keyboard.monitor_keyboard(),
             'bulk': Keyboard.bulk_keyboard(),
-            'account_management': Keyboard.account_management_keyboard(tbot, chat_id),
+            'account_management': Keyboard.account_management_keyboard(),
             'channel_message': Keyboard.channel_message_keyboard,
             'toggle_and_delete': Keyboard.toggle_and_delete_keyboard,
             'individual_keyboard': Keyboard.individual_keyboard(),
@@ -134,19 +121,11 @@ class Keyboard:
 
         if keyboard:
             if event:
-                try:
-                    # For callback queries, answer first and then edit
-                    if hasattr(event, 'answer'):
-                        await event.answer()
-                    # Clear the previous keyboard
-                    await event.edit("Please choose an option:", buttons=keyboard)
-                except Exception as e:
-                    logger.error(f"Error showing keyboard {keyboard_name}: {e}")
-                    # If edit fails, try responding
-                    await event.respond("Please choose an option:", buttons=keyboard)
+                # Clear the previous keyboard
+                await event.edit("Please choose an option:", buttons=keyboard)
             return keyboard
         else:
             if event:
-                await event.respond("Sorry, the requested keyboard is not available.")
+                return event.respond("Sorry, the requested keyboard is not available.")
             return None
 
