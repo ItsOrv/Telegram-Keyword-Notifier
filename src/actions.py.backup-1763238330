@@ -1540,12 +1540,10 @@ class Actions:
                 result_message += f"  • {phone}: ✅ {stats['success']} | ❌ {stats['failed']}\n"
             
             # اگر username‌هایی کاملاً fail شدند
-            if results.get("failed_attempts"):
-                failed_list = list(results["failed_attempts"].keys())
-                if failed_list:
-                    result_message += f"\n❌ Could not send to: {', '.join(failed_list[:5])}"
-                    if len(failed_list) > 5:
-                        result_message += f" and {len(failed_list)-5} more"
+            if results["failed_usernames"]:
+                result_message += f"\n❌ Could not send to: {', '.join(results['failed_usernames'][:5])}"
+                if len(results["failed_usernames"]) > 5:
+                    result_message += f" and {len(results['failed_usernames'])-5} more"
             
             await event.respond(result_message)
             
@@ -1557,11 +1555,416 @@ class Actions:
 
         except Exception as e:
             logger.error(f"Error in bulk_send_pv_message_handler: {e}", exc_info=True)
-            await event.respond(
-                "❌ An error occurred during message sending.\n\n"
-                f"Error: {str(e)}\n\n"
-                "⚠️ Check that your accounts are valid and authorized."
-            )
+            await event.respond("❌ An error occurred during message sending.")
+            # Cleanup
+            self.tbot.handlers.pop('send_pv_num_accounts', None)
+            self.tbot.handlers.pop('send_pv_user', None)
+            async with self.tbot._conversations_lock:
+                self.tbot._conversations.pop(event.chat_id, None)
+    
+    async def bulk_comment(self, event, num_accounts):
+                    
+                    # Verify account is working
+                    try:
+                        me = await account.get_me()
+                        if not me:
+                            logger.error(f"Account {session_name} get_me() returned None")
+                            return False
+                    except Exception as auth_error:
+                        logger.error(f"Account {session_name} is not authorized: {auth_error}")
+                        return False
+                    
+                    # Try multiple methods to send - START WITH DIRECT SEND (most reliable)
+                    # Don't try to resolve entity first - it can cause NoneType errors
+                    send_methods = [
+                        (f"@{clean_user}", "direct with @"),
+                        (clean_user, "direct without @"),
+                    ]
+                    
+                    # Try to resolve entity as a fallback (but don't fail if it doesn't work)
+                    entity = None
+                    try:
+                        # Try with @ first
+                        try:
+                            entity = await account.get_entity(f"@{clean_user}")
+                            if entity:
+                                send_methods.insert(0, (entity, "resolved entity with @"))
+                                logger.info(f"✅ Resolved entity for @{clean_user} with {session_name}")
+                        except:
+                            pass
+                        
+                        # Try without @
+                        if not entity:
+                            try:
+                                entity = await account.get_entity(clean_user)
+                                if entity:
+                                    send_methods.insert(0, (entity, "resolved entity without @"))
+                                    logger.info(f"✅ Resolved entity for {clean_user} with {session_name}")
+                            except:
+                                pass
+                    except Exception as resolve_error:
+                        # Entity resolution failed - that's OK, we'll use direct methods
+                        logger.debug(f"Entity resolution failed for {clean_user}: {resolve_error}")
+                    
+                    last_error = None
+                    for method_target, method_name in send_methods:
+                        try:
+                            # Check if method_target is None (shouldn't happen, but safety check)
+                            if method_target is None:
+                                logger.warning(f"Method target is None for {method_name}, skipping")
+                                continue
+                            
+                            # Send message
+                            await account.send_message(method_target, message_text)
+                            logger.info(f"✅ Successfully sent to {clean_user} via {method_name} with {session_name}")
+                            return True
+                                
+                        except Exception as send_error:
+                            error_str = str(send_error).lower()
+                            error_msg = error_str
+                            last_error = send_error
+                            
+                            # Handle NoneType errors specifically
+                            if 'nonetype' in error_msg or 'cannot cast' in error_msg or 'peer' in error_msg:
+                                logger.warning(f"NoneType/Peer error for {clean_user} with {session_name} via {method_name}: {send_error}")
+                                # Try next method
+                                continue
+                            
+                            # Rate limiting - should retry with different account
+                            if any(kw in error_msg for kw in ['too many requests', 'flood', 'rate limit', 'floodwait']):
+                                logger.warning(f"Rate limit for {clean_user} with {session_name} - will retry")
+                                return "RATE_LIMIT"
+                            
+                            # Username not found - only fail if this is the last method
+                            if any(kw in error_msg for kw in ['username', 'not found', 'invalid', 'no user', 'user not found', 'could not find', 'no entity']):
+                                if method_name == "direct without @":  # Last method
+                                    logger.warning(f"Username {clean_user} not found or invalid with {session_name}")
+                                    return False
+                                continue  # Try next method
+                            
+                            # Privacy/blocked - might work with different account or method
+                            if any(kw in error_msg for kw in ['privacy', 'blocked', 'restricted', 'cannot send', 'user is blocking', 'user privacy']):
+                                logger.warning(f"Cannot send to {clean_user}: privacy/blocked with {session_name} via {method_name}")
+                                # Don't return False - might work with different account
+                                continue
+                            
+                            # Other errors - try next method
+                            logger.debug(f"Method {method_name} failed for {clean_user}: {send_error}")
+                            continue
+                    
+                    # All methods failed
+                    if last_error:
+                        logger.warning(f"All methods failed for {clean_user} with {session_name}. Last error: {last_error}")
+                    else:
+                        logger.warning(f"All methods failed for {clean_user} with {session_name}")
+                    return False
+                        
+                except Exception as e:
+                    error_msg = str(e).lower()
+                    logger.error(f"Error sending private message with account {session_name} to {original_user}: {error_msg}")
+
+                    if "sessionrevokederror" in error_msg or "not logged in" in error_msg:
+                        async with self.tbot.active_clients_lock:
+                            if session_name in self.tbot.active_clients:
+                                logger.warning(f"Removing revoked session: {session_name}")
+                                del self.tbot.active_clients[session_name]
+
+                    return False
+
+            # Execute all tasks with concurrency control but limit concurrent operations
+            semaphore = asyncio.Semaphore(3)  # Limit to 3 concurrent operations for better stability
+
+            async def send_with_semaphore(session_name, account, target_user, message_text):
+                async with semaphore:
+                    # Add delay to avoid rate limiting (increased delay)
+                    await asyncio.sleep(random.uniform(2, 4))
+                    return await send_pv_with_account(session_name, account, target_user, message_text)
+
+            # Create tasks for all assignments
+            tasks = []
+            for session_name, account, target_user in account_assignments:
+                task = send_with_semaphore(session_name, account, target_user, message)
+                tasks.append(task)
+
+            # Execute all tasks
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Track which accounts failed and which users failed
+            failed_accounts = set()
+            failed_users = []
+
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    error_count += 1
+                    logger.error(f"Task {i} failed with exception: {result}")
+                    session_name, account, target_user = account_assignments[i]
+                    failed_accounts.add(session_name)
+                    failed_users.append((target_user, i))
+                elif result == True:
+                    success_count += 1
+                elif result == "RATE_LIMIT":
+                    # Rate limited - will retry
+                    error_count += 1
+                    session_name, account, target_user = account_assignments[i]
+                    failed_accounts.add(session_name)
+                    failed_users.append((target_user, i))
+                else:
+                    # False or None - failed
+                    error_count += 1
+                    session_name, account, target_user = account_assignments[i]
+                    failed_accounts.add(session_name)
+                    failed_users.append((target_user, i))
+            
+            # Retry failed messages with ALL available accounts - ULTIMATE RETRY with multiple rounds
+            if failed_users and len(valid_accounts) > 0:
+                logger.info(f"🔄 Retrying {len(failed_users)} failed messages with ALL {len(valid_accounts)} available accounts...")
+                retry_success = 0
+                rate_limited_users = []
+                still_failed_users = []
+                
+                # ROUND 1: Try with all accounts (except original if it wasn't rate limited)
+                for target_user, original_index in failed_users:
+                    original_session = account_assignments[original_index][0]
+                    retried = False
+                    
+                    # Try with ALL accounts in order
+                    for attempt_num, (session_name, account) in enumerate(valid_accounts, 1):
+                        # Only skip original account if it wasn't rate limited
+                        if session_name == original_session and results[original_index] != "RATE_LIMIT":
+                            logger.debug(f"Skipping original account {session_name} for {target_user} (already tried)")
+                            continue
+                        
+                        try:
+                            logger.info(f"🔄 Round 1 - Retry attempt {attempt_num}/{len(valid_accounts)}: {target_user} with account {session_name}...")
+                            
+                            # Ensure account is connected before retry
+                            if not account.is_connected():
+                                try:
+                                    await account.connect()
+                                    await asyncio.sleep(1)  # Wait after connection
+                                except Exception as conn_err:
+                                    logger.warning(f"Could not connect {session_name} for retry: {conn_err}")
+                                    continue
+                            
+                            # Add delay before retry
+                            await asyncio.sleep(random.uniform(2, 4))
+                            
+                            result = await send_pv_with_account(session_name, account, target_user, message)
+                            
+                            if result == True:
+                                # Success!
+                                results[original_index] = True
+                                success_count += 1
+                                error_count -= 1
+                                retry_success += 1
+                                logger.info(f"✅ SUCCESS! Retried {target_user} with {session_name}")
+                                retried = True
+                                await asyncio.sleep(random.uniform(2, 3))
+                                break
+                            elif result == "RATE_LIMIT":
+                                # Rate limited - try next account
+                                logger.warning(f"⚠️ Rate limited for {target_user} with {session_name}, trying next account...")
+                                rate_limited_users.append((target_user, original_index))
+                                await asyncio.sleep(random.uniform(3, 5))
+                                continue
+                            else:
+                                # Failed - try next account
+                                logger.debug(f"❌ Failed to send to {target_user} with {session_name}, trying next account...")
+                                await asyncio.sleep(random.uniform(2, 3))
+                                continue
+                                
+                        except Exception as retry_error:
+                            error_str = str(retry_error).lower()
+                            logger.error(f"❌ Retry exception for {target_user} with {session_name}: {retry_error}")
+                            
+                            # If it's a connection/auth error, skip this account
+                            if any(kw in error_str for kw in ['not connected', 'not authorized', 'session', 'auth']):
+                                logger.warning(f"Skipping {session_name} due to auth/connection issue")
+                                continue
+                            
+                            await asyncio.sleep(random.uniform(2, 3))
+                            continue
+                    
+                    if not retried:
+                        still_failed_users.append((target_user, original_index))
+                        logger.warning(f"⚠️ Could not send to {target_user} with ANY account in Round 1")
+                
+                # ROUND 2: Try again with ALL accounts including original (with longer delays)
+                if still_failed_users and len(valid_accounts) > 0:
+                    logger.info(f"🔄 Round 2: Retrying {len(still_failed_users)} still-failed messages with ALL accounts (including original)...")
+                    await asyncio.sleep(5)  # Wait before round 2
+                    
+                    for target_user, original_index in still_failed_users:
+                        if results[original_index] == True:
+                            continue  # Already succeeded
+                        
+                        retried = False
+                        for attempt_num, (session_name, account) in enumerate(valid_accounts, 1):
+                            try:
+                                logger.info(f"🔄 Round 2 - Attempt {attempt_num}/{len(valid_accounts)}: {target_user} with account {session_name}...")
+                                
+                                if not account.is_connected():
+                                    try:
+                                        await account.connect()
+                                        await asyncio.sleep(2)
+                                    except Exception as conn_err:
+                                        logger.warning(f"Could not connect {session_name} for round 2: {conn_err}")
+                                        continue
+                                
+                                # Longer delay in round 2
+                                await asyncio.sleep(random.uniform(4, 6))
+                                
+                                result = await send_pv_with_account(session_name, account, target_user, message)
+                                
+                                if result == True:
+                                    results[original_index] = True
+                                    success_count += 1
+                                    error_count -= 1
+                                    retry_success += 1
+                                    logger.info(f"✅ SUCCESS in Round 2! {target_user} with {session_name}")
+                                    retried = True
+                                    await asyncio.sleep(random.uniform(3, 4))
+                                    break
+                                elif result == "RATE_LIMIT":
+                                    rate_limited_users.append((target_user, original_index))
+                                    await asyncio.sleep(random.uniform(5, 7))
+                                    continue
+                                else:
+                                    await asyncio.sleep(random.uniform(3, 5))
+                                    continue
+                                    
+                            except Exception as round2_error:
+                                logger.debug(f"Round 2 error for {target_user} with {session_name}: {round2_error}")
+                                await asyncio.sleep(random.uniform(3, 5))
+                                continue
+                        
+                        if not retried:
+                            logger.warning(f"⚠️ Still failed: {target_user} after Round 2")
+                
+                # ROUND 3: Handle rate limited users with longer wait
+                if rate_limited_users and len(valid_accounts) > 0:
+                    logger.info(f"⏳ Waiting 20 seconds before retrying {len(rate_limited_users)} rate-limited users...")
+                    await asyncio.sleep(20)  # Wait longer for rate limit to reset
+                    
+                    for target_user, original_index in rate_limited_users:
+                        if results[original_index] == True:
+                            continue  # Already succeeded
+                        
+                        logger.info(f"🔄 Round 3 - Final retry for rate-limited user: {target_user}")
+                        # Try with ALL accounts again
+                        for session_name, account in valid_accounts:
+                            try:
+                                if not account.is_connected():
+                                    await account.connect()
+                                    await asyncio.sleep(2)
+                                
+                                await asyncio.sleep(random.uniform(5, 7))
+                                
+                                result = await send_pv_with_account(session_name, account, target_user, message)
+                                if result == True:
+                                    results[original_index] = True
+                                    success_count += 1
+                                    error_count -= 1
+                                    retry_success += 1
+                                    logger.info(f"✅ Successfully sent to rate-limited {target_user} with {session_name} in Round 3")
+                                    await asyncio.sleep(random.uniform(3, 4))
+                                    break
+                            except Exception as final_error:
+                                logger.debug(f"Final retry failed for {target_user} with {session_name}: {final_error}")
+                                await asyncio.sleep(random.uniform(3, 5))
+                                continue
+            
+            # Check report status for ALL accounts used in this task (not just failed ones)
+            reported_accounts = []
+            accounts_to_check = set()
+            
+            # Add all accounts that were used
+            for session_name, _, _ in account_assignments:
+                accounts_to_check.add(session_name)
+            
+            # Also add failed accounts
+            accounts_to_check.update(failed_accounts)
+            
+            if accounts_to_check and REPORT_CHECK_BOT:
+                logger.info(f"Checking report status for {len(accounts_to_check)} accounts...")
+                await event.respond(f"🔍 Checking report status for {len(accounts_to_check)} accounts...")
+                
+                for session_name in accounts_to_check:
+                    try:
+                        # Get phone number from session name
+                        # Session name format: +1234567890 or +1234567890.session
+                        phone_number = session_name.replace('.session', '').strip()
+                        if not phone_number.startswith('+'):
+                            # If it doesn't start with +, try to add it
+                            phone_number = '+' + phone_number
+                        
+                        # Get account client
+                        account = None
+                        async with self.tbot.active_clients_lock:
+                            if session_name in self.tbot.active_clients:
+                                account = self.tbot.active_clients[session_name]
+                        
+                        if account:
+                            # Check report status
+                            is_reported = await self.check_report_status(phone_number, account)
+                            if is_reported:
+                                reported_accounts.append(session_name)
+                                # Save report status to config
+                                if 'clients' in self.tbot.config:
+                                    if session_name in self.tbot.config['clients']:
+                                        if not isinstance(self.tbot.config['clients'][session_name], dict):
+                                            # Convert to dict format
+                                            old_groups = self.tbot.config['clients'][session_name]
+                                            self.tbot.config['clients'][session_name] = {
+                                                'groups': old_groups if isinstance(old_groups, list) else [],
+                                                'is_reported': True
+                                            }
+                                        else:
+                                            self.tbot.config['clients'][session_name]['is_reported'] = True
+                                        
+                                        # Save config
+                                        self.tbot.config_manager.save_config(self.tbot.config)
+                                        logger.info(f"Marked {session_name} as reported in config")
+                    except Exception as e:
+                        logger.error(f"Error checking report status for {session_name}: {e}")
+            elif not REPORT_CHECK_BOT:
+                logger.warning("REPORT_CHECK_BOT not configured. Skipping report check.")
+
+            # Report results
+            total_users = len(user_list)
+            result_message = ""
+            if error_count == 0:
+                result_message = f"✅ Message successfully sent to all {success_count} users using account rotation."
+            else:
+                result_message = f"⚠️ Message sent to {success_count} users, {error_count} failed. Total users: {total_users}"
+            
+            # Add report status if any accounts are reported
+            if reported_accounts:
+                reported_phones = [acc.replace('.session', '') for acc in reported_accounts]
+                result_message += f"\n\n⚠️ Reported accounts detected: {', '.join(reported_phones)}"
+            
+            await event.respond(result_message)
+
+            # Show account usage summary
+            account_usage = {}
+            for session_name, _, _ in account_assignments:
+                account_usage[session_name] = account_usage.get(session_name, 0) + 1
+
+            usage_summary = "📊 Account Usage Summary:\n"
+            for account_name, count in account_usage.items():
+                usage_summary += f"• {account_name}: {count} messages sent\n"
+
+            await event.respond(usage_summary)
+
+            # Cleanup
+            self.tbot.handlers.pop('send_pv_num_accounts', None)
+            self.tbot.handlers.pop('send_pv_user', None)
+            async with self.tbot._conversations_lock:
+                self.tbot._conversations.pop(event.chat_id, None)
+
+        except Exception as e:
+            logger.error(f"Error in bulk_send_pv_message_handler: {e}")
+            await event.respond("❌ An error occurred during message sending.")
             # Cleanup
             self.tbot.handlers.pop('send_pv_num_accounts', None)
             self.tbot.handlers.pop('send_pv_user', None)

@@ -25,6 +25,11 @@ class Monitor:
         if self.channel_id is not None:
             return  # Channel ID already resolved
 
+        # Check if CHANNEL_ID is set and valid
+        if not CHANNEL_ID or CHANNEL_ID in ['x', 'your_channel_id_or_username', '0']:
+            logger.warning("CHANNEL_ID is not configured. Message forwarding will be disabled.")
+            return
+
         if isinstance(CHANNEL_ID, str) and not CHANNEL_ID.isdigit():
             try:
                 # Resolve username to numeric ID
@@ -48,6 +53,11 @@ class Monitor:
         """
         logger.info("Setting up message processing for client.")
         await self.resolve_channel_id()  # Ensure channel ID is resolved
+        
+        # Check if channel ID is configured
+        if self.channel_id is None:
+            logger.warning("CHANNEL_ID not configured. Message forwarding is disabled.")
+            return
         
         # Capture self references to avoid scope issues in nested function
         channel_id = self.channel_id
