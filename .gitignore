@@ -44,3 +44,14 @@ htmlcov/
 
 # OS specific
 Thumbs.db
+.DS_Store
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Cursor IDE
+.cursor/
+.cursorrules
