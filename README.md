@@ -1,8 +1,3 @@
-
-
-#it's not completed, it's not usable 
-
-
 # Telegram Management Bot Panel
 
 A comprehensive Telegram bot management system for monitoring messages, managing multiple accounts, and performing bulk operations across Telegram groups and channels.
