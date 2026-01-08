@@ -6,6 +6,8 @@ A professional Telegram bot management system for monitoring messages, managing 
 
 Telegram Panel provides a comprehensive solution for managing multiple Telegram accounts through a single bot interface. It enables automated message monitoring, bulk operations, and account management with proper error handling, rate limiting, and thread-safe operations.
 
+**Note:** This project is under active development and may contain incomplete features or known issues. Please refer to [INCOMPLETE_FEATURES.md](INCOMPLETE_FEATURES.md) for details on remaining work.
+
 ## Features
 
 ### Account Management
@@ -196,18 +198,20 @@ Telegram-Panel/
 ├── requirements.txt        # Python dependencies
 ├── env.example            # Environment variables template
 ├── install.sh             # Installation script
-├── .editorconfig          # Editor configuration
-├── .gitignore            # Git ignore rules
-├── CHANGELOG.md          # Version history
-├── CONTRIBUTING.md       # Contribution guidelines
-├── LICENSE               # License file
-├── README.md             # This file
-├── docs/                 # Documentation
+├── README.md              # This file
+├── INCOMPLETE_FEATURES.md # List of incomplete features
+├── CHANGELOG.md           # Version history
+├── CONTRIBUTING.md        # Contribution guidelines
+├── LICENSE                # License file
+├── docs/                  # Documentation
 │   ├── README.md
+│   ├── PROJECT_STRUCTURE.md
+│   ├── SYSTEM_DESIGN.md
+│   ├── TEST_SUMMARY.md
 │   └── ...
-├── logs/                 # Log files
+├── logs/                  # Log files
 │   └── bot.log
-├── src/                  # Source code
+├── src/                   # Source code
 │   ├── Config.py         # Configuration management
 │   ├── Telbot.py         # Main bot class
 │   ├── Client.py         # Account/session management
