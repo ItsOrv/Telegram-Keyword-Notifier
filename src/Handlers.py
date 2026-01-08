@@ -23,23 +23,26 @@ class CommandHandler:
         self.bot = tbot
 
     async def start_command(self, event):
-        """Handle /start command"""
-        logger.info(f"start command in CommandHandler - sender_id: {event.sender_id}")
+        """
+        Handle /start command.
+        
+        Displays the main menu keyboard to authorized admin users.
+        
+        Args:
+            event: Telegram NewMessage event
+        """
+        logger.info(f"Start command received from user {event.sender_id}")
         try:
-            # Admin check is already done in admin_only wrapper, but keeping for safety
             if event.sender_id != int(ADMIN_ID):
                 logger.warning(f"Unauthorized /start from {event.sender_id}")
                 await event.respond("You are not the admin")
                 return
 
-            logger.info("Creating start keyboard...")
             buttons = Keyboard.start_keyboard()
-            logger.info("Sending start message with keyboard...")
             await event.respond(
                 "Telegram Management Bot\n\n",
                 buttons=buttons
             )
-            logger.info("Start command completed successfully")
 
         except Exception as e:
             logger.error(f"Error in start_command: {e}", exc_info=True)
@@ -240,8 +243,11 @@ class MessageHandler:
             await event.respond("You are not the admin")
             return False
 
-        if event.chat_id in self.tbot._conversations:
-            handler_name = self.tbot._conversations[event.chat_id]
+        # Use lock when reading conversation state
+        async with self.tbot._conversations_lock:
+            handler_name = self.tbot._conversations.get(event.chat_id)
+        
+        if handler_name:
             
             # Account handlers
             if handler_name == 'phone_number_handler':
@@ -271,9 +277,6 @@ class MessageHandler:
             # Action handlers - Reaction
             elif handler_name == 'reaction_link_handler':
                 await self.actions.reaction_link_handler(event)
-                return True
-            elif handler_name == 'reaction_count_handler':
-                await self.actions.reaction_count_handler(event)
                 return True
             
             # Action handlers - Poll
@@ -322,6 +325,20 @@ class MessageHandler:
                 return True
             elif handler_name == 'comment_text_handler':
                 await self.actions.comment_text_handler(event)
+                return True
+            
+            # Bulk operation handlers
+            elif handler_name == 'bulk_join_link_handler':
+                await self.actions.bulk_join_link_handler(event)
+                return True
+            elif handler_name == 'bulk_block_user_handler':
+                await self.actions.bulk_block_user_handler(event)
+                return True
+            elif handler_name == 'bulk_send_pv_user_handler':
+                await self.actions.bulk_send_pv_user_handler(event)
+                return True
+            elif handler_name == 'bulk_send_pv_message_handler':
+                await self.actions.bulk_send_pv_message_handler(event)
                 return True
 
         return False
@@ -433,7 +450,7 @@ class CallbackHandler:
             'add_account': self.account_handler.add_account,
             'list_accounts': self.account_handler.show_accounts,
             'check_report_status': self.account_handler.check_all_accounts_report_status,
-            'inactive_accounts': self.tbot.client_manager.show_inactive_accounts,
+            'inactive_accounts': self.handle_inactive_accounts,
             'update_groups': self.account_handler.update_groups,
             'add_keyword': self.keyword_handler.add_keyword_handler,
             'remove_keyword': self.keyword_handler.remove_keyword_handler,
@@ -457,6 +474,7 @@ class CallbackHandler:
             'bulk_send_pv': self.handle_bulk_send_pv,
             'bulk_comment': self.handle_bulk_comment,
             # Individual operations
+            'reaction': self.handle_individual_reaction,
             'send_pv': self.handle_individual_send_pv,
             'join': self.handle_individual_join,
             'left': self.handle_individual_left,
@@ -494,15 +512,22 @@ class CallbackHandler:
             logger.error(f"Error showing report keyboard: {e}")
             await event.respond("Report status - Please choose an option:", buttons=keyboard)
 
-    # Bulk operation handlers
     async def handle_bulk_reaction(self, event):
-        """Handle bulk reaction operation"""
-        logger.info("handle_bulk_reaction in CallbackHandler")
+        """
+        Handle bulk reaction operation.
+        
+        Args:
+            event: Telegram CallbackQuery event
+        """
         await self.actions.prompt_group_action(event, 'reaction')
 
     async def handle_bulk_poll(self, event):
-        """Handle bulk poll operation"""
-        logger.info("handle_bulk_poll in CallbackHandler")
+        """
+        Handle bulk poll operation.
+        
+        Args:
+            event: Telegram CallbackQuery event
+        """
         async with self.tbot.active_clients_lock:
             total_accounts = len(self.tbot.active_clients)
         if total_accounts == 0:
@@ -511,13 +536,21 @@ class CallbackHandler:
         await self.actions.bulk_poll(event, total_accounts)
 
     async def handle_bulk_join(self, event):
-        """Handle bulk join operation"""
-        logger.info("handle_bulk_join in CallbackHandler")
+        """
+        Handle bulk join operation.
+        
+        Args:
+            event: Telegram CallbackQuery event
+        """
         await self.actions.prompt_group_action(event, 'join')
 
     async def handle_bulk_block(self, event):
-        """Handle bulk block operation"""
-        logger.info("handle_bulk_block in CallbackHandler")
+        """
+        Handle bulk block operation.
+        
+        Args:
+            event: Telegram CallbackQuery event
+        """
         await self.actions.prompt_group_action(event, 'block')
 
     async def handle_bulk_send_pv(self, event):
@@ -559,6 +592,11 @@ class CallbackHandler:
         await self.actions.prompt_group_action(event, 'comment')
 
     # Individual operation handlers
+    async def handle_individual_reaction(self, event):
+        """Handle individual reaction operation"""
+        logger.info("handle_individual_reaction in CallbackHandler")
+        await self.actions.prompt_individual_action(event, 'reaction')
+    
     async def handle_individual_send_pv(self, event):
         """Handle individual send_pv operation"""
         logger.info("handle_individual_send_pv in CallbackHandler")
@@ -578,6 +616,18 @@ class CallbackHandler:
         """Handle individual comment operation"""
         logger.info("handle_individual_comment in CallbackHandler")
         await self.actions.prompt_individual_action(event, 'comment')
+
+    async def handle_inactive_accounts(self, event):
+        """
+        Handle inactive accounts display.
+        
+        Args:
+            event: Telegram CallbackQuery event
+        """
+        if hasattr(self.tbot, 'client_manager') and self.tbot.client_manager:
+            await self.tbot.client_manager.show_inactive_accounts(event)
+        else:
+            await event.respond("❌ Client manager not initialized. Please restart the bot.")
 
     async def callback_handler(self, event):
         """Handle callback queries"""
@@ -612,7 +662,8 @@ class CallbackHandler:
             if data == 'request_phone_number':
                 logger.info("request_phone_number in callback_handler")
                 await event.respond("Please enter your phone number:")
-                self.tbot._conversations[event.chat_id] = 'phone_number_handler'
+                async with self.tbot._conversations_lock:
+                    self.tbot._conversations[event.chat_id] = 'phone_number_handler'
             elif data.startswith('ignore_'):
                 parts = data.split('_')
                 if len(parts) == 2 and parts[1].isdigit():
@@ -627,28 +678,27 @@ class CallbackHandler:
             elif data.startswith('delete_'):
                 session = data.replace('delete_', '')
                 try:
-                    await self.tbot.client_manager.delete_session(session)
-                    await event.respond(f"✅ حساب {session} با موفقیت حذف شد.")
+                    if hasattr(self.tbot, 'client_manager') and self.tbot.client_manager:
+                        await self.tbot.client_manager.delete_session(session)
+                        await event.respond(f"✅ حساب {session} با موفقیت حذف شد.")
+                    else:
+                        await event.respond("❌ Client manager not initialized. Please restart the bot.")
                 except Exception as e:
                     logger.error(f"Error deleting session {session}: {e}")
-                    await event.respond(f"❌ خطا در حذف حساب {session}.")
-            # Handle reaction button selections
-            elif data.startswith('reaction_') and data != 'reaction_link_handler':
-                # Check if it's a reaction emoji selection (not a number)
-                if data in ['reaction_thumbsup', 'reaction_heart', 'reaction_laugh', 'reaction_wow', 'reaction_sad', 'reaction_angry']:
-                    await self.actions.reaction_select_handler(event)
-                    return
+                    await event.respond(f"❌ خطا در حذف حساب {session}: {str(e)}")
+            # Handle reaction button selections (must be before bulk/individual handlers)
+            elif data in ['reaction_thumbsup', 'reaction_heart', 'reaction_laugh', 'reaction_wow', 'reaction_sad', 'reaction_angry']:
+                await self.actions.reaction_select_handler(event)
+                return
             # Handle bulk action callbacks (e.g., "reaction_3" means 3 accounts for reaction)
             elif '_' in data:
                 parts = data.split('_')
                 if len(parts) == 2:
                     action_name, value = parts
-                    # Check if it's a bulk operation with number of accounts
-                    if value.isdigit() and action_name in ['reaction', 'join', 'block', 'comment', 'send_pv']:
+                    if value.isdigit() and action_name in ['reaction', 'poll', 'join', 'block', 'comment', 'send_pv']:
                         num_accounts = int(value)
                         await self.actions.handle_group_action(event, action_name, num_accounts)
-                    # Check if it's an individual operation with session name
-                    elif action_name in ['send_pv', 'join', 'left', 'comment']:
+                    elif action_name in ['reaction', 'send_pv', 'join', 'left', 'comment']:
                         session = value
                         async with self.tbot.active_clients_lock:
                             account = self.tbot.active_clients.get(session)
@@ -658,28 +708,22 @@ class CallbackHandler:
                         else:
                             await event.respond(f"Account {session} not found.")
                     else:
-                        # Try standard actions
                         action = self.callback_actions.get(data)
                         if action:
-                            logger.info(f"{data} in callback_handler")
                             await action(event)
                         else:
                             logger.error(f"No handler found for callback data: {data}")
                             await event.respond("Unknown command.")
                 else:
-                    # Try standard actions
                     action = self.callback_actions.get(data)
                     if action:
-                        logger.info(f"{data} in callback_handler")
                         await action(event)
                     else:
                         logger.error(f"No handler found for callback data: {data}")
                         await event.respond("Unknown command.")
             else:
-                # Handle standard actions based on callback data
                 action = self.callback_actions.get(data)
                 if action:
-                    logger.info(f"{data} in callback_handler")
                     await action(event)
                 else:
                     logger.error(f"No handler found for callback data: {data}")

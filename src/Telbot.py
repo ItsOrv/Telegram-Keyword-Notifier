@@ -9,7 +9,6 @@ from src.Handlers import MessageHandler, CallbackHandler, CommandHandler, Accoun
 from src.Client import SessionManager
 from src.Monitor import Monitor
 
-# تنظیم لاگینگ
 setup_logging()
 logger = logging.getLogger(__name__)
 
@@ -21,17 +20,15 @@ class TelegramBot:
         try:
             self.config_manager = ConfigManager('clients.json')
             self.config = self.config_manager.load_config()
-            # Don't create TelegramClient here - it needs an event loop
-            # Will be created in start() method when we're in async context
             self.tbot = None
             self.active_clients = {}
-            self.active_clients_lock = None  # Will be created in async context
+            self.active_clients_lock = None
             self.handlers = {}
             self._conversations = {}
-            self._conversations_lock = None  # Will be created in async context
-            self.client_manager = None  # Will be initialized in start()
-            self.account_handler = None  # Will be initialized in start()
-            self.monitor = None  # Will be initialized in start()
+            self._conversations_lock = None
+            self.client_manager = None
+            self.account_handler = None
+            self.monitor = None
 
             logger.info("Bot initialized successfully")
         except Exception as e:
@@ -86,7 +83,6 @@ class TelegramBot:
                 logger.info("Admin notification sent")
             except Exception as e:
                 logger.warning(f"Failed to send admin notification: {e}")
-                # Don't fail startup if notification fails
             
             logger.info("Bot started successfully")
         except Exception as e:
@@ -179,11 +175,10 @@ class TelegramBot:
             logger.warning("Bot run was cancelled")
         except Exception as e:
             logger.error(f"Error running bot: {e}", exc_info=True)
-            # Try to notify admin about the error
             try:
                 await self.notify_admin(f"❌ Bot encountered an error: {str(e)[:200]}")
-            except:
-                pass
+            except Exception:
+                logger.error("Failed to notify admin about error")
         finally:
             await self.shutdown()
 

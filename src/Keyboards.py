@@ -4,10 +4,21 @@ from telethon import Button
 logger = logging.getLogger(__name__)
 
 class Keyboard:
-
+    """
+    Provides static methods for generating inline keyboard layouts.
+    
+    All methods return lists of button rows that can be used with
+    Telethon's Button.inline() for creating interactive keyboards.
+    """
+    
     @staticmethod
     def start_keyboard():
-        """Returns the start menu keyboard"""
+        """
+        Generate the main start menu keyboard.
+        
+        Returns:
+            List of button rows for the main menu
+        """
         return [
             [Button.inline("Account Management", 'account_management')],
             [
@@ -20,7 +31,12 @@ class Keyboard:
 
     @staticmethod
     def monitor_keyboard():
-        """Returns the monitor mode keyboard"""
+        """
+        Generate the monitor mode keyboard.
+        
+        Returns:
+            List of button rows for monitor operations
+        """
         return [
             [
                 Button.inline('Add Keyword', b'add_keyword'),
@@ -41,7 +57,12 @@ class Keyboard:
 
     @staticmethod
     def bulk_keyboard():
-        """Returns a keyboard with action buttons like like, join, block, message, comment"""
+        """
+        Generate the bulk operations keyboard.
+        
+        Returns:
+            List of button rows for bulk operations
+        """
         return [
             [Button.inline('Reaction', 'bulk_reaction')],
             [Button.inline('Poll', 'bulk_poll')],
@@ -54,7 +75,18 @@ class Keyboard:
 
     @staticmethod
     def account_management_keyboard(tbot=None, chat_id=None):
-        """Returns the keyboard for account management"""
+        """
+        Generate the account management keyboard.
+        
+        Dynamically adjusts buttons based on current conversation state.
+        
+        Args:
+            tbot: Optional TelegramBot instance
+            chat_id: Optional chat ID to check conversation state
+            
+        Returns:
+            List of button rows for account management
+        """
         buttons = [
             [Button.inline('Add Account', 'add_account')],
             [Button.inline('List Accounts', 'list_accounts')],
@@ -62,27 +94,42 @@ class Keyboard:
             [Button.inline("Exit", 'exit')]
         ]
 
-        # If user is in an active conversation, hide certain buttons
         if tbot and chat_id and chat_id in tbot._conversations:
             conversation_state = tbot._conversations[chat_id]
-            # Hide list_accounts button during bulk operations
             if conversation_state.startswith('bulk_send_pv') or conversation_state.startswith('bulk_poll'):
-                # Remove the list_accounts button (second row)
                 buttons.pop(1)
 
         return buttons
 
     @staticmethod
-    def channel_message_keyboard(message_link, sender_id):
-        """Returns a keyboard with a 'View Message' URL button and 'Ignore' inline button"""
+    def channel_message_keyboard(message_link: str, sender_id: int):
+        """
+        Generate keyboard for forwarded messages in channel.
+        
+        Args:
+            message_link: URL to the original message
+            sender_id: ID of the message sender
+            
+        Returns:
+            List of button rows with view and ignore options
+        """
         return [
             [Button.url("View Message", url=message_link)],
             [Button.inline("❌Ignore❌", data=f"ignore_{sender_id}")]
         ]
 
     @staticmethod
-    def toggle_and_delete_keyboard(status, session):
-        """Returns a keyboard with 'Disable/Enable' and 'Delete' buttons"""
+    def toggle_and_delete_keyboard(status: str, session: str):
+        """
+        Generate keyboard for account management actions.
+        
+        Args:
+            status: Current account status (e.g., "🟢 Active")
+            session: Session name/identifier
+            
+        Returns:
+            List of button rows with toggle and delete options
+        """
         return [
             [
                 Button.inline(
@@ -95,7 +142,12 @@ class Keyboard:
 
     @staticmethod
     def individual_keyboard():
-        """Returns the keyboard for individual operations"""
+        """
+        Generate the individual operations keyboard.
+        
+        Returns:
+            List of button rows for individual account operations
+        """
         return [
             [Button.inline("Reaction", 'reaction')],
             [Button.inline("Send PV", 'send_pv')],
@@ -107,15 +159,35 @@ class Keyboard:
 
     @staticmethod
     def report_keyboard():
-        """Returns the keyboard for report"""
+        """
+        Generate the report/statistics keyboard.
+        
+        Returns:
+            List of button rows for report operations
+        """
         return [
             [Button.inline("Show Stats", 'show_stats')],
+            [Button.inline("Check Report Status", 'check_report_status')],
             [Button.inline("Exit", 'exit')]
         ]
 
     @staticmethod
-    async def show_keyboard(keyboard_name, event=None, tbot=None):
-        """Dynamically returns and shows the requested keyboard based on its name"""
+    async def show_keyboard(keyboard_name: str, event=None, tbot=None):
+        """
+        Display a keyboard by name.
+        
+        Dynamically selects and displays the appropriate keyboard layout
+        based on the keyboard name. Handles both callback queries and
+        new messages.
+        
+        Args:
+            keyboard_name: Name of the keyboard to display
+            event: Optional Telegram event (CallbackQuery or NewMessage)
+            tbot: Optional TelegramBot instance for dynamic keyboards
+            
+        Returns:
+            Keyboard layout (list of button rows) or None if not found
+        """
         chat_id = event.chat_id if event else None
 
         keyboards = {
@@ -135,23 +207,22 @@ class Keyboard:
         if keyboard:
             if event:
                 try:
-                    # For callback queries, answer first and then edit
                     if hasattr(event, 'answer'):
                         await event.answer()
-                    # Custom message for report keyboard
-                    if keyboard_name == 'report':
-                        message_text = "Report status - Please choose an option:"
-                    else:
-                        message_text = "Please choose an option:"
-                    # Clear the previous keyboard
+                    
+                    message_text = (
+                        "Report status - Please choose an option:"
+                        if keyboard_name == 'report'
+                        else "Please choose an option:"
+                    )
                     await event.edit(message_text, buttons=keyboard)
                 except Exception as e:
                     logger.error(f"Error showing keyboard {keyboard_name}: {e}")
-                    # If edit fails, try responding
-                    if keyboard_name == 'report':
-                        message_text = "Report status - Please choose an option:"
-                    else:
-                        message_text = "Please choose an option:"
+                    message_text = (
+                        "Report status - Please choose an option:"
+                        if keyboard_name == 'report'
+                        else "Please choose an option:"
+                    )
                     await event.respond(message_text, buttons=keyboard)
             return keyboard
         else:

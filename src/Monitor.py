@@ -7,20 +7,30 @@ from src.Keyboards import Keyboard
 logger = logging.getLogger(__name__)
 
 class Monitor:
+    """
+    Handles message monitoring and forwarding based on configured keywords.
+    
+    Monitors messages from all active Telegram accounts and forwards messages
+    containing configured keywords to a designated channel.
+    """
+    
     def __init__(self, tbot):
         """
-        Initialize the Monitor class to handle message monitoring and forwarding.
+        Initialize the Monitor class.
         
-        :param tbot: Main bot instance containing configuration and Telegram client.
+        Args:
+            tbot: Main bot instance containing configuration and Telegram client
         """
         self.tbot = tbot
         self.channel_id = None  # Numeric channel ID
         self.channel_username = None  # Channel username (if applicable)
 
-    async def resolve_channel_id(self):
+    async def resolve_channel_id(self) -> None:
         """
-        Resolve the CHANNEL_ID to a numeric ID if it's a username.
-        This ensures compatibility between username-based and ID-based channel references.
+        Resolve CHANNEL_ID to numeric ID if it's a username.
+        
+        Ensures compatibility between username-based and ID-based channel
+        references. Caches the resolved ID for subsequent use.
         """
         if self.channel_id is not None:
             return  # Channel ID already resolved
