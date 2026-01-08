@@ -1,94 +1,101 @@
-# Telegram Management Bot Panel
+# Telegram Panel
 
-A comprehensive Telegram bot management system for monitoring messages, managing multiple accounts, and performing bulk operations across Telegram groups and channels.
+A professional Telegram bot management system for monitoring messages, managing multiple accounts, and performing bulk operations across Telegram groups and channels.
+
+## Overview
+
+Telegram Panel provides a comprehensive solution for managing multiple Telegram accounts through a single bot interface. It enables automated message monitoring, bulk operations, and account management with proper error handling, rate limiting, and thread-safe operations.
 
 ## Features
 
-### 🤖 Account Management
-- Add multiple Telegram accounts
+### Account Management
+- Add and manage multiple Telegram accounts
 - Enable/disable accounts dynamically
 - View account status and statistics
-- Auto-detect and manage Telegram groups
+- Automatic session detection and management
+- Inactive account tracking
 
-### 📊 Message Monitoring
-- Monitor messages based on keywords
-- Forward filtered messages to a designated channel
+### Message Monitoring
+- Monitor messages based on configurable keywords
+- Forward filtered messages to designated channels
 - Ignore specific users
 - Track message sources and senders
+- Real-time message processing
 
-### 🔄 Bulk Operations
-- **Reaction**: Apply reactions to messages using multiple accounts
-- **Poll**: Vote on polls with multiple accounts
-- **Join**: Join groups/channels with multiple accounts
+### Bulk Operations
+- **Reactions**: Apply reactions to messages using multiple accounts
+- **Polls**: Vote on polls with multiple accounts
+- **Join/Leave**: Join or leave groups/channels in bulk
 - **Block**: Block users across multiple accounts
-- **Send PV**: Send private messages to users
-- **Comment**: Reply to messages/posts
+- **Private Messages**: Send private messages to users
+- **Comments**: Post comments/replies to messages
 
-### 👤 Individual Operations
+### Individual Operations
 - Perform actions using specific accounts
 - Send private messages
 - Join/leave groups
 - Post comments
+- Apply reactions
 
-### 📈 Statistics & Reports
+### Statistics & Reporting
 - View bot statistics
 - Display groups per account
 - Show configured keywords
 - List ignored users
+- Check account report status
 
 ## Prerequisites
 
 - Python 3.8 or higher
-- Telegram API credentials (API_ID and API_HASH)
-- A Telegram bot token
+- Telegram API credentials (API_ID and API_HASH from [my.telegram.org](https://my.telegram.org/apps))
+- Telegram bot token (from [@BotFather](https://t.me/BotFather))
 - Admin user ID
 
 ## Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd Telegram-Panel
-   ```
+### 1. Clone the repository
 
-2. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-   
-   Or use the installation script:
-   ```bash
-   chmod +x install.sh
-   ./install.sh
-   ```
+```bash
+git clone https://github.com/ItsOrv/Telegram-Panel.git
+cd Telegram-Panel
+```
 
-3. **Configure environment variables**
-   
-   Copy the example environment file:
-   ```bash
-   cp env.example .env
-   ```
-   
-   Edit `.env` and fill in your credentials:
-   ```env
-   # Get API_ID and API_HASH from https://my.telegram.org/apps
-   API_ID=your_api_id
-   API_HASH=your_api_hash
-   
-   # Get BOT_TOKEN from @BotFather
-   BOT_TOKEN=your_bot_token
-   
-   # Your Telegram user ID (get from @userinfobot)
-   ADMIN_ID=your_user_id
-   
-   # Channel ID or username where filtered messages will be sent
-   CHANNEL_ID=@your_channel or -100xxxxxxxxxx
-   ```
+### 2. Install dependencies
 
-4. **Run the bot**
-   ```bash
-   python main.py
-   ```
+```bash
+pip install -r requirements.txt
+```
+
+Or use the installation script:
+
+```bash
+chmod +x install.sh
+./install.sh
+```
+
+### 3. Configure environment variables
+
+Copy the example environment file:
+
+```bash
+cp env.example .env
+```
+
+Edit `.env` and configure your credentials:
+
+```env
+API_ID=your_api_id
+API_HASH=your_api_hash
+BOT_TOKEN=your_bot_token
+ADMIN_ID=your_user_id
+CHANNEL_ID=@your_channel
+```
+
+### 4. Run the bot
+
+```bash
+python main.py
+```
 
 ## Configuration
 
@@ -96,8 +103,8 @@ A comprehensive Telegram bot management system for monitoring messages, managing
 
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
-| `API_ID` | Telegram API ID from my.telegram.org | Yes | - |
-| `API_HASH` | Telegram API Hash from my.telegram.org | Yes | - |
+| `API_ID` | Telegram API ID | Yes | - |
+| `API_HASH` | Telegram API Hash | Yes | - |
 | `BOT_TOKEN` | Bot token from @BotFather | Yes | - |
 | `ADMIN_ID` | Your Telegram user ID | Yes | - |
 | `CHANNEL_ID` | Channel for forwarded messages | Yes | - |
@@ -106,28 +113,29 @@ A comprehensive Telegram bot management system for monitoring messages, managing
 | `RATE_LIMIT_SLEEP` | Sleep time to avoid rate limits (seconds) | No | `60` |
 | `GROUPS_BATCH_SIZE` | Groups to process per batch | No | `10` |
 | `GROUPS_UPDATE_SLEEP` | Sleep time between group updates | No | `60` |
+| `REPORT_CHECK_BOT` | Report check bot username/ID | No | - |
 
 ### Configuration Files
 
-- **clients.json**: Stores account and group information
-- **logs/bot.log**: Contains bot operation logs
+- `clients.json`: Stores account and group information (auto-generated)
+- `logs/bot.log`: Application logs
 
 ## Usage
 
 ### Getting Started
 
 1. Start the bot with `/start` command
-2. You'll see the main menu with following options:
-   - 🔐 Account Management
-   - 👤 Individual Operations
-   - 🔄 Bulk Operations
-   - 📊 Monitor Mode
-   - 📈 Report
+2. Navigate through the main menu:
+   - Account Management
+   - Individual Operations
+   - Bulk Operations
+   - Monitor Mode
+   - Report
 
 ### Account Management
 
 **Add Account:**
-1. Click "Account Management" → "Add Account"
+1. Navigate to Account Management → Add Account
 2. Enter phone number (with country code, e.g., +1234567890)
 3. Enter verification code from Telegram
 4. Enter 2FA password (if enabled)
@@ -148,23 +156,13 @@ A comprehensive Telegram bot management system for monitoring messages, managing
 - Messages containing these keywords will be forwarded
 - Case-insensitive matching
 
-**Remove Keywords:**
-- Remove keywords from the monitoring list
-
 **Ignore Users:**
 - Add user IDs to ignore their messages
 - Useful for filtering spam or unwanted content
 
-**Remove Ignored Users:**
-- Remove users from the ignore list
-
-**Show Groups:**
+**Show Statistics:**
 - Display groups count for each account
-
-**Show Keywords:**
 - List all configured keywords
-
-**Show Ignores:**
 - View all ignored user IDs
 
 ### Bulk Operations
@@ -176,7 +174,7 @@ Perform actions using multiple accounts simultaneously:
 3. Provide required information (link, message, etc.)
 
 **Example: Bulk Reaction**
-1. Click "Bulk" → "Reaction"
+1. Navigate to Bulk → Reaction
 2. Select number of accounts
 3. Provide message link
 4. Select reaction emoji
@@ -194,81 +192,40 @@ Perform actions using a specific account:
 
 ```
 Telegram-Panel/
-├── main.py                 # Entry point
+├── main.py                 # Application entry point
 ├── requirements.txt        # Python dependencies
 ├── env.example            # Environment variables template
 ├── install.sh             # Installation script
-├── clients.json           # Client configuration (auto-generated)
-├── logs/
-│   └── bot.log           # Application logs
-└── src/
-    ├── Config.py         # Configuration management
-    ├── Telbot.py         # Main bot class
-    ├── Client.py         # Account/session management
-    ├── Handlers.py       # Event handlers
-    ├── Keyboards.py      # Keyboard layouts
-    ├── Monitor.py        # Message monitoring
-    ├── actions.py        # Bulk/individual actions
-    └── Logger.py         # Logging setup
+├── .editorconfig          # Editor configuration
+├── .gitignore            # Git ignore rules
+├── CHANGELOG.md          # Version history
+├── CONTRIBUTING.md       # Contribution guidelines
+├── LICENSE               # License file
+├── README.md             # This file
+├── docs/                 # Documentation
+│   ├── README.md
+│   └── ...
+├── logs/                 # Log files
+│   └── bot.log
+├── src/                  # Source code
+│   ├── Config.py         # Configuration management
+│   ├── Telbot.py         # Main bot class
+│   ├── Client.py         # Account/session management
+│   ├── Handlers.py       # Event handlers
+│   ├── Keyboards.py      # Keyboard layouts
+│   ├── Monitor.py        # Message monitoring
+│   ├── actions.py        # Bulk/individual actions
+│   ├── Validation.py     # Input validation
+│   └── Logger.py         # Logging setup
+└── tests/                # Test suite
+    ├── test_unit_*.py    # Unit tests
+    ├── test_flows_*.py   # Flow tests
+    └── test_integration_*.py  # Integration tests
 ```
-
-## Security Considerations
-
-1. **Never share your `.env` file** - it contains sensitive credentials
-2. **Keep session files secure** - they provide access to accounts
-3. **Use strong 2FA passwords** for Telegram accounts
-4. **Regularly update dependencies** to patch security vulnerabilities
-5. **Monitor bot logs** for suspicious activities
-
-## Troubleshooting
-
-### Bot doesn't respond
-- Check if bot token is correct
-- Verify ADMIN_ID matches your user ID
-- Review logs in `logs/bot.log`
-
-### Account authorization fails
-- Ensure API_ID and API_HASH are correct
-- Check if phone number format is correct (+country_code)
-- Verify 2FA password if enabled
-
-### Rate limit errors
-- Increase `RATE_LIMIT_SLEEP` value
-- Reduce `GROUPS_BATCH_SIZE`
-- Wait before retrying operations
-
-### Messages not forwarding
-- Verify keywords are configured
-- Check if users are not in ignore list
-- Ensure bot has access to CHANNEL_ID
-- Confirm accounts are active and authorized
-
-## Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the terms specified in the LICENSE file.
-
-## Support
-
-For issues, questions, or suggestions:
-- Open an issue on GitHub
-- Check logs in `logs/bot.log` for error details
-- Refer to Telethon documentation: https://docs.telethon.dev/
 
 ## Testing
 
-This project includes comprehensive tests covering all flows and functionality.
-
-### Running Tests
+Run the test suite:
 
 ```bash
 # Install test dependencies
@@ -284,25 +241,63 @@ pytest tests/ --cov=src --cov-report=html
 pytest tests/test_unit_*.py          # Unit tests
 pytest tests/test_flows_*.py         # Flow tests
 pytest tests/test_integration_*.py   # Integration tests
-
-# Or use the test runner script
-python tests/run_tests.py
 ```
 
-### Test Coverage
+## Security Considerations
 
-The test suite includes:
-- ✅ Unit tests for all components (Validation, Config, Keyboards, Handlers)
-- ✅ Complete flow tests for all user workflows
-- ✅ Integration tests for component interactions
-- ✅ Edge case and error handling tests
+1. **Never share your `.env` file** - it contains sensitive credentials
+2. **Keep session files secure** - they provide access to accounts
+3. **Use strong 2FA passwords** for Telegram accounts
+4. **Regularly update dependencies** to patch security vulnerabilities
+5. **Monitor bot logs** for suspicious activities
+6. **Validate all user inputs** to prevent injection attacks
 
-See `tests/README.md` for detailed documentation.
+## Troubleshooting
+
+### Bot doesn't respond
+- Verify bot token is correct
+- Check ADMIN_ID matches your user ID
+- Review logs in `logs/bot.log`
+
+### Account authorization fails
+- Ensure API_ID and API_HASH are correct
+- Check phone number format (+country_code)
+- Verify 2FA password if enabled
+
+### Rate limit errors
+- Increase `RATE_LIMIT_SLEEP` value
+- Reduce `GROUPS_BATCH_SIZE`
+- Wait before retrying operations
+
+### Messages not forwarding
+- Verify keywords are configured
+- Check if users are not in ignore list
+- Ensure bot has access to CHANNEL_ID
+- Confirm accounts are active and authorized
+
+## Contributing
+
+Contributions are welcome. Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+## License
+
+This project is licensed under the terms specified in the LICENSE file.
+
+## Support
+
+For issues, questions, or suggestions:
+- Open an issue on GitHub
+- Check logs in `logs/bot.log` for error details
+- Refer to Telethon documentation: https://docs.telethon.dev/
 
 ## Disclaimer
 
 This bot is for educational and legitimate purposes only. Users are responsible for complying with Telegram's Terms of Service and applicable laws. Misuse of this tool may result in account bans or legal consequences.
-
----
-
-**Note**: This is a powerful automation tool. Use responsibly and respect Telegram's rate limits and policies.
