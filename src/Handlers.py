@@ -331,6 +331,9 @@ class MessageHandler:
             elif handler_name == 'bulk_join_link_handler':
                 await self.actions.bulk_join_link_handler(event)
                 return True
+            elif handler_name == 'bulk_leave_link_handler':
+                await self.actions.bulk_leave_link_handler(event)
+                return True
             elif handler_name == 'bulk_block_user_handler':
                 await self.actions.bulk_block_user_handler(event)
                 return True
@@ -470,6 +473,7 @@ class CallbackHandler:
             'bulk_reaction': self.handle_bulk_reaction,
             'bulk_poll': self.handle_bulk_poll,
             'bulk_join': self.handle_bulk_join,
+            'bulk_leave': self.handle_bulk_leave,
             'bulk_block': self.handle_bulk_block,
             'bulk_send_pv': self.handle_bulk_send_pv,
             'bulk_comment': self.handle_bulk_comment,
@@ -543,6 +547,15 @@ class CallbackHandler:
             event: Telegram CallbackQuery event
         """
         await self.actions.prompt_group_action(event, 'join')
+
+    async def handle_bulk_leave(self, event):
+        """
+        Handle bulk leave operation.
+        
+        Args:
+            event: Telegram CallbackQuery event
+        """
+        await self.actions.prompt_group_action(event, 'leave')
 
     async def handle_bulk_block(self, event):
         """
@@ -695,7 +708,7 @@ class CallbackHandler:
                 parts = data.split('_')
                 if len(parts) == 2:
                     action_name, value = parts
-                    if value.isdigit() and action_name in ['reaction', 'poll', 'join', 'block', 'comment', 'send_pv']:
+                    if value.isdigit() and action_name in ['reaction', 'poll', 'join', 'leave', 'block', 'comment', 'send_pv']:
                         num_accounts = int(value)
                         await self.actions.handle_group_action(event, action_name, num_accounts)
                     elif action_name in ['reaction', 'send_pv', 'join', 'left', 'comment']:
