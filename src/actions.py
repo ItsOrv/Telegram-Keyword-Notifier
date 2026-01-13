@@ -10,13 +10,16 @@ except ImportError:
     # Fallback for older Telethon versions
     from telethon.tl import types
     ReactionEmoji = getattr(types, 'ReactionEmoji', None)
-from src.Config import CHANNEL_ID
+from src.Config import CHANNEL_ID, REPORT_CHECK_BOT
 from src.Validation import InputValidator
 
 logger = logging.getLogger(__name__)
 
 # Concurrency limit for bulk operations to avoid rate limiting
 MAX_CONCURRENT_OPERATIONS = 3
+
+# Maximum retry attempts for operations
+MAX_RETRY_ATTEMPTS = 3
 
 class Actions:
     """
@@ -38,6 +41,64 @@ class Actions:
         self.tbot = tbot
         self.operation_semaphore = asyncio.Semaphore(MAX_CONCURRENT_OPERATIONS)
         self._counter_lock = asyncio.Lock()
+    
+    async def _execute_with_retry(self, operation, account, max_retries=3, operation_name="operation"):
+        """
+        Execute an operation with automatic retry logic for transient errors.
+        
+        Args:
+            operation: Async callable to execute
+            account: TelegramClient instance
+            max_retries: Maximum number of retry attempts
+            operation_name: Name of operation for logging
+            
+        Returns:
+            Tuple of (success: bool, error: Exception or None)
+        """
+        session_name = None
+        try:
+            session_name = account.session.filename if hasattr(account, 'session') and hasattr(account.session, 'filename') else 'Unknown'
+        except:
+            session_name = 'Unknown'
+        
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                await operation()
+                return True, None
+            except FloodWaitError as e:
+                wait_time = e.seconds
+                logger.warning(f"FloodWaitError for account {session_name} (attempt {attempt + 1}/{max_retries}): waiting {wait_time} seconds")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(wait_time)
+                    continue
+                else:
+                    return False, e
+            except (SessionRevokedError, ValueError) as e:
+                error_msg = str(e).lower()
+                if 'session' in error_msg or 'revoked' in error_msg or 'not logged in' in error_msg:
+                    logger.warning(f"Session revoked for account {session_name}: {e}")
+                    return False, e
+                # For other ValueError, retry
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                    last_error = e
+                    continue
+                return False, e
+            except Exception as e:
+                error_msg = str(e).lower()
+                # Retry on network/connection errors
+                if any(keyword in error_msg for keyword in ['network', 'connection', 'timeout', 'temporary']):
+                    if attempt < max_retries - 1:
+                        wait_time = 2 ** attempt  # Exponential backoff
+                        logger.warning(f"Network error for account {session_name} (attempt {attempt + 1}/{max_retries}): retrying in {wait_time}s")
+                        await asyncio.sleep(wait_time)
+                        last_error = e
+                        continue
+                # Don't retry on other errors
+                return False, e
+        
+        return False, last_error
 
     async def parse_telegram_link(self, link: str, account=None):
         """
@@ -158,6 +219,7 @@ class Actions:
             'reaction': self.bulk_reaction,
             'poll': self.bulk_poll,
             'join': self.bulk_join,
+            'leave': self.bulk_leave,
             'block': self.bulk_block,
             'send_pv': self.bulk_send_pv,
             'comment': self.bulk_comment
@@ -1078,6 +1140,114 @@ class Actions:
                 self.tbot._conversations.pop(event.chat_id, None)
             self.tbot.handlers.pop('join_num_accounts', None)
     
+    async def bulk_leave(self, event, num_accounts):
+        """
+        Handle bulk leave operation - ask for link once, then leave with all accounts.
+        """
+        try:
+            await event.respond("لطفاً لینک گروه یا کانال را برای ترک کردن ارسال کنید:")
+            async with self.tbot._conversations_lock:
+                self.tbot._conversations[event.chat_id] = 'bulk_leave_link_handler'
+            self.tbot.handlers['leave_num_accounts'] = num_accounts
+        except Exception as e:
+            logger.error(f"Error in bulk_leave: {e}")
+            await event.respond("❌ خطا در شروع عملیات bulk leave.")
+            self.tbot.handlers.pop('leave_num_accounts', None)
+    
+    async def bulk_leave_link_handler(self, event):
+        """
+        Handle bulk leave link input.
+        """
+        try:
+            link = event.message.text.strip()
+            
+            # Validate link
+            is_valid, error_msg = InputValidator.validate_telegram_link(link)
+            if not is_valid:
+                await event.respond(f"❌ {error_msg}")
+                async with self.tbot._conversations_lock:
+                    self.tbot._conversations.pop(event.chat_id, None)
+                self.tbot.handlers.pop('leave_num_accounts', None)
+                return
+            
+            num_accounts = self.tbot.handlers.get('leave_num_accounts')
+            if num_accounts is None:
+                await event.respond("❌ تعداد حساب‌ها یافت نشد. لطفاً دوباره شروع کنید.")
+                async with self.tbot._conversations_lock:
+                    self.tbot._conversations.pop(event.chat_id, None)
+                return
+            
+            async with self.tbot.active_clients_lock:
+                accounts = list(self.tbot.active_clients.values())[:num_accounts]
+            
+            success_count = 0
+            error_count = 0
+            revoked_sessions = []
+            
+            async def leave_with_account(acc):
+                nonlocal success_count, error_count
+                session_name = None
+                try:
+                    session_name = acc.session.filename if hasattr(acc, 'session') and hasattr(acc.session, 'filename') else 'Unknown'
+                except:
+                    session_name = 'Unknown'
+                
+                async with self.operation_semaphore:
+                    try:
+                        entity = await acc.get_entity(link)
+                        await acc.leave_chat(entity)
+                        async with self._counter_lock:
+                            success_count += 1
+                        await asyncio.sleep(random.uniform(2, 5))
+                    except FloodWaitError as e:
+                        async with self._counter_lock:
+                            error_count += 1
+                        logger.warning(f"FloodWaitError for account {session_name}: waiting {e.seconds} seconds")
+                        await asyncio.sleep(e.seconds)
+                    except (SessionRevokedError, ValueError) as e:
+                        error_msg = str(e).lower()
+                        if 'session' in error_msg or 'revoked' in error_msg or 'not logged in' in error_msg:
+                            async with self._counter_lock:
+                                error_count += 1
+                                revoked_sessions.append(session_name)
+                            logger.warning(f"Session revoked for account {session_name}: {e}")
+                        else:
+                            async with self._counter_lock:
+                                error_count += 1
+                            logger.error(f"Error leaving group/channel with account {session_name}: {e}")
+                    except Exception as e:
+                        async with self._counter_lock:
+                            error_count += 1
+                        logger.error(f"Error leaving group/channel with account {session_name}: {e}")
+            
+            tasks = [leave_with_account(acc) for acc in accounts]
+            await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Remove revoked sessions from active_clients
+            if revoked_sessions:
+                await self._remove_revoked_sessions(revoked_sessions)
+            
+            # Report results
+            if error_count == 0:
+                await event.respond(f"✅ با موفقیت با {success_count} حساب از گروه/کانال خارج شدید.")
+            else:
+                msg = f"⚠️ با {success_count} حساب از گروه/کانال خارج شدید. {error_count} حساب با خطا مواجه شد."
+                if revoked_sessions:
+                    msg += f"\n⚠️ {len(revoked_sessions)} حساب revoked شده و حذف شدند."
+                await event.respond(msg)
+            
+            # Cleanup
+            self.tbot.handlers.pop('leave_num_accounts', None)
+            async with self.tbot._conversations_lock:
+                self.tbot._conversations.pop(event.chat_id, None)
+            
+        except Exception as e:
+            logger.error(f"Error in bulk_leave_link_handler: {e}")
+            await event.respond(f"❌ خطا در ترک کردن گروه/کانال: {str(e)}")
+            async with self.tbot._conversations_lock:
+                self.tbot._conversations.pop(event.chat_id, None)
+            self.tbot.handlers.pop('leave_num_accounts', None)
+    
     async def bulk_block(self, event, num_accounts):
         """
         Handle bulk block operation - ask for user once, then block with all accounts.
@@ -1299,4 +1469,61 @@ class Actions:
             await event.respond("❌ خطا در شروع عملیات bulk comment.")
             self.tbot.handlers.pop('comment_num_accounts', None)
             self.tbot.handlers.pop('comment_is_bulk', None)
+    
+    async def check_report_status(self, phone_number: str, account) -> bool:
+        """
+        Check if an account has been reported by querying the report check bot.
+        
+        Args:
+            phone_number: Phone number of the account to check
+            account: TelegramClient instance for the account
+            
+        Returns:
+            True if account is reported, False otherwise
+        """
+        if not REPORT_CHECK_BOT:
+            logger.warning("REPORT_CHECK_BOT not configured, cannot check report status")
+            return False
+        
+        try:
+            # Send a message to the report check bot with the phone number
+            try:
+                report_bot = await account.get_entity(REPORT_CHECK_BOT)
+                message = await account.send_message(report_bot, phone_number)
+                
+                # Wait a bit for the bot to respond
+                await asyncio.sleep(2)
+                
+                # Get the response from the bot
+                async for response in account.iter_messages(report_bot, limit=1):
+                    response_text = response.text.lower() if response.text else ""
+                    
+                    # Check if the response indicates the account is reported
+                    # Common indicators: "reported", "banned", "restricted", etc.
+                    reported_keywords = ['reported', 'banned', 'restricted', 'blocked', 'yes', 'true', '1']
+                    is_reported = any(keyword in response_text for keyword in reported_keywords)
+                    
+                    # Clean up the messages
+                    try:
+                        await message.delete()
+                        await response.delete()
+                    except:
+                        pass
+                    
+                    return is_reported
+                
+                # If no response, assume not reported
+                try:
+                    await message.delete()
+                except:
+                    pass
+                return False
+                
+            except Exception as e:
+                logger.error(f"Error checking report status for {phone_number}: {e}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error in check_report_status for {phone_number}: {e}")
+            return False
 
