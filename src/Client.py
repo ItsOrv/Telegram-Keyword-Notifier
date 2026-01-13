@@ -1015,7 +1015,7 @@ class AccountHandler:
                                 self.tbot.config['inactive_accounts'] = {}
                             self.tbot.config['inactive_accounts'][session] = {
                                 'phone': session,
-                                'last_seen': self.tbot.loop.time(),
+                                'last_seen': asyncio.get_event_loop().time(),
                                 'reason': 'not_authorized_on_reactivation',
                                 'error_details': 'Client not authorized'
                             }
@@ -1047,7 +1047,7 @@ class AccountHandler:
                                 self.tbot.config['inactive_accounts'] = {}
                             self.tbot.config['inactive_accounts'][session] = {
                                 'phone': session,
-                                'last_seen': self.tbot.loop.time(),
+                                'last_seen': asyncio.get_event_loop().time(),
                                 'reason': 'connection_error',
                                 'error_details': str(e)
                             }
