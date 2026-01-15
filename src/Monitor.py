@@ -164,7 +164,10 @@ class Monitor:
             except UnicodeEncodeError as e:
                 # Handle encoding errors gracefully
                 logger.error(f"UnicodeEncodeError: {e}")
-                logger.error(f"Failed text: {text}")
+                try:
+                    logger.error(f"Failed text: {text}")
+                except NameError:
+                    logger.error("Failed text: (text variable not defined)")
                 await tbot_instance.send_message(
                     channel_id,
                     "Error processing message due to encoding issues.",
