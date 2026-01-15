@@ -12,15 +12,16 @@ This document lists features that are incomplete, need improvement, or have know
 ## Incomplete Features
 
 ### 1. Bulk Leave Operation
-**Status**: Incomplete  
+**Status**: ✅ **COMPLETED** (2025-01-27)  
 **Location**: `src/actions.py`
 
-- Individual leave operation exists (`left` method)
-- Bulk leave operation is not implemented
-- Users can only leave groups/channels one account at a time
+- ✅ Individual leave operation exists (`left` method)
+- ✅ Bulk leave operation now fully implemented
+- ✅ Users can leave groups/channels with multiple accounts simultaneously
+- ✅ Proper error handling and session revocation detection added
 
 **Impact**: Medium  
-**Priority**: Low
+**Priority**: Low (Resolved)
 
 ---
 
