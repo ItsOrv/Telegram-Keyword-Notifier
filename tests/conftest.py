@@ -263,11 +263,3 @@ def mock_monitor(mock_tbot):
     monitor = Monitor(mock_tbot)
     return monitor
 
-
-print('debug')
-
-print('debug')
-
-print('debug')
-
-print('debug')
