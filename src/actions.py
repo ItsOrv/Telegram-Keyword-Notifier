@@ -58,7 +58,7 @@ class Actions:
         session_name = None
         try:
             session_name = account.session.filename if hasattr(account, 'session') and hasattr(account.session, 'filename') else 'Unknown'
-        except:
+        except (AttributeError, Exception):
             session_name = 'Unknown'
         
         last_error = None
@@ -177,7 +177,8 @@ class Actions:
                                 del self.tbot.active_clients[key]
                                 logger.info(f"Removed revoked session: {key}")
                                 break
-                    except:
+                    except (AttributeError, KeyError, Exception) as e:
+                        logger.debug(f"Error checking session for {key}: {e}")
                         pass
 
     async def prompt_group_action(self, event, action_name):
@@ -366,7 +367,7 @@ class Actions:
                 session_name = None
                 try:
                     session_name = acc.session.filename if hasattr(acc, 'session') and hasattr(acc.session, 'filename') else 'Unknown'
-                except:
+                except (AttributeError, Exception):
                     session_name = 'Unknown'
                 
                 async with self.operation_semaphore:
@@ -584,7 +585,7 @@ class Actions:
                     session_name = None
                     try:
                         session_name = acc.session.filename if hasattr(acc, 'session') and hasattr(acc.session, 'filename') else 'Unknown'
-                    except:
+                    except (AttributeError, Exception):
                         session_name = 'Unknown'
                     
                     async with self.operation_semaphore:
@@ -976,9 +977,16 @@ class Actions:
                 # Comment with all accounts
                 success_count = 0
                 error_count = 0
+                revoked_sessions = []
                 
                 async def comment_with_account(acc):
                     nonlocal success_count, error_count
+                    session_name = None
+                    try:
+                        session_name = acc.session.filename if hasattr(acc, 'session') and hasattr(acc.session, 'filename') else 'Unknown'
+                    except (AttributeError, Exception):
+                        session_name = 'Unknown'
+                    
                     async with self.operation_semaphore:
                         try:
                             # Resolve entity if needed
@@ -989,20 +997,45 @@ class Actions:
                                 peer = await acc.get_entity(peer)
                             
                             await acc.send_message(peer, comment_text, reply_to=message_id)
-                            success_count += 1
+                            async with self._counter_lock:
+                                success_count += 1
                             await asyncio.sleep(random.uniform(2, 5))
+                        except FloodWaitError as e:
+                            async with self._counter_lock:
+                                error_count += 1
+                            logger.warning(f"FloodWaitError for account {session_name}: waiting {e.seconds} seconds")
+                            await asyncio.sleep(e.seconds)
+                        except (SessionRevokedError, ValueError) as e:
+                            error_msg = str(e).lower()
+                            if 'session' in error_msg or 'revoked' in error_msg or 'not logged in' in error_msg:
+                                async with self._counter_lock:
+                                    error_count += 1
+                                    revoked_sessions.append(session_name)
+                                logger.warning(f"Session revoked for account {session_name}: {e}")
+                            else:
+                                async with self._counter_lock:
+                                    error_count += 1
+                                logger.error(f"Error posting comment with account {session_name}: {e}")
                         except Exception as e:
-                            error_count += 1
-                            logger.error(f"Error posting comment with account {acc.session.filename if hasattr(acc, 'session') else 'Unknown'}: {e}")
+                            async with self._counter_lock:
+                                error_count += 1
+                            logger.error(f"Error posting comment with account {session_name}: {e}")
                 
                 tasks = [comment_with_account(acc) for acc in accounts]
                 await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # Remove revoked sessions from active_clients
+                if revoked_sessions:
+                    await self._remove_revoked_sessions(revoked_sessions)
                 
                 # Report results
                 if error_count == 0:
                     await event.respond(f"✅ با موفقیت نظر با {success_count} حساب ارسال شد.")
                 else:
-                    await event.respond(f"⚠️ نظر با {success_count} حساب ارسال شد. {error_count} حساب با خطا مواجه شد.")
+                    msg = f"⚠️ نظر با {success_count} حساب ارسال شد. {error_count} حساب با خطا مواجه شد."
+                    if revoked_sessions:
+                        msg += f"\n⚠️ {len(revoked_sessions)} حساب revoked شده و حذف شدند."
+                    await event.respond(msg)
                 
                 # Cleanup
                 self.tbot.handlers.pop('comment_link', None)
@@ -1107,26 +1140,58 @@ class Actions:
             
             success_count = 0
             error_count = 0
+            revoked_sessions = []
             
             async def join_with_account(acc):
                 nonlocal success_count, error_count
+                session_name = None
+                try:
+                    session_name = acc.session.filename if hasattr(acc, 'session') and hasattr(acc.session, 'filename') else 'Unknown'
+                except (AttributeError, Exception):
+                    session_name = 'Unknown'
+                
                 async with self.operation_semaphore:
                     try:
                         await acc.join_chat(link)
-                        success_count += 1
+                        async with self._counter_lock:
+                            success_count += 1
                         await asyncio.sleep(random.uniform(2, 5))
+                    except FloodWaitError as e:
+                        async with self._counter_lock:
+                            error_count += 1
+                        logger.warning(f"FloodWaitError for account {session_name}: waiting {e.seconds} seconds")
+                        await asyncio.sleep(e.seconds)
+                    except (SessionRevokedError, ValueError) as e:
+                        error_msg = str(e).lower()
+                        if 'session' in error_msg or 'revoked' in error_msg or 'not logged in' in error_msg:
+                            async with self._counter_lock:
+                                error_count += 1
+                                revoked_sessions.append(session_name)
+                            logger.warning(f"Session revoked for account {session_name}: {e}")
+                        else:
+                            async with self._counter_lock:
+                                error_count += 1
+                            logger.error(f"Error joining with account {session_name}: {e}")
                     except Exception as e:
-                        error_count += 1
-                        logger.error(f"Error joining with account {acc.session.filename if hasattr(acc, 'session') else 'Unknown'}: {e}")
+                        async with self._counter_lock:
+                            error_count += 1
+                        logger.error(f"Error joining with account {session_name}: {e}")
             
             tasks = [join_with_account(acc) for acc in accounts]
             await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Remove revoked sessions from active_clients
+            if revoked_sessions:
+                await self._remove_revoked_sessions(revoked_sessions)
             
             # Report results
             if error_count == 0:
                 await event.respond(f"✅ با موفقیت با {success_count} حساب عضو شدید.")
             else:
-                await event.respond(f"⚠️ با {success_count} حساب عضو شدید. {error_count} حساب با خطا مواجه شد.")
+                msg = f"⚠️ با {success_count} حساب عضو شدید. {error_count} حساب با خطا مواجه شد."
+                if revoked_sessions:
+                    msg += f"\n⚠️ {len(revoked_sessions)} حساب revoked شده و حذف شدند."
+                await event.respond(msg)
             
             # Cleanup
             self.tbot.handlers.pop('join_num_accounts', None)
@@ -1189,7 +1254,7 @@ class Actions:
                 session_name = None
                 try:
                     session_name = acc.session.filename if hasattr(acc, 'session') and hasattr(acc.session, 'filename') else 'Unknown'
-                except:
+                except (AttributeError, Exception):
                     session_name = 'Unknown'
                 
                 async with self.operation_semaphore:
@@ -1281,28 +1346,60 @@ class Actions:
             
             success_count = 0
             error_count = 0
+            revoked_sessions = []
             
             async def block_with_account(acc):
                 nonlocal success_count, error_count
+                session_name = None
+                try:
+                    session_name = acc.session.filename if hasattr(acc, 'session') and hasattr(acc.session, 'filename') else 'Unknown'
+                except (AttributeError, Exception):
+                    session_name = 'Unknown'
+                
                 async with self.operation_semaphore:
                     try:
                         from telethon.tl.functions.contacts import BlockRequest
                         entity = await acc.get_entity(user_input)
                         await acc(BlockRequest(entity))
-                        success_count += 1
+                        async with self._counter_lock:
+                            success_count += 1
                         await asyncio.sleep(random.uniform(2, 5))
+                    except FloodWaitError as e:
+                        async with self._counter_lock:
+                            error_count += 1
+                        logger.warning(f"FloodWaitError for account {session_name}: waiting {e.seconds} seconds")
+                        await asyncio.sleep(e.seconds)
+                    except (SessionRevokedError, ValueError) as e:
+                        error_msg = str(e).lower()
+                        if 'session' in error_msg or 'revoked' in error_msg or 'not logged in' in error_msg:
+                            async with self._counter_lock:
+                                error_count += 1
+                                revoked_sessions.append(session_name)
+                            logger.warning(f"Session revoked for account {session_name}: {e}")
+                        else:
+                            async with self._counter_lock:
+                                error_count += 1
+                            logger.error(f"Error blocking user with account {session_name}: {e}")
                     except Exception as e:
-                        error_count += 1
-                        logger.error(f"Error blocking user with account {acc.session.filename if hasattr(acc, 'session') else 'Unknown'}: {e}")
+                        async with self._counter_lock:
+                            error_count += 1
+                        logger.error(f"Error blocking user with account {session_name}: {e}")
             
             tasks = [block_with_account(acc) for acc in accounts]
             await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Remove revoked sessions from active_clients
+            if revoked_sessions:
+                await self._remove_revoked_sessions(revoked_sessions)
             
             # Report results
             if error_count == 0:
                 await event.respond(f"✅ با موفقیت کاربر {user_input} با {success_count} حساب بلاک شد.")
             else:
-                await event.respond(f"⚠️ کاربر {user_input} با {success_count} حساب بلاک شد. {error_count} حساب با خطا مواجه شد.")
+                msg = f"⚠️ کاربر {user_input} با {success_count} حساب بلاک شد. {error_count} حساب با خطا مواجه شد."
+                if revoked_sessions:
+                    msg += f"\n⚠️ {len(revoked_sessions)} حساب revoked شده و حذف شدند."
+                await event.respond(msg)
             
             # Cleanup
             self.tbot.handlers.pop('block_num_accounts', None)
@@ -1418,27 +1515,59 @@ class Actions:
             
             success_count = 0
             error_count = 0
+            revoked_sessions = []
             
             async def send_pv_with_account(acc):
                 nonlocal success_count, error_count
+                session_name = None
+                try:
+                    session_name = acc.session.filename if hasattr(acc, 'session') and hasattr(acc.session, 'filename') else 'Unknown'
+                except (AttributeError, Exception):
+                    session_name = 'Unknown'
+                
                 async with self.operation_semaphore:
                     try:
                         entity = await acc.get_entity(user_input)
                         await acc.send_message(entity, message)
-                        success_count += 1
+                        async with self._counter_lock:
+                            success_count += 1
                         await asyncio.sleep(random.uniform(2, 5))
+                    except FloodWaitError as e:
+                        async with self._counter_lock:
+                            error_count += 1
+                        logger.warning(f"FloodWaitError for account {session_name}: waiting {e.seconds} seconds")
+                        await asyncio.sleep(e.seconds)
+                    except (SessionRevokedError, ValueError) as e:
+                        error_msg = str(e).lower()
+                        if 'session' in error_msg or 'revoked' in error_msg or 'not logged in' in error_msg:
+                            async with self._counter_lock:
+                                error_count += 1
+                                revoked_sessions.append(session_name)
+                            logger.warning(f"Session revoked for account {session_name}: {e}")
+                        else:
+                            async with self._counter_lock:
+                                error_count += 1
+                            logger.error(f"Error sending private message with account {session_name}: {e}")
                     except Exception as e:
-                        error_count += 1
-                        logger.error(f"Error sending private message with account {acc.session.filename if hasattr(acc, 'session') else 'Unknown'}: {e}")
+                        async with self._counter_lock:
+                            error_count += 1
+                        logger.error(f"Error sending private message with account {session_name}: {e}")
             
             tasks = [send_pv_with_account(acc) for acc in accounts]
             await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Remove revoked sessions from active_clients
+            if revoked_sessions:
+                await self._remove_revoked_sessions(revoked_sessions)
             
             # Report results
             if error_count == 0:
                 await event.respond(f"✅ با موفقیت پیام با {success_count} حساب ارسال شد.")
             else:
-                await event.respond(f"⚠️ پیام با {success_count} حساب ارسال شد. {error_count} حساب با خطا مواجه شد.")
+                msg = f"⚠️ پیام با {success_count} حساب ارسال شد. {error_count} حساب با خطا مواجه شد."
+                if revoked_sessions:
+                    msg += f"\n⚠️ {len(revoked_sessions)} حساب revoked شده و حذف شدند."
+                await event.respond(msg)
             
             # Cleanup
             self.tbot.handlers.pop('send_pv_num_accounts', None)
@@ -1507,7 +1636,7 @@ class Actions:
                     try:
                         await message.delete()
                         await response.delete()
-                    except:
+                    except (Exception, AttributeError):
                         pass
                     
                     return is_reported
@@ -1515,7 +1644,7 @@ class Actions:
                 # If no response, assume not reported
                 try:
                     await message.delete()
-                except:
+                except (Exception, AttributeError):
                     pass
                 return False
                 
