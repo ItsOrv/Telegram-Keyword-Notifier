@@ -213,7 +213,3 @@ except ValueError as e:
     # Re-raise to prevent bot from starting with invalid configuration
     raise SystemExit(str(e))
 
-
-print('debug')
-
-print('debug')
