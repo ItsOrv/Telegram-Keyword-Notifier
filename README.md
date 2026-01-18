@@ -1,28 +1,28 @@
 # Telegram Panel
 
-A professional Telegram bot management system for monitoring messages, managing multiple accounts, and performing bulk operations across Telegram groups and channels.
+Enterprise-grade Telegram bot management system for monitoring messages, managing multiple accounts, and performing bulk operations across Telegram groups and channels.
 
 ## Overview
 
-Telegram Panel provides a comprehensive solution for managing multiple Telegram accounts through a single bot interface. It enables automated message monitoring, bulk operations, and account management with proper error handling, rate limiting, and thread-safe operations.
+Telegram Panel is a comprehensive solution for managing multiple Telegram accounts through a single bot interface. It provides automated message monitoring, bulk operations, and account management with robust error handling, rate limiting, and thread-safe operations.
 
-**Note:** This project is under active development and may contain incomplete features or known issues. Please refer to [INCOMPLETE_FEATURES.md](INCOMPLETE_FEATURES.md) for details on remaining work.
+**Status:** This project is under active development. Refer to [INCOMPLETE_FEATURES.md](INCOMPLETE_FEATURES.md) for details on remaining work.
 
 ## Features
 
 ### Account Management
-- Add and manage multiple Telegram accounts
-- Enable/disable accounts dynamically
-- View account status and statistics
+- Multi-account support with dynamic enable/disable
 - Automatic session detection and management
+- Account status monitoring and statistics
 - Inactive account tracking
+- Group synchronization across accounts
 
 ### Message Monitoring
-- Monitor messages based on configurable keywords
-- Forward filtered messages to designated channels
-- Ignore specific users
-- Track message sources and senders
+- Keyword-based message filtering
+- Automatic forwarding to designated channels
+- User ignore list management
 - Real-time message processing
+- Source and sender tracking
 
 ### Bulk Operations
 - **Reactions**: Apply reactions to messages using multiple accounts
@@ -30,21 +30,21 @@ Telegram Panel provides a comprehensive solution for managing multiple Telegram 
 - **Join/Leave**: Join or leave groups/channels in bulk
 - **Block**: Block users across multiple accounts
 - **Private Messages**: Send private messages to users
-- **Comments**: Post comments/replies to messages
+- **Comments**: Post comments and replies to messages
 
 ### Individual Operations
-- Perform actions using specific accounts
-- Send private messages
-- Join/leave groups
-- Post comments
-- Apply reactions
+- Account-specific actions
+- Private message sending
+- Group join/leave operations
+- Comment posting
+- Reaction management
 
 ### Statistics & Reporting
-- View bot statistics
-- Display groups per account
-- Show configured keywords
-- List ignored users
-- Check account report status
+- Bot statistics dashboard
+- Groups per account display
+- Keyword configuration overview
+- Ignored users list
+- Account report status checking
 
 ## Prerequisites
 
@@ -68,7 +68,7 @@ cd Telegram-Panel
 pip install -r requirements.txt
 ```
 
-Or use the installation script:
+Alternatively, use the installation script:
 
 ```bash
 chmod +x install.sh
@@ -171,7 +171,7 @@ python main.py
 
 Perform actions using multiple accounts simultaneously:
 
-1. Select the operation (Reaction, Poll, Join, Block, Send PV, Comment)
+1. Select the operation (Reaction, Poll, Join, Leave, Block, Send PV, Comment)
 2. Choose how many accounts to use
 3. Provide required information (link, message, etc.)
 
