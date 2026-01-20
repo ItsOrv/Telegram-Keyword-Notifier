@@ -143,7 +143,7 @@ class TelegramBot:
                 logger.error(f"Error in admin_only wrapper: {e}", exc_info=True)
                 try:
                     await event.respond("An error occurred. Please try again.")
-                except:
+                except (Exception, AttributeError):
                     pass
         return wrapper
 
