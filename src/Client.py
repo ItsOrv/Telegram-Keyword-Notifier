@@ -414,7 +414,7 @@ class AccountHandler:
                 # Delete the wait message and send the verification code message
                 try:
                     await wait_message.delete()
-                except:
+                except (Exception, AttributeError):
                     pass
                 await self.tbot.tbot.send_message(chat_id, "📱 Verification code sent to your Telegram account.\n\nEnter the verification code:")
                 async with self.tbot._conversations_lock:
@@ -485,7 +485,7 @@ class AccountHandler:
                 # Delete processing message
                 try:
                     await processing_msg.delete()
-                except:
+                except (Exception, AttributeError):
                     pass
                 # Re-raise to be handled by outer exception handlers
                 raise sign_in_error
@@ -555,7 +555,7 @@ class AccountHandler:
                 # Delete processing message
                 try:
                     await processing_msg.delete()
-                except:
+                except (Exception, AttributeError):
                     pass
                 # Re-raise to be handled by outer exception handlers
                 raise sign_in_error
@@ -903,7 +903,7 @@ class AccountHandler:
                         import time
                         try:
                             last_seen_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(last_seen))
-                        except:
+                        except (ValueError, OSError, Exception):
                             last_seen_str = 'Unknown'
 
                         status = "❌ Inactive (Auth Error)"
