@@ -1,5 +1,0 @@
-{
-  "setup-worktree": [
-    "pip install -r requirements.txt"
-  ]
-}
