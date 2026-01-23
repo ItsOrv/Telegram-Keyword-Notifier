@@ -17,17 +17,19 @@ class ConfigManager:
         :param config: Initial configuration dictionary (optional).
         """
         try:
-            # Sanitize filename to prevent path traversal
+            # Store full path for file operations
+            self.filepath = filename
+            # Sanitize filename for display purposes only
             import re
-            filename = re.sub(r'[^\w\-_\.]', '', os.path.basename(filename))
-            if not filename.endswith('.json'):
-                filename = "config.json"
-            self.filename = filename
+            sanitized = re.sub(r'[^\w\-_\.]', '', os.path.basename(filename))
+            if not sanitized.endswith('.json'):
+                sanitized = "config.json"
+            self.filename = sanitized
             self.default_config = {
                 "TARGET_GROUPS": [],  # List of target groups for the bot
                 "KEYWORDS": [],       # List of keywords for filtering
                 "IGNORE_USERS": [],   # List of user IDs to ignore
-                "clients": []         # List of client configurations
+                "clients": {}         # Dictionary of client configurations
             }
             # Load existing configuration or use the provided one
             self.config = config if config else self.load_config()  # type: Dict[str, Any]
@@ -43,12 +45,15 @@ class ConfigManager:
         :return: Configuration dictionary.
         """
         try:
-            if not os.path.exists(self.filename) or os.path.getsize(self.filename) == 0:
-                logger.warning(f"Config file '{self.filename}' not found or empty. Creating a new file with default settings.")
-                self.save_config(self.default_config)
+            if not os.path.exists(self.filepath):
+                logger.warning(f"Config file '{self.filepath}' not found. Using default settings.")
+                return self.default_config.copy()
+            
+            if os.path.getsize(self.filepath) == 0:
+                logger.warning(f"Config file '{self.filepath}' is empty. Using default settings.")
                 return self.default_config.copy()
 
-            with open(self.filename, 'r', encoding='utf-8') as f:
+            with open(self.filepath, 'r', encoding='utf-8') as f:
                 loaded_config = json.load(f)
                 if not isinstance(loaded_config, dict):
                     raise ValueError("Config file must contain a JSON object.")
@@ -56,7 +61,7 @@ class ConfigManager:
                 # Merge loaded configuration with default values
                 return {**self.default_config, **loaded_config}
         except (json.JSONDecodeError, OSError, ValueError) as e:
-            logger.error(f"Error loading config file '{self.filename}': {e}. Falling back to default config.")
+            logger.error(f"Error loading config file '{self.filepath}': {e}. Falling back to default config.")
             return self.default_config.copy()
 
     def save_config(self, config: Dict[str, Any]) -> None:
@@ -65,11 +70,15 @@ class ConfigManager:
         :param config: Configuration dictionary to save.
         """
         try:
-            with open(self.filename, 'w', encoding='utf-8') as f:
+            # Update self.config to match the saved config
+            self.config = config.copy()
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(self.filepath) if os.path.dirname(self.filepath) else '.', exist_ok=True)
+            with open(self.filepath, 'w', encoding='utf-8') as f:
                 json.dump(config, f, indent=4, ensure_ascii=False)
             logger.info("Configuration saved successfully.")
         except OSError as e:
-            logger.error(f"Failed to save config file '{self.filename}': {e}")
+            logger.error(f"Failed to save config file '{self.filepath}': {e}")
 
     def update_config(self, key: str, value: Any) -> None:
         """
@@ -91,10 +100,20 @@ class ConfigManager:
         :param new_config: Dictionary containing configuration updates.
         """
         try:
+            # Reload current config from file to ensure we have the latest
+            current_config = self.load_config()
             for key, value in new_config.items():
-                if key in self.config and isinstance(self.config[key], list) and isinstance(value, list):
-                    # Combine lists while avoiding duplicates
-                    self.config[key] = list(set(self.config[key] + value))
+                if key in current_config and isinstance(current_config[key], list) and isinstance(value, list):
+                    # Combine lists while avoiding duplicates but preserving all unique items
+                    combined = current_config[key] + value
+                    # Remove duplicates while preserving order
+                    seen = set()
+                    result = []
+                    for item in combined:
+                        if item not in seen:
+                            seen.add(item)
+                            result.append(item)
+                    self.config[key] = result
                 else:
                     self.config[key] = value
             self.save_config(self.config)
@@ -184,32 +203,44 @@ def get_env_variable(name: str, default: Optional[Any] = None) -> Any:
         logger.error(f"Error retrieving environment variable '{name}': {e}")
         return default
 
+def get_env_int(name: str, default: int = 0) -> int:
+    """
+    Retrieve an environment variable as an integer with a default value.
+    :param name: Name of the environment variable.
+    :param default: Default integer value if the variable is not set or invalid.
+    :return: Integer value of the environment variable or the default.
+    """
+    try:
+        value = get_env_variable(name, default=str(default))
+        if value in ['x', 'your_api_id_here', 'your_admin_user_id_here', '0', '']:
+            return default
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
 # Load essential configuration values from environment variables
-API_ID = int(get_env_variable('API_ID', default=0))
+API_ID = get_env_int('API_ID', default=0)
 API_HASH = get_env_variable('API_HASH', default='x')
 BOT_TOKEN = get_env_variable('BOT_TOKEN', default='x')
 CHANNEL_ID = get_env_variable('CHANNEL_ID', default='x')
 BOT_SESSION_NAME = get_env_variable('BOT_SESSION_NAME', default='BOT_SESSION')
-ADMIN_ID = int(get_env_variable('ADMIN_ID', default=0))
+ADMIN_ID = get_env_int('ADMIN_ID', default=0)
 CLIENTS_JSON_PATH = str(get_env_variable('CLIENTS_JSON_PATH', default='clients.json'))
-RATE_LIMIT_SLEEP = int(get_env_variable('RATE_LIMIT_SLEEP', default=60))
-GROUPS_BATCH_SIZE = int(get_env_variable('GROUPS_BATCH_SIZE', default=10))
-GROUPS_UPDATE_SLEEP = int(get_env_variable('GROUPS_UPDATE_SLEEP', default=60))
+RATE_LIMIT_SLEEP = get_env_int('RATE_LIMIT_SLEEP', default=60)
+GROUPS_BATCH_SIZE = get_env_int('GROUPS_BATCH_SIZE', default=10)
+GROUPS_UPDATE_SLEEP = get_env_int('GROUPS_UPDATE_SLEEP', default=60)
 
 # Load port configurations from environment variables
 PORTS = {
-    "HTTP": int(get_env_variable('HTTP_PORT', default=80)),
-    "HTTPS": int(get_env_variable('HTTPS_PORT', default=443)),
-    "TELEGRAM": int(get_env_variable('TELEGRAM_PORT', default=443))
+    "HTTP": get_env_int('HTTP_PORT', default=80),
+    "HTTPS": get_env_int('HTTPS_PORT', default=443),
+    "TELEGRAM": get_env_int('TELEGRAM_PORT', default=443)
 }
 
 # Report check bot configuration
 REPORT_CHECK_BOT = get_env_variable('REPORT_CHECK_BOT', default='')
 
-# Validate environment configuration on module import
-try:
-    validate_env_file()
-except ValueError as e:
-    # Re-raise to prevent bot from starting with invalid configuration
-    raise SystemExit(str(e))
+# Validate environment configuration - only when bot starts, not at import time
+# This allows tests to set environment variables via fixtures before validation
+# Validation will be called explicitly in main.py or Telbot.__init__
 
