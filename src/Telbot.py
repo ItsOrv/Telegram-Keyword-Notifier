@@ -3,7 +3,7 @@ from telethon import TelegramClient, events, Button
 from telethon.errors import FloodWaitError
 import asyncio
 from src.Config import API_ID, API_HASH, BOT_TOKEN, ADMIN_ID
-from src.Config import ConfigManager
+from src.Config import ConfigManager, validate_env_file
 from src.Logger import setup_logging
 from src.Handlers import MessageHandler, CallbackHandler, CommandHandler, AccountHandler
 from src.Client import SessionManager
@@ -40,6 +40,13 @@ class TelegramBot:
         Start the bot and initialize all components.
         """
         try:
+            # Validate environment configuration before starting
+            try:
+                validate_env_file()
+            except ValueError as e:
+                logger.critical(f"Environment configuration error: {e}")
+                raise SystemExit(str(e))
+            
             # Create TelegramClient now that we're in an async context
             if self.tbot is None:
                 self.tbot = TelegramClient('bot2', API_ID, API_HASH)

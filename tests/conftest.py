@@ -53,10 +53,36 @@ def temp_config_file(temp_dir):
         json.dump(TEST_CONFIG, f, indent=4)
     return config_path
 
-@pytest.fixture
+@pytest.fixture(autouse=True, scope='function')
+def reset_module_state():
+    """Reset module-level state between tests"""
+    # This fixture runs automatically before each test
+    # Reset any module-level state that might be shared
+    import importlib
+    import sys
+    
+    # Save original modules
+    original_modules = {}
+    modules_to_reload = ['src.Config', 'src.Handlers']
+    
+    # Reload modules to reset any cached values
+    for module_name in modules_to_reload:
+        if module_name in sys.modules:
+            importlib.reload(sys.modules[module_name])
+    
+    yield
+    
+    # Cleanup after test - reload again to ensure clean state
+    for module_name in modules_to_reload:
+        if module_name in sys.modules:
+            importlib.reload(sys.modules[module_name])
+
+@pytest.fixture(scope='function')
 def mock_tbot():
     """Create a mock TelegramBot instance"""
-    mock = MagicMock()
+    from types import SimpleNamespace
+    mock = SimpleNamespace()
+    # Use fresh copies for each test to avoid state sharing
     mock.config = TEST_CONFIG.copy()
     mock.active_clients = {}
     mock.active_clients_lock = asyncio.Lock()
@@ -69,6 +95,13 @@ def mock_tbot():
     mock.tbot = AsyncMock()
     mock.tbot.send_message = AsyncMock()
     mock.notify_admin = AsyncMock()
+    mock.client_manager = MagicMock()
+    # Add account_handler and monitor for integration tests
+    mock.account_handler = MagicMock()
+    mock.monitor = MagicMock()
+    # Ensure tbot.tbot exists for AccountHandler
+    if not hasattr(mock.tbot, 'tbot'):
+        mock.tbot.tbot = mock.tbot
     return mock
 
 @pytest.fixture
@@ -127,18 +160,22 @@ def mock_event():
     
     return mock
 
-@pytest.fixture
+class MockCallbackEvent:
+    """Mock callback event for testing"""
+    def __init__(self):
+        self.sender_id = 123456789
+        self.chat_id = 123456789
+        self.data = b'add_account'
+        self.message = None
+        self.respond = AsyncMock()
+        self.edit = AsyncMock()
+        self.delete = AsyncMock()
+        self.answer = AsyncMock()
+
+@pytest.fixture(scope='function')
 def mock_callback_event():
     """Create a mock callback query event"""
-    mock = AsyncMock()
-    mock.sender_id = 123456789
-    mock.chat_id = 123456789
-    mock.data = b'add_account'
-    mock.respond = AsyncMock()
-    mock.edit = AsyncMock()
-    mock.delete = AsyncMock()
-    mock.answer = AsyncMock()
-    return mock
+    return MockCallbackEvent()
 
 @pytest.fixture
 def mock_new_message_event():
@@ -171,19 +208,17 @@ def mock_new_message_event():
     mock.respond = AsyncMock()
     return mock
 
-@pytest.fixture
-def mock_admin_event():
+@pytest.fixture(scope='function')
+def mock_admin_event(mock_event):
     """Create a mock event from admin"""
-    mock = mock_event()
-    mock.sender_id = 123456789  # Admin ID from TEST_ENV_VARS
-    return mock
+    mock_event.sender_id = 123456789  # Admin ID from TEST_ENV_VARS
+    return mock_event
 
-@pytest.fixture
-def mock_non_admin_event():
+@pytest.fixture(scope='function')
+def mock_non_admin_event(mock_event):
     """Create a mock event from non-admin"""
-    mock = mock_event()
-    mock.sender_id = 999999999  # Non-admin ID
-    return mock
+    mock_event.sender_id = 999999999  # Non-admin ID
+    return mock_event
 
 @pytest.fixture(autouse=True)
 def mock_env_vars(monkeypatch):
