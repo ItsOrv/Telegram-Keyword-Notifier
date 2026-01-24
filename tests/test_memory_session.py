@@ -4,8 +4,10 @@ Test script to verify memory session approach works
 """
 import asyncio
 import os
+import pytest
 from pathlib import Path
 
+@pytest.mark.asyncio
 async def test_memory_session():
     """Test the memory session approach"""
     print("Testing Memory Session Approach")
