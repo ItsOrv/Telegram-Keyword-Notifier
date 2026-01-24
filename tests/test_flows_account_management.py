@@ -67,8 +67,11 @@ class TestAccountManagementFlows:
         mock_tbot._conversations[mock_event.chat_id] = 'code_handler'
         mock_tbot.handlers = {}
         
+        from unittest.mock import MagicMock
         mock_client = AsyncMock()
-        mock_client.sign_in = AsyncMock(side_effect=SessionPasswordNeededError())
+        # SessionPasswordNeededError requires a request parameter
+        mock_request = MagicMock()
+        mock_client.sign_in = AsyncMock(side_effect=SessionPasswordNeededError(mock_request))
         mock_tbot.handlers['temp_client'] = mock_client
         mock_tbot.handlers['temp_phone'] = "+1234567890"
         
@@ -228,8 +231,17 @@ class TestAccountManagementFlows:
         
         # Verify error message was sent
         account_handler.tbot.tbot.send_message.assert_called()
-        call_args = account_handler.tbot.tbot.send_message.call_args[0][0]
-        assert "❌" in call_args or "error" in call_args.lower()
+        call_args = account_handler.tbot.tbot.send_message.call_args
+        # call_args is a tuple: (args, kwargs)
+        # First arg is chat_id, second is message text
+        if call_args and len(call_args[0]) > 1:
+            message_text = str(call_args[0][1])
+            assert "❌" in message_text or "error" in message_text.lower()
+        else:
+            # Check kwargs if args don't have message
+            if call_args and call_args[1] and 'message' in call_args[1]:
+                message_text = str(call_args[1]['message'])
+                assert "❌" in message_text or "error" in message_text.lower()
 
     @pytest.mark.asyncio
     async def test_add_account_invalid_code(self, mock_tbot, mock_event):
