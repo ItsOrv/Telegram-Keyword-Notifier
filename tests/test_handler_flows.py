@@ -5,6 +5,7 @@ Test script to verify all handler flows work correctly
 import sys
 import os
 import asyncio
+import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 # Set mock environment variables before importing
@@ -58,6 +59,7 @@ def create_mock_event(chat_id=12345, sender_id=123456789, data=None, text=None):
     event.delete = AsyncMock()
     return event
 
+@pytest.mark.asyncio
 async def test_callback_handlers():
     """Test all callback handlers"""
     print("\n" + "="*60)
@@ -127,6 +129,7 @@ async def test_callback_handlers():
     print(f"\nنتایج: {passed} موفق, {failed} ناموفق")
     return failed == 0
 
+@pytest.mark.asyncio
 async def test_message_handlers():
     """Test message handlers for conversation states"""
     print("\n" + "="*60)
@@ -201,6 +204,7 @@ async def test_message_handlers():
     print(f"\nنتایج: {passed} موفق, {failed} ناموفق")
     return failed == 0
 
+@pytest.mark.asyncio
 async def test_action_methods():
     """Test that all action methods exist and are callable"""
     print("\n" + "="*60)
@@ -261,6 +265,7 @@ async def test_action_methods():
     print(f"\nنتایج: {passed} موفق, {failed} ناموفق")
     return failed == 0
 
+@pytest.mark.asyncio
 async def test_dynamic_buttons():
     """Test dynamic button handlers (toggle_, delete_, ignore_, reaction buttons)"""
     print("\n" + "="*60)
