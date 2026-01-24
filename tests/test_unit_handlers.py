@@ -125,10 +125,15 @@ class TestMessageHandler:
         handler.account_handler.code_handler.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_message_handler_non_admin(self, mock_tbot, mock_non_admin_event):
+    async def test_message_handler_non_admin(self, mock_tbot, mock_non_admin_event, monkeypatch):
         """Test message handler rejects non-admin"""
+        # Patch ADMIN_ID for this test
+        monkeypatch.setattr('src.Handlers.ADMIN_ID', 123456789)
+        
         handler = MessageHandler(mock_tbot)
-        await handler.message_handler(mock_non_admin_event)
+        result = await handler.message_handler(mock_non_admin_event)
+        # Should return False for non-admin
+        assert result is False
         mock_non_admin_event.respond.assert_called_once()
 
 
@@ -225,6 +230,8 @@ class TestCallbackHandler:
         
         handler = CallbackHandler(mock_tbot)
         handler.account_handler.add_account = AsyncMock()
+        # Update callback_actions to use the mocked method
+        handler.callback_actions['add_account'] = handler.account_handler.add_account
         
         await handler.callback_handler(mock_callback_event)
         handler.account_handler.add_account.assert_called_once()
@@ -248,6 +255,7 @@ class TestCallbackHandler:
         
         handler = CallbackHandler(mock_tbot)
         handler.account_handler.show_accounts = AsyncMock()
+        handler.callback_actions['list_accounts'] = handler.account_handler.show_accounts
         
         await handler.callback_handler(mock_callback_event)
         handler.account_handler.show_accounts.assert_called_once()
@@ -259,6 +267,7 @@ class TestCallbackHandler:
         
         handler = CallbackHandler(mock_tbot)
         handler.stats_handler.show_stats = AsyncMock()
+        handler.callback_actions['show_stats'] = handler.stats_handler.show_stats
         
         await handler.callback_handler(mock_callback_event)
         handler.stats_handler.show_stats.assert_called_once()
@@ -269,10 +278,11 @@ class TestCallbackHandler:
         mock_callback_event.data = b'bulk_reaction'
         
         handler = CallbackHandler(mock_tbot)
-        handler.actions.prompt_group_action = AsyncMock()
+        handler.handle_bulk_reaction = AsyncMock()
+        handler.callback_actions['bulk_reaction'] = handler.handle_bulk_reaction
         
         await handler.callback_handler(mock_callback_event)
-        handler.actions.prompt_group_action.assert_called_once_with(mock_callback_event, 'reaction')
+        handler.handle_bulk_reaction.assert_called_once_with(mock_callback_event)
 
     @pytest.mark.asyncio
     async def test_callback_handler_unknown(self, mock_tbot, mock_callback_event):
@@ -285,8 +295,11 @@ class TestCallbackHandler:
         mock_callback_event.respond.assert_called()
 
     @pytest.mark.asyncio
-    async def test_callback_handler_non_admin(self, mock_tbot, mock_callback_event):
+    async def test_callback_handler_non_admin(self, mock_tbot, mock_callback_event, monkeypatch):
         """Test callback handler rejects non-admin"""
+        # Patch ADMIN_ID for this test
+        monkeypatch.setattr('src.Handlers.ADMIN_ID', 123456789)
+        
         mock_callback_event.sender_id = 999999999  # Non-admin
         
         handler = CallbackHandler(mock_tbot)
