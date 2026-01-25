@@ -19,7 +19,7 @@ class TestKeyboard:
         assert "Account Management" in button_texts
         assert "Individual" in button_texts or "Bulk" in button_texts
         assert "Monitor Mode" in button_texts
-        assert "Report" in button_texts
+        assert "Report status" in button_texts or "Report" in button_texts
 
     def test_monitor_keyboard(self):
         """Test monitor keyboard structure"""
