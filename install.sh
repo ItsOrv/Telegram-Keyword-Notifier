@@ -17,11 +17,11 @@ echo "Installing Docker and setting up environment..."
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y docker.io docker-compose
 
-# Clone the project from GitHub
+# Clone the project
 PROJECT_DIR="/opt/Telegram-Message-Monitor"
 
 if [ ! -d "$PROJECT_DIR" ]; then
-    sudo git clone https://github.com/ItsOrv/Telegram-Message-Monitor "$PROJECT_DIR"
+    sudo git clone <repository-url> "$PROJECT_DIR"
 else
     echo "Project already cloned!"
 fi
@@ -55,7 +55,7 @@ show_menu() {
     echo "1. Start container"
     echo "2. Stop container"
     echo "3. Restart container"
-    echo "4. Update project from GitHub"
+    echo "4. Update project"
     echo "5. Uninstall project"
     echo "6. Exit"
     echo -n "Enter your choice: "
