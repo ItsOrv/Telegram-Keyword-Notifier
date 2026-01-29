@@ -9,6 +9,7 @@ from telethon.tl.types import Channel, Chat
 from src.Config import ConfigManager, API_ID, API_HASH, ADMIN_ID, CHANNEL_ID, CLIENTS_JSON_PATH, RATE_LIMIT_SLEEP, GROUPS_BATCH_SIZE, GROUPS_UPDATE_SLEEP, REPORT_CHECK_BOT
 from src.Keyboards import Keyboard
 from src.Validation import InputValidator
+from src.utils import send_error_message, extract_account_name, prompt_for_input, is_session_revoked_error, remove_revoked_session_completely
 
 
 # Set up logger for the SessionManager class
@@ -175,11 +176,11 @@ class SessionManager:
             inactive_accounts = self.config['inactive_accounts']
 
             if not inactive_accounts:
-                await event.respond("✅ No inactive accounts found. All accounts are working properly.")
+                await event.respond("No inactive accounts found. All accounts are working properly.")
                 return
 
             # Build response message
-            message = "📋 **Inactive Accounts Report**\n\n"
+            message = "**Inactive Accounts Report**\n\n"
             message += f"Total inactive accounts: {len(inactive_accounts)}\n\n"
 
             for phone, account_info in inactive_accounts.items():
@@ -191,7 +192,7 @@ class SessionManager:
                 import time
                 last_seen_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(last_seen))
 
-                message += f"📱 **{phone}**\n"
+                message += f"**{phone}**\n"
                 message += f"   Reason: {reason}\n"
                 message += f"   Last seen: {last_seen_str}\n"
                 message += f"   Error: {error_details[:100]}{'...' if len(error_details) > 100 else ''}\n\n"
@@ -228,7 +229,7 @@ class SessionManager:
 
         except Exception as e:
             logger.error(f"Error in show_inactive_accounts: {e}")
-            await event.respond("❌ Error retrieving inactive accounts list.")
+            await event.respond("Error retrieving inactive accounts list.")
 
     async def reactivate_account(self, event, phone_number):
         """
@@ -238,7 +239,7 @@ class SessionManager:
             logger.info(f"reactivate_account called for {phone_number}")
 
             if 'inactive_accounts' not in self.config or phone_number not in self.config['inactive_accounts']:
-                await event.respond(f"❌ Account {phone_number} is not in inactive accounts list.")
+                await event.respond(f"Account {phone_number} is not in inactive accounts list.")
                 return
 
             # Remove from inactive list and try to reload
@@ -268,23 +269,23 @@ class SessionManager:
                         self.config['clients'][phone_number] = []  # Empty groups list
                         self.config_manager.save_config(self.config)
 
-                        await event.respond(f"✅ Account {phone_number} successfully reactivated!")
+                        await event.respond(f"Account {phone_number} successfully reactivated!")
                         logger.info(f"Account {phone_number} reactivated successfully")
                     else:
                         await client.disconnect()
-                        await event.respond(f"❌ Account {phone_number} is still not authorized. Cannot reactivate.")
+                        await event.respond(f"Account {phone_number} is still not authorized. Cannot reactivate.")
                         logger.warning(f"Account {phone_number} still not authorized during reactivation")
 
                 except Exception as e:
                     logger.error(f"Error reactivating account {phone_number}: {e}")
-                    await event.respond(f"❌ Error reactivating account {phone_number}: {str(e)}")
+                    await event.respond(f"Error reactivating account {phone_number}: {str(e)}")
             else:
-                await event.respond(f"❌ Session file for {phone_number} not found.")
+                await event.respond(f"Session file for {phone_number} not found.")
                 logger.warning(f"Session file {session_file} not found during reactivation")
 
         except Exception as e:
             logger.error(f"Error in reactivate_account: {e}")
-            await event.respond("❌ Error during account reactivation.")
+            await event.respond("Error during account reactivation.")
 
     async def disconnect_all_clients(self):
         """
@@ -372,10 +373,11 @@ class AccountHandler:
         logger.info("add_account in AccountHandler")
         chat_id = event.chat_id
         try:
-            buttons = [Button.inline("Cancel", b'cancel')]
-            await self.tbot.tbot.send_message(chat_id, "Please enter your phone number:", buttons=buttons)
-            async with self.tbot._conversations_lock:
-                self.tbot._conversations[chat_id] = 'phone_number_handler'
+            await prompt_for_input(
+                self.tbot, event,
+                "Please enter your phone number:",
+                'phone_number_handler'
+            )
         except Exception as e:
             logger.error(f"Error in add_account: {e}")
             await self.tbot.tbot.send_message(chat_id, "Error occurred while adding account. Please try again.")
@@ -394,7 +396,7 @@ class AccountHandler:
         # Validate phone number
         is_valid, error_msg = InputValidator.validate_phone_number(phone_number)
         if not is_valid:
-            await self.tbot.tbot.send_message(chat_id, f"❌ {error_msg}\nPlease try again.")
+            await self.tbot.tbot.send_message(chat_id, f"{error_msg}\nPlease try again.")
             return
         
         try:
@@ -416,7 +418,7 @@ class AccountHandler:
                     await wait_message.delete()
                 except (Exception, AttributeError):
                     pass
-                await self.tbot.tbot.send_message(chat_id, "📱 Verification code sent to your Telegram account.\n\nEnter the verification code:")
+                await self.tbot.tbot.send_message(chat_id, "Verification code sent to your Telegram account.\n\nEnter the verification code:")
                 async with self.tbot._conversations_lock:
                     self.tbot._conversations[chat_id] = 'code_handler'
                 self.tbot.handlers['temp_client'] = client
@@ -428,19 +430,7 @@ class AccountHandler:
                 await self.finalize_client_setup(client, phone_number, chat_id)
         except Exception as e:
             logger.error(f"PHONE_NUMBER_HANDLER: Error - {e}")
-            error_msg = str(e).lower()
-
-            if 'flood' in error_msg:
-                await self.tbot.tbot.send_message(chat_id, "❌ Too many requests. Please wait a few minutes and try again.")
-            elif 'phone' in error_msg and 'invalid' in error_msg:
-                await self.tbot.tbot.send_message(chat_id, "❌ Invalid phone number. Please check the format and try again.")
-            elif 'network' in error_msg or 'connection' in error_msg:
-                await self.tbot.tbot.send_message(chat_id, "❌ Network error. Please check your connection and try again.")
-            elif 'api' in error_msg and 'invalid' in error_msg:
-                await self.tbot.tbot.send_message(chat_id, "❌ API credentials error. Please contact the administrator.")
-            else:
-                await self.tbot.tbot.send_message(chat_id, f"❌ Failed to add account: {str(e)[:100]}...")
-
+            await send_error_message(self.tbot, chat_id, e, 'phone')
             self.cleanup_temp_handlers()
 
     async def code_handler(self, event):
@@ -458,12 +448,12 @@ class AccountHandler:
             phone_number = self.tbot.handlers.get('temp_phone')
 
             if not client or not phone_number:
-                await self.tbot.tbot.send_message(chat_id, "❌ Session expired or invalid. Please start over with /start.")
+                await self.tbot.tbot.send_message(chat_id, "Session expired or invalid. Please start over with /start.")
                 self.cleanup_temp_handlers()
                 return
 
             # Send processing message
-            processing_msg = await self.tbot.tbot.send_message(chat_id, "🔄 Verifying code...")
+            processing_msg = await self.tbot.tbot.send_message(chat_id, "Verifying code...")
             
             try:
                 # Attempt sign in with code
@@ -471,14 +461,14 @@ class AccountHandler:
                 
                 # ✅ CRITICAL: Verify that login was successful
                 if await client.is_user_authorized():
-                    logger.info(f"✅ Code verification successful for {phone_number}")
+                    logger.info(f"Code verification successful for {phone_number}")
                     await processing_msg.delete()
                     await self.finalize_client_setup(client, phone_number, chat_id)
                 else:
                     # Login failed but no exception
-                    logger.error(f"❌ Code verification failed for {phone_number}: not authorized after sign_in")
+                    logger.error(f"Code verification failed for {phone_number}: not authorized after sign_in")
                     await processing_msg.delete()
-                    await self.tbot.tbot.send_message(chat_id, "❌ Code verification failed. Please try again with /start.")
+                    await self.tbot.tbot.send_message(chat_id, "Code verification failed. Please try again with /start.")
                     self.cleanup_temp_handlers()
                     
             except Exception as sign_in_error:
@@ -491,26 +481,15 @@ class AccountHandler:
                 raise sign_in_error
                 
         except SessionPasswordNeededError:
-            await self.tbot.tbot.send_message(chat_id, "🔐 Two-factor authentication is enabled.\n\nPlease enter your password:")
+            await self.tbot.tbot.send_message(chat_id, "Two-factor authentication is enabled.\n\nPlease enter your password:")
             async with self.tbot._conversations_lock:
                 self.tbot._conversations[chat_id] = 'password_handler'
         except FloodWaitError as e:
-            await self.tbot.tbot.send_message(chat_id, f"⏱️ Too many attempts. Please wait {e.seconds} seconds and try again.")
+            await self.tbot.tbot.send_message(chat_id, f"Too many attempts. Please wait {e.seconds} seconds and try again.")
             self.cleanup_temp_handlers()
         except Exception as e:
-            error_str = str(e).lower()
-            logger.error(f"❌ Error during code verification: {e}")
-            
-            # Provide specific error messages
-            if 'phone code invalid' in error_str or 'code invalid' in error_str:
-                await self.tbot.tbot.send_message(chat_id, "❌ Invalid verification code.\n\nPlease start over with /start and try again.")
-            elif 'phone code expired' in error_str or 'code expired' in error_str:
-                await self.tbot.tbot.send_message(chat_id, "❌ Verification code has expired.\n\nPlease start over with /start and enter the code faster.")
-            elif 'timeout' in error_str:
-                await self.tbot.tbot.send_message(chat_id, "❌ Connection timeout.\n\nPlease check your internet and try again.")
-            else:
-                await self.tbot.tbot.send_message(chat_id, f"❌ Error verifying code: {str(e)[:100]}\n\nPlease start over with /start.")
-            
+            logger.error(f"Error during code verification: {e}")
+            await send_error_message(self.tbot, chat_id, e, 'code')
             self.cleanup_temp_handlers()
 
     async def password_handler(self, event):
@@ -528,12 +507,12 @@ class AccountHandler:
             phone_number = self.tbot.handlers.get('temp_phone')
 
             if not client or not phone_number:
-                await self.tbot.tbot.send_message(chat_id, "❌ Session expired or invalid. Please start over with /start.")
+                await self.tbot.tbot.send_message(chat_id, "Session expired or invalid. Please start over with /start.")
                 self.cleanup_temp_handlers()
                 return
 
             # Send processing message
-            processing_msg = await self.tbot.tbot.send_message(chat_id, "🔄 Verifying password...")
+            processing_msg = await self.tbot.tbot.send_message(chat_id, "Verifying password...")
             
             try:
                 # Attempt sign in with password
@@ -541,14 +520,14 @@ class AccountHandler:
                 
                 # ✅ CRITICAL: Verify that login was successful
                 if await client.is_user_authorized():
-                    logger.info(f"✅ Password verification successful for {phone_number}")
+                    logger.info(f"Password verification successful for {phone_number}")
                     await processing_msg.delete()
                     await self.finalize_client_setup(client, phone_number, chat_id)
                 else:
                     # Login failed but no exception
-                    logger.error(f"❌ Password verification failed for {phone_number}: not authorized after sign_in")
+                    logger.error(f"Password verification failed for {phone_number}: not authorized after sign_in")
                     await processing_msg.delete()
-                    await self.tbot.tbot.send_message(chat_id, "❌ Password verification failed. Please try again with /start.")
+                    await self.tbot.tbot.send_message(chat_id, "Password verification failed. Please try again with /start.")
                     self.cleanup_temp_handlers()
                     
             except Exception as sign_in_error:
@@ -561,20 +540,11 @@ class AccountHandler:
                 raise sign_in_error
                 
         except FloodWaitError as e:
-            await self.tbot.tbot.send_message(chat_id, f"⏱️ Too many attempts. Please wait {e.seconds} seconds and try again.")
+            await self.tbot.tbot.send_message(chat_id, f"Too many attempts. Please wait {e.seconds} seconds and try again.")
             self.cleanup_temp_handlers()
         except Exception as e:
-            error_str = str(e).lower()
-            logger.error(f"❌ Error during password verification: {e}")
-            
-            # Provide specific error messages
-            if 'password' in error_str and 'invalid' in error_str:
-                await self.tbot.tbot.send_message(chat_id, "❌ Invalid password.\n\nPlease start over with /start and try again with the correct password.")
-            elif 'timeout' in error_str:
-                await self.tbot.tbot.send_message(chat_id, "❌ Connection timeout.\n\nPlease check your internet and try again.")
-            else:
-                await self.tbot.tbot.send_message(chat_id, f"❌ Error verifying password: {str(e)[:100]}\n\nPlease start over with /start.")
-            
+            logger.error(f"Error during password verification: {e}")
+            await send_error_message(self.tbot, chat_id, e, 'password')
             self.cleanup_temp_handlers()
 
     async def finalize_client_setup(self, client, phone_number, chat_id):
@@ -590,8 +560,8 @@ class AccountHandler:
         try:
             # ✅ DOUBLE CHECK: Make absolutely sure the client is authorized before saving
             if not await client.is_user_authorized():
-                logger.error(f"❌ CRITICAL: Client {phone_number} is NOT authorized in finalize_client_setup!")
-                await self.tbot.tbot.send_message(chat_id, "❌ Authentication failed. Account is not properly authorized.\n\nPlease try again with /start.")
+                logger.error(f"CRITICAL: Client {phone_number} is NOT authorized in finalize_client_setup!")
+                await self.tbot.tbot.send_message(chat_id, "Authentication failed. Account is not properly authorized.\n\nPlease try again with /start.")
                 self.cleanup_temp_handlers()
                 return
             
@@ -599,21 +569,21 @@ class AccountHandler:
             try:
                 me = await client.get_me()
                 if not me:
-                    logger.error(f"❌ CRITICAL: get_me() returned None for {phone_number}")
-                    await self.tbot.tbot.send_message(chat_id, "❌ Authentication verification failed.\n\nPlease try again with /start.")
+                    logger.error(f"CRITICAL: get_me() returned None for {phone_number}")
+                    await self.tbot.tbot.send_message(chat_id, "Authentication verification failed.\n\nPlease try again with /start.")
                     self.cleanup_temp_handlers()
                     return
-                logger.info(f"✅ Verified user: {me.first_name} (@{me.username}) - ID: {me.id}")
+                logger.info(f"Verified user: {me.first_name} (@{me.username}) - ID: {me.id}")
             except Exception as verify_error:
-                logger.error(f"❌ CRITICAL: Cannot verify user {phone_number}: {verify_error}")
-                await self.tbot.tbot.send_message(chat_id, f"❌ Authentication verification failed: {verify_error}\n\nPlease try again with /start.")
+                logger.error(f"CRITICAL: Cannot verify user {phone_number}: {verify_error}")
+                await self.tbot.tbot.send_message(chat_id, f"Authentication verification failed: {verify_error}\n\nPlease try again with /start.")
                 self.cleanup_temp_handlers()
                 return
             
             # ✅ NOW save the session (only after all checks passed)
             session_name = f"{phone_number}"
             client.session.save()
-            logger.info(f"✅ Session saved for {phone_number}")
+            logger.info(f"Session saved for {phone_number}")
 
             if not isinstance(self.tbot.config['clients'], dict):
                 logger.warning("'clients' is not a dictionary. Initializing it as an empty dictionary.")
@@ -621,12 +591,12 @@ class AccountHandler:
 
             self.tbot.config['clients'][session_name] = []
             self.tbot.config_manager.save_config(self.tbot.config)
-            logger.info(f"✅ Config saved for {phone_number}")
+            logger.info(f"Config saved for {phone_number}")
 
             # Use lock when modifying active_clients
             async with self.tbot.active_clients_lock:
                 self.tbot.active_clients[session_name] = client
-            logger.info(f"✅ Added to active_clients: {phone_number}")
+            logger.info(f"Added to active_clients: {phone_number}")
             
             # Set up message monitoring for this new client
             if not hasattr(client, '_message_processing_set'):
@@ -635,18 +605,18 @@ class AccountHandler:
 
             await self.tbot.tbot.send_message(
                 chat_id, 
-                f"✅ Account added successfully!\n\n"
-                f"📱 Phone: {phone_number}\n"
-                f"👤 Name: {me.first_name}\n"
-                f"🆔 Username: @{me.username if me.username else 'N/A'}\n\n"
+                f"Account added successfully!\n\n"
+                f"Phone: {phone_number}\n"
+                f"Name: {me.first_name}\n"
+                f"Username: @{me.username if me.username else 'N/A'}\n\n"
                 f"Account is now active and ready to use!"
             )
-            logger.info(f"✅ Account {phone_number} fully set up and verified")
+            logger.info(f"Account {phone_number} fully set up and verified")
             self.cleanup_temp_handlers()
 
         except Exception as e:
-            logger.error(f"❌ Error in finalize_client_setup: {e}", exc_info=True)
-            await self.tbot.tbot.send_message(chat_id, f"❌ Error occurred while finalizing setup: {str(e)[:100]}")
+            logger.error(f"Error in finalize_client_setup: {e}", exc_info=True)
+            await self.tbot.tbot.send_message(chat_id, f"Error occurred while finalizing setup: {str(e)[:100]}")
             self.cleanup_temp_handlers()
 
     def cleanup_temp_handlers(self):
@@ -737,6 +707,13 @@ class AccountHandler:
                     await asyncio.sleep(wait_time)
                     continue
                 except Exception as e:
+                    error_msg = str(e).lower()
+                    # Check if session is revoked
+                    from src.utils import is_session_revoked_error, remove_revoked_session_completely
+                    if is_session_revoked_error(e):
+                        logger.error(f"Session revoked while updating groups for {session_name}: {e}")
+                        await remove_revoked_session_completely(self.tbot, session_name)
+                        continue
                     logger.error(f"Unexpected error while processing client {session_name}.", exc_info=True)
                     continue
 
@@ -765,73 +742,76 @@ class AccountHandler:
         Check report status for all existing accounts.
         """
         if not REPORT_CHECK_BOT:
-            await event.respond("❌ REPORT_CHECK_BOT not configured. Please set it in start_bot.py or .env file.")
+            await event.respond("REPORT_CHECK_BOT not configured. Please set it in start_bot.py or .env file.")
             return
         
         try:
-            await event.respond("🔍 Checking report status for all accounts... This may take a while.")
+            await event.respond("Checking report status for all accounts... This may take a while.")
             
             clients_data = self.tbot.config.get('clients', {})
             if not clients_data:
-                await event.respond("❌ No accounts found to check.")
+                await event.respond("No accounts found to check.")
                 return
             
             reported_accounts = []
             checked_count = 0
             
+            # Only check accounts that are in active_clients (skip revoked sessions)
             async with self.tbot.active_clients_lock:
-                for session_name in clients_data.keys():
-                    try:
-                        # Get phone number from session name
-                        phone_number = session_name.replace('.session', '').strip()
-                        if not phone_number.startswith('+'):
-                            phone_number = '+' + phone_number
+                active_sessions = set(self.tbot.active_clients.keys())
+                sessions_to_check = [s for s in clients_data.keys() if s in active_sessions]
+            
+            for session_name in sessions_to_check:
+                try:
+                    # Get phone number from session name
+                    phone_number = session_name.replace('.session', '').strip()
+                    if not phone_number.startswith('+'):
+                        phone_number = '+' + phone_number
+                    
+                    # Get account client
+                    async with self.tbot.active_clients_lock:
+                        account = self.tbot.active_clients.get(session_name)
+                    
+                    if account:
+                        checked_count += 1
+                        # Check report status
+                        from src.actions import Actions
+                        actions = Actions(self.tbot)
+                        is_reported = await actions.check_report_status(phone_number, account)
                         
-                        # Get account client
-                        account = None
-                        if session_name in self.tbot.active_clients:
-                            account = self.tbot.active_clients[session_name]
+                        if is_reported:
+                            reported_accounts.append(session_name)
+                            # Save report status to config
+                            if not isinstance(clients_data[session_name], dict):
+                                old_groups = clients_data[session_name]
+                                clients_data[session_name] = {
+                                    'groups': old_groups if isinstance(old_groups, list) else [],
+                                    'is_reported': True
+                                }
+                            else:
+                                clients_data[session_name]['is_reported'] = True
+                            
+                            # Save config
+                            self.tbot.config_manager.save_config(self.tbot.config)
+                            logger.info(f"Marked {session_name} as reported in config")
                         
-                        if account:
-                            checked_count += 1
-                            # Check report status
-                            from src.actions import Actions
-                            actions = Actions(self.tbot)
-                            is_reported = await actions.check_report_status(phone_number, account)
-                            
-                            if is_reported:
-                                reported_accounts.append(session_name)
-                                # Save report status to config
-                                if not isinstance(clients_data[session_name], dict):
-                                    old_groups = clients_data[session_name]
-                                    clients_data[session_name] = {
-                                        'groups': old_groups if isinstance(old_groups, list) else [],
-                                        'is_reported': True
-                                    }
-                                else:
-                                    clients_data[session_name]['is_reported'] = True
-                                
-                                # Save config
-                                self.tbot.config_manager.save_config(self.tbot.config)
-                                logger.info(f"Marked {session_name} as reported in config")
-                            
-                            # Small delay between checks
-                            await asyncio.sleep(1)
-                    except Exception as e:
-                        logger.error(f"Error checking report status for {session_name}: {e}")
+                        # Small delay between checks
+                        await asyncio.sleep(1)
+                except Exception as e:
+                    logger.error(f"Error checking report status for {session_name}: {e}")
             
             # Report results
             if reported_accounts:
                 reported_phones = [acc.replace('.session', '') for acc in reported_accounts]
-                result_msg = f"✅ Checked {checked_count} accounts.\n\n⚠️ Reported accounts: {', '.join(reported_phones)}"
+                result_msg = f"Checked {checked_count} accounts.\n\nReported accounts: {', '.join(reported_phones)}"
             else:
-                result_msg = f"✅ Checked {checked_count} accounts.\n\n✅ No reported accounts found."
+                result_msg = f"Checked {checked_count} accounts.\n\nNo reported accounts found."
             
             await event.respond(result_msg)
             
         except Exception as e:
             logger.error(f"Error in check_all_accounts_report_status: {e}", exc_info=True)
-            await event.respond(f"❌ Error checking accounts: {str(e)}")
+            await event.respond(f"Error checking accounts: {str(e)}")
 
     async def show_accounts(self, event):
         """
@@ -856,6 +836,21 @@ class AccountHandler:
             if isinstance(clients_data, dict) and clients_data:
                 for session, account_data in clients_data.items():
                     try:
+                        # Skip revoked sessions - if session is in config but not in active_clients,
+                        # and not in inactive_accounts, it's likely revoked - skip it
+                        if session not in active_sessions:
+                            # Check if it's in inactive_accounts
+                            if 'inactive_accounts' not in self.tbot.config or session not in self.tbot.config['inactive_accounts']:
+                                # Session is in config but not active and not in inactive_accounts - likely revoked, skip it
+                                logger.debug(f"Skipping potentially revoked session {session} (not in active_clients and not in inactive_accounts)")
+                                continue
+                            else:
+                                # Check if reason indicates revoked session
+                                inactive_reason = self.tbot.config['inactive_accounts'][session].get('reason', '').lower()
+                                if 'revoked' in inactive_reason or 'auth' in inactive_reason or 'session' in inactive_reason:
+                                    logger.debug(f"Skipping revoked session {session}")
+                                    continue
+                        
                         phone = session.replace('.session', '') if session else 'Unknown'
                         
                         # Handle both old format (list of groups) and new format (dict)
@@ -868,18 +863,18 @@ class AccountHandler:
                         
                         groups_count = len(groups) if isinstance(groups, list) else 0
                         is_active = session in active_sessions
-                        status = "🟢 Active" if is_active else "🔴 Inactive"
+                        status = "Active" if is_active else "Inactive"
                         
                         # Add report status
-                        report_status = "⚠️ Reported" if is_reported else "✅ Clean"
+                        report_status = "Reported" if is_reported else "Clean"
 
                         logger.debug(f"Processing account: {session}, Status: {status}, Groups: {groups_count}, Reported: {is_reported}")
 
                         text = (
-                            f"📱 Phone: {phone}\n"
-                            f"👥 Groups: {groups_count}\n"
-                            f"📊 Status: {status}\n"
-                            f"🚨 Report: {report_status}\n"
+                            f"Phone: {phone}\n"
+                            f"Groups: {groups_count}\n"
+                            f"Status: {status}\n"
+                            f"Report: {report_status}\n"
                         )
 
                         buttons = Keyboard.toggle_and_delete_keyboard(status, session)
@@ -906,16 +901,16 @@ class AccountHandler:
                         except (ValueError, OSError, Exception):
                             last_seen_str = 'Unknown'
 
-                        status = "❌ Inactive (Auth Error)"
+                        status = "Inactive (Auth Error)"
 
                         logger.debug(f"Processing inactive account: {session}, Reason: {reason}")
 
                         text = (
-                            f"📱 Phone: {phone}\n"
-                            f"👥 Groups: N/A\n"
-                            f"📊 Status: {status}\n"
-                            f"⚠️ Reason: {reason}\n"
-                            f"🕒 Last seen: {last_seen_str}\n"
+                            f"Phone: {phone}\n"
+                            f"Groups: N/A\n"
+                            f"Status: {status}\n"
+                            f"Reason: {reason}\n"
+                            f"Last seen: {last_seen_str}\n"
                         )
 
                         buttons = Keyboard.toggle_and_delete_keyboard(status, session)
@@ -978,7 +973,7 @@ class AccountHandler:
                     # Check if session file exists
                     session_file = f"{session}.session"
                     if not os.path.exists(session_file):
-                        await event.respond(f"❌ فایل session برای حساب {session} یافت نشد.")
+                        await event.respond(f"Session file for account {session} not found.")
                         logger.error(f"Session file {session_file} not found")
                         return
 
@@ -1002,7 +997,7 @@ class AccountHandler:
                                 client._message_processing_set = True
 
                             logger.info(f"Client {session} enabled successfully.")
-                            await event.respond(f"✅ حساب {session} فعال شد.")
+                            await event.respond(f"Account {session} activated.")
 
                             # Remove from inactive accounts if it was there
                             if 'inactive_accounts' in self.tbot.config and session in self.tbot.config['inactive_accounts']:
@@ -1020,7 +1015,7 @@ class AccountHandler:
                                 'error_details': 'Client not authorized'
                             }
                             self.tbot.config_manager.save_config(self.tbot.config)
-                            await event.respond(f"❌ حساب {session} توسط تلگرام غیرمجاز شده است.")
+                            await event.respond(f"Account {session} has been unauthorized by Telegram.")
                             logger.warning(f"Client {session} not authorized on reactivation")
 
                     except Exception as e:
@@ -1031,15 +1026,15 @@ class AccountHandler:
                         # Handle different types of errors
                         if 'database is locked' in error_msg or 'sqlite' in error_msg:
                             # Database lock - this is temporary, keep the account in config for retry
-                            await event.respond(f"⚠️ حساب {session} موقتاً غیرفعال است (مشکل دیتابیس). بعداً دوباره امتحان کنید.")
+                            await event.respond(f"Account {session} is temporarily inactive (database issue). Please try again later.")
                             logger.warning(f"Database lock for {session}, will retry later")
                         elif 'flood' in error_msg or 'too many' in error_msg:
                             # Flood control - temporary issue
-                            await event.respond(f"⚠️ حساب {session} موقتاً غیرفعال است (محدودیت تلگرام). بعداً دوباره امتحان کنید.")
+                            await event.respond(f"Account {session} is temporarily inactive (Telegram limit). Please try again later.")
                             logger.warning(f"Flood control for {session}, will retry later")
                         elif 'network' in error_msg or 'connection' in error_msg:
                             # Network issue - temporary
-                            await event.respond(f"⚠️ حساب {session} موقتاً غیرفعال است (مشکل شبکه). بعداً دوباره امتحان کنید.")
+                            await event.respond(f"Account {session} is temporarily inactive (network issue). Please try again later.")
                             logger.warning(f"Network issue for {session}, will retry later")
                         else:
                             # Other error - move to inactive accounts for admin review
@@ -1052,11 +1047,11 @@ class AccountHandler:
                                 'error_details': str(e)
                             }
                             self.tbot.config_manager.save_config(self.tbot.config)
-                            await event.respond(f"❌ خطا در فعال‌سازی حساب {session}: {str(e)[:100]}...")
+                            await event.respond(f"Error activating account {session}: {str(e)[:100]}...")
 
                 except Exception as e:
                     logger.error(f"Error in toggle_client enable section: {e}")
-                    await event.respond(f"❌ خطا در فعال‌سازی حساب {session}.")
+                    await event.respond(f"Error activating account {session}.")
 
             logger.info("Saving updated configuration.")
             self.tbot.config_manager.save_config(self.tbot.config)
@@ -1064,7 +1059,7 @@ class AccountHandler:
         except Exception as e:
             logger.error(f"Error toggling client {session}: {e}", exc_info=True)
             try:
-                await event.respond("❌ خطا در تغییر وضعیت حساب.")
+                await event.respond("Error changing account status.")
             except Exception as resp_e:
                 logger.error(f"Failed to send error response: {resp_e}")
 
