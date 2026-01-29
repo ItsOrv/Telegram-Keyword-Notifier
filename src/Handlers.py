@@ -10,7 +10,12 @@ from src.Config import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID, ADMIN_ID ,CLIENT
 from src.Client import SessionManager ,AccountHandler
 from src.Keyboards import Keyboard
 from src.actions import Actions
-from src.Validation import InputValidator 
+from src.Validation import InputValidator
+from src.utils import (
+    get_session_name, cleanup_conversation_state, is_session_revoked_error,
+    check_admin_access, is_bot_message, cleanup_handlers, prompt_for_input,
+    cleanup_handlers_and_state
+) 
 
 # Setting up the logger
 logger = logging.getLogger(__name__)
@@ -72,10 +77,11 @@ class KeywordHandler:
         logger.info("add_keyword_handler in KeywordHandler")
         try:
             if is_callback_event(event):
-                buttons = [Button.inline("Cancel", b'cancel')]
-                await event.respond("لطفاً کلمه کلیدی که می‌خواهید اضافه کنید را وارد کنید.", buttons=buttons)
-                async with self.tbot._conversations_lock:
-                    self.tbot._conversations[event.chat_id] = 'add_keyword_handler'
+                await prompt_for_input(
+                    self.tbot, event,
+                    "Please enter the keyword you want to add.",
+                    'add_keyword_handler'
+                )
                 return
 
             keyword = str(event.message.text.strip())
@@ -83,7 +89,7 @@ class KeywordHandler:
             # Validate keyword
             is_valid, error_msg = InputValidator.validate_keyword(keyword)
             if not is_valid:
-                await event.respond(f"❌ {error_msg}")
+                await event.respond(f"{error_msg}")
                 return
             
             if keyword not in self.tbot.config['KEYWORDS']:
@@ -94,15 +100,14 @@ class KeywordHandler:
                 await event.respond(f"Keyword '{keyword}' already exists")
 
             keywords = ', '.join(str(k) for k in self.tbot.config['KEYWORDS'])
-            await event.respond(f"📝 Current keywords: {keywords}")
+            await event.respond(f"Current keywords: {keywords}")
             
             # Cleanup conversation state
-            async with self.tbot._conversations_lock:
-                self.tbot._conversations.pop(event.chat_id, None)
+            await cleanup_conversation_state(self.tbot, event.chat_id)
 
         except Exception as e:
             logger.error(f"Error adding keyword: {e}")
-            await event.respond("❌ خطا در اضافه کردن کلمه کلیدی")
+            await event.respond("Error adding keyword")
             async with self.tbot._conversations_lock:
                 self.tbot._conversations.pop(event.chat_id, None)
 
@@ -111,10 +116,11 @@ class KeywordHandler:
         logger.info("remove_keyword_handler in KeywordHandler")
         try:
             if is_callback_event(event):
-                buttons = [Button.inline("Cancel", b'cancel')]
-                await event.respond("لطفاً کلمه کلیدی که می‌خواهید حذف کنید را وارد کنید.", buttons=buttons)
-                async with self.tbot._conversations_lock:
-                    self.tbot._conversations[event.chat_id] = 'remove_keyword_handler'
+                await prompt_for_input(
+                    self.tbot, event,
+                    "Please enter the keyword you want to remove.",
+                    'remove_keyword_handler'
+                )
                 return
 
             keyword = str(event.message.text.strip())
@@ -129,30 +135,29 @@ class KeywordHandler:
             await event.respond(f"Current keywords: {keywords}")
             
             # Cleanup conversation state
-            async with self.tbot._conversations_lock:
-                self.tbot._conversations.pop(event.chat_id, None)
+            await cleanup_conversation_state(self.tbot, event.chat_id)
 
         except Exception as e:
             logger.error(f"Error removing keyword: {e}")
-            await event.respond("❌ خطا در حذف کلمه کلیدی")
-            async with self.tbot._conversations_lock:
-                self.tbot._conversations.pop(event.chat_id, None)
+            await event.respond("Error removing keyword")
+            await cleanup_conversation_state(self.tbot, event.chat_id)
 
     async def ignore_user_handler(self, event):
         """Ignore a user from further interaction"""
         logger.info("ignore_user_handler in KeywordHandler")
         try:
             if is_callback_event(event):
-                buttons = [Button.inline("Cancel", b'cancel')]
-                await event.respond("لطفاً شناسه کاربری که می‌خواهید نادیده گرفته شود را وارد کنید.", buttons=buttons)
-                async with self.tbot._conversations_lock:
-                    self.tbot._conversations[event.chat_id] = 'ignore_user_handler'
+                await prompt_for_input(
+                    self.tbot, event,
+                    "Please enter the user ID you want to ignore.",
+                    'ignore_user_handler'
+                )
                 return
 
             # Validate and parse user ID
             is_valid, error_msg, user_id = InputValidator.validate_user_id(event.message.text.strip())
             if not is_valid:
-                await event.respond(f"❌ {error_msg}")
+                await event.respond(f"{error_msg}")
                 return
             
             if user_id not in self.tbot.config['IGNORE_USERS']:
@@ -166,30 +171,29 @@ class KeywordHandler:
             await event.respond(f"Ignored users: {ignored_users}")
             
             # Cleanup conversation state
-            async with self.tbot._conversations_lock:
-                self.tbot._conversations.pop(event.chat_id, None)
+            await cleanup_conversation_state(self.tbot, event.chat_id)
 
         except Exception as e:
             logger.error(f"Error ignoring user: {e}")
-            await event.respond("❌ خطا در نادیده گرفتن کاربر")
-            async with self.tbot._conversations_lock:
-                self.tbot._conversations.pop(event.chat_id, None)
+            await event.respond("Error ignoring user")
+            await cleanup_conversation_state(self.tbot, event.chat_id)
 
     async def delete_ignore_user_handler(self, event):
         """Remove a user from the ignore list"""
         logger.info("delete_ignore_user_handler in KeywordHandler")
         try:
             if is_callback_event(event):
-                buttons = [Button.inline("Cancel", b'cancel')]
-                await event.respond("لطفاً شناسه کاربری که می‌خواهید از لیست نادیده گرفته‌شده حذف کنید را وارد کنید.", buttons=buttons)
-                async with self.tbot._conversations_lock:
-                    self.tbot._conversations[event.chat_id] = 'delete_ignore_user_handler'
+                await prompt_for_input(
+                    self.tbot, event,
+                    "Please enter the user ID you want to remove from the ignore list.",
+                    'delete_ignore_user_handler'
+                )
                 return
 
             # Validate and parse user ID
             is_valid, error_msg, user_id = InputValidator.validate_user_id(event.message.text.strip())
             if not is_valid:
-                await event.respond(f"❌ {error_msg}")
+                await event.respond(f"{error_msg}")
                 return
             
             if user_id in self.tbot.config['IGNORE_USERS']:
@@ -203,14 +207,12 @@ class KeywordHandler:
             await event.respond(f"Ignored users: {ignored_users}")
             
             # Cleanup conversation state
-            async with self.tbot._conversations_lock:
-                self.tbot._conversations.pop(event.chat_id, None)
+            await cleanup_conversation_state(self.tbot, event.chat_id)
 
         except Exception as e:
             logger.error(f"Error deleting ignored user: {e}")
-            await event.respond("❌ خطا در حذف کاربر از لیست نادیده گرفته‌شده")
-            async with self.tbot._conversations_lock:
-                self.tbot._conversations.pop(event.chat_id, None)
+            await event.respond("Error removing user from ignore list")
+            await cleanup_conversation_state(self.tbot, event.chat_id)
 
     async def ignore_user(self, user_id, event): # for channel button
         """Ignore a user from further interaction."""
@@ -239,14 +241,9 @@ class MessageHandler:
         logger.info(f"message_handler in MessageHandler - message: {event.message.text}")
 
         # Skip messages from the bot itself
-        try:
-            bot_user_id = int(BOT_TOKEN.split(':')[0])  # Extract bot ID from token
-            if event.sender_id == bot_user_id:
-                logger.debug(f"Ignoring message from bot itself (ID: {bot_user_id})")
-                return False
-        except (ValueError, AttributeError, IndexError):
-            # If BOT_TOKEN is not in expected format (e.g., in tests), skip this check
-            pass
+        if is_bot_message(event, BOT_TOKEN):
+            logger.debug(f"Ignoring message from bot itself")
+            return False
 
         # Skip if this is a command (should be handled by command handler)
         if event.message.text and event.message.text.startswith('/'):
@@ -254,10 +251,9 @@ class MessageHandler:
             return False
 
         # Allow admin user to continue conversations
-        # Skip admin check if ADMIN_ID is 0 or invalid (e.g., in tests)
         try:
             admin_id = int(ADMIN_ID) if isinstance(ADMIN_ID, str) else ADMIN_ID
-            if admin_id != 0 and event.sender_id != admin_id:
+            if not await check_admin_access(event, admin_id):
                 logger.warning(f"Non-admin message from {event.sender_id}: {event.message.text[:50]}...")
                 await event.respond("You are not the admin")
                 return False
@@ -386,7 +382,7 @@ class StatsHandler:
                 "Ignored Users": len(self.tbot.config['IGNORE_USERS'])
             }
 
-            text = "📊 Bot Statistics\n\n"
+            text = "Bot Statistics\n\n"
             for key, value in stats.items():
                 text += f"• {key}: {value}\n"
 
@@ -406,16 +402,34 @@ class StatsHandler:
                 await event.respond("No groups found. Please run 'Update Groups' first.")
                 return
             
-            text = "📋 Groups per Account:\n\n"
+            text = "Groups per Account:\n\n"
             total_groups = 0
             
+            # Get active clients snapshot to filter revoked sessions
+            async with self.tbot.active_clients_lock:
+                active_sessions = set(self.tbot.active_clients.keys())
+            
             for session, groups in clients_data.items():
+                # Skip revoked sessions (in config but not in active_clients and not in inactive_accounts)
+                if session not in active_sessions:
+                    # Check if it's in inactive_accounts
+                    if 'inactive_accounts' not in self.tbot.config or session not in self.tbot.config['inactive_accounts']:
+                        # Session is in config but not active and not in inactive_accounts - likely revoked, skip it
+                        logger.debug(f"Skipping potentially revoked session {session} in show_groups")
+                        continue
+                    else:
+                        # Check if reason indicates revoked session
+                        inactive_reason = self.tbot.config['inactive_accounts'][session].get('reason', '').lower()
+                        if 'revoked' in inactive_reason or 'auth' in inactive_reason or 'session' in inactive_reason:
+                            logger.debug(f"Skipping revoked session {session} in show_groups")
+                            continue
+                
                 phone = session.replace('.session', '') if session else 'Unknown'
                 groups_count = len(groups) if isinstance(groups, list) else 0
                 total_groups += groups_count
                 text += f"• {phone}: {groups_count} groups\n"
             
-            text += f"\n📊 Total: {total_groups} groups"
+            text += f"\nTotal: {total_groups} groups"
             await event.respond(text)
 
         except Exception as e:
@@ -432,7 +446,7 @@ class StatsHandler:
                 await event.respond("No keywords configured yet.")
                 return
             
-            text = "🔑 Configured Keywords:\n\n"
+            text = "Configured Keywords:\n\n"
             for idx, keyword in enumerate(keywords, 1):
                 text += f"{idx}. {keyword}\n"
             
@@ -452,7 +466,7 @@ class StatsHandler:
                 await event.respond("No users are currently ignored.")
                 return
             
-            text = "🚫 Ignored Users:\n\n"
+            text = "Ignored Users:\n\n"
             for idx, user_id in enumerate(ignored_users, 1):
                 text += f"{idx}. User ID: `{user_id}`\n"
             
@@ -491,6 +505,7 @@ class CallbackHandler:
             'individual_keyboard': self.show_individual_keyboard,
             'report': self.show_report_keyboard,
             'exit': self.show_start_keyboard,
+            'back_to_start': self.handle_back_to_start,
             # Bulk operations
             'bulk_reaction': self.handle_bulk_reaction,
             'bulk_poll': self.handle_bulk_poll,
@@ -504,12 +519,27 @@ class CallbackHandler:
             'send_pv': self.handle_individual_send_pv,
             'join': self.handle_individual_join,
             'left': self.handle_individual_left,
+            'block': self.handle_individual_block,
             'comment': self.handle_individual_comment,
         }
 
     async def show_start_keyboard(self, event):
         """Handles the start keyboard display"""
+        # Clean up any active conversations when returning to start
+        await cleanup_conversation_state(self.tbot, event.chat_id)
         await Keyboard.show_keyboard('start', event, self.tbot)
+
+    async def handle_back_to_start(self, event):
+        """Handle back to start navigation with cleanup"""
+        # Clean up any active conversations and temporary keyboards
+        await cleanup_conversation_state(self.tbot, event.chat_id)
+        # Try to delete the current message if it's a callback
+        try:
+            if hasattr(event, 'message') and event.message:
+                await event.message.delete()
+        except Exception as e:
+            logger.debug(f"Could not delete message when going back: {e}")
+        await self.show_start_keyboard(event)
 
     async def show_monitor_keyboard(self, event):
         """Handles the monitor mode keyboard display"""
@@ -533,10 +563,10 @@ class CallbackHandler:
         try:
             if hasattr(event, 'answer'):
                 await event.answer()
-            await event.edit("Report status - Please choose an option:", buttons=keyboard)
+            await event.edit("Report Status\n\nPlease select an option:", buttons=keyboard)
         except Exception as e:
             logger.error(f"Error showing report keyboard: {e}")
-            await event.respond("Report status - Please choose an option:", buttons=keyboard)
+            await event.respond("Report Status\n\nPlease select an option:", buttons=keyboard)
 
     async def handle_bulk_reaction(self, event):
         """
@@ -557,7 +587,7 @@ class CallbackHandler:
         async with self.tbot.active_clients_lock:
             total_accounts = len(self.tbot.active_clients)
         if total_accounts == 0:
-            await event.respond("❌ هیچ حسابی برای عملیات موجود نیست.")
+            await event.respond("No accounts available for this operation.")
             return
         await self.actions.bulk_poll(event, total_accounts)
 
@@ -603,7 +633,7 @@ class CallbackHandler:
             total_accounts = len(self.tbot.active_clients)
         logger.info(f"Total accounts available: {total_accounts}")
         if total_accounts == 0:
-            await event.respond("❌ No accounts available for this operation.")
+            await event.respond("No accounts available for this operation.")
             return
 
         # Ask user to specify how many accounts they want to use
@@ -647,6 +677,11 @@ class CallbackHandler:
         logger.info("handle_individual_left in CallbackHandler")
         await self.actions.prompt_individual_action(event, 'left')
 
+    async def handle_individual_block(self, event):
+        """Handle individual block operation"""
+        logger.info("handle_individual_block in CallbackHandler")
+        await self.actions.prompt_individual_action(event, 'block')
+
     async def handle_individual_comment(self, event):
         """Handle individual comment operation"""
         logger.info("handle_individual_comment in CallbackHandler")
@@ -662,21 +697,16 @@ class CallbackHandler:
         if hasattr(self.tbot, 'client_manager') and self.tbot.client_manager:
             await self.tbot.client_manager.show_inactive_accounts(event)
         else:
-            await event.respond("❌ Client manager not initialized. Please restart the bot.")
+            await event.respond("Client manager not initialized. Please restart the bot.")
 
     async def callback_handler(self, event):
         """Handle callback queries"""
         logger.info("callback_handler in CallbackHandler")
         try:
             # Skip callbacks from the bot itself
-            try:
-                bot_user_id = int(BOT_TOKEN.split(':')[0])  # Extract bot ID from token
-                if event.sender_id == bot_user_id:
-                    logger.debug(f"Ignoring callback from bot itself (ID: {bot_user_id})")
-                    return
-            except (ValueError, AttributeError, IndexError):
-                # If BOT_TOKEN is not in expected format (e.g., in tests), skip this check
-                pass
+            if is_bot_message(event, BOT_TOKEN):
+                logger.debug(f"Ignoring callback from bot itself")
+                return
 
             # Answer the callback query first to remove loading state
             try:
@@ -699,9 +729,18 @@ class CallbackHandler:
 
             if data == 'cancel':
                 chat_id = event.chat_id
-                async with self.tbot._conversations_lock:
-                    self.tbot._conversations.pop(chat_id, None)
-                await event.delete()
+                # Clean up conversation state
+                await cleanup_conversation_state(self.tbot, chat_id)
+                # Try to delete the message
+                try:
+                    if hasattr(event, 'message') and event.message:
+                        await event.message.delete()
+                    elif hasattr(event, 'delete'):
+                        await event.delete()
+                except Exception as e:
+                    logger.debug(f"Could not delete message when canceling: {e}")
+                # Return to start keyboard
+                await self.show_start_keyboard(event)
                 return
 
             # Handle special cases (e.g., phone number request, toggle, delete, ignore)
@@ -711,8 +750,11 @@ class CallbackHandler:
                 async with self.tbot._conversations_lock:
                     self.tbot._conversations[event.chat_id] = 'phone_number_handler'
                 return
-            # Check if it's a known callback action FIRST (before parsing prefixes)
-            # This must come before prefix checks to handle actions like 'ignore_user'
+            # Handle reaction button selections (must be before other handlers)
+            elif data in ['reaction_thumbsup', 'reaction_heart', 'reaction_laugh', 'reaction_wow', 'reaction_sad', 'reaction_angry']:
+                await self.actions.reaction_select_handler(event)
+                return
+            # Check if it's a known callback action (before prefix checks like 'ignore_')
             elif data in self.callback_actions:
                 action = self.callback_actions[data]
                 await action(event)
@@ -735,19 +777,14 @@ class CallbackHandler:
                 try:
                     if hasattr(self.tbot, 'client_manager') and self.tbot.client_manager:
                         await self.tbot.client_manager.delete_session(session)
-                        await event.respond(f"✅ حساب {session} با موفقیت حذف شد.")
+                        await event.respond(f"Account {session} deleted successfully.")
                     else:
-                        await event.respond("❌ Client manager not initialized. Please restart the bot.")
+                        await event.respond("Client manager not initialized. Please restart the bot.")
                 except Exception as e:
                     logger.error(f"Error deleting session {session}: {e}")
-                    await event.respond(f"❌ خطا در حذف حساب {session}: {str(e)}")
+                    await event.respond(f"Error deleting account {session}: {str(e)}")
                 return
-            # Handle reaction button selections (must be before bulk/individual handlers)
-            elif data in ['reaction_thumbsup', 'reaction_heart', 'reaction_laugh', 'reaction_wow', 'reaction_sad', 'reaction_angry']:
-                await self.actions.reaction_select_handler(event)
-                return
-            # Check if it's a known callback action FIRST (before parsing underscores for actions like 'add_account')
-            # This must come before the '_' check to handle actions with underscores
+            # Check if it's a known callback action (before parsing underscores)
             elif data in self.callback_actions:
                 action = self.callback_actions[data]
                 await action(event)
@@ -775,7 +812,7 @@ class CallbackHandler:
                             num_accounts = int(parts[1])
                             await self.actions.handle_group_action(event, action_name, num_accounts)
                         # Check if it's an individual operation with session name (may contain underscores)
-                        elif action_name in ['reaction', 'send_pv', 'join', 'left', 'comment']:
+                        elif action_name in ['reaction', 'send_pv', 'join', 'left', 'block', 'comment']:
                             # Session name is everything after the first underscore
                             session = '_'.join(parts[1:])
                             async with self.tbot.active_clients_lock:
@@ -790,23 +827,26 @@ class CallbackHandler:
                             if action:
                                 await action(event)
                             else:
-                                logger.error(f"No handler found for callback data: {data}")
-                                await event.respond("Unknown command.")
+                                logger.warning(f"No handler found for callback data: {data} (after parsing underscores)")
+                                await event.respond("Command not recognized. Please try again.")
                 else:
                     action = self.callback_actions.get(data)
                     if action:
                         await action(event)
                     else:
-                        logger.error(f"No handler found for callback data: {data}")
-                        await event.respond("Unknown command.")
+                        logger.warning(f"No handler found for callback data: {data} (single part with underscore)")
+                        await event.respond("Command not recognized. Please try again.")
             else:
                 action = self.callback_actions.get(data)
                 if action:
                     await action(event)
                 else:
-                    logger.error(f"No handler found for callback data: {data}")
-                    await event.respond("Unknown command.")
+                    logger.warning(f"No handler found for callback data: {data} (no underscore)")
+                    await event.respond("❌ دستور شناسایی نشد. لطفاً دوباره تلاش کنید.")
 
         except Exception as e:
-            logger.error(f"Error in callback_handler: {e}")
-            await event.respond("Error processing request. Please try again.")
+            logger.error(f"Error in callback_handler: {e}", exc_info=True)
+            try:
+                await event.respond("Error processing request. Please try again.")
+            except Exception as e2:
+                logger.error(f"Error sending error message: {e2}")
