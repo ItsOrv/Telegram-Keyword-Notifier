@@ -2,6 +2,7 @@ import logging
 from telethon import TelegramClient, events, Button
 from src.Config import CHANNEL_ID
 from src.Keyboards import Keyboard
+from src.utils import extract_account_name
 
 # Set up logger for the Monitor class
 logger = logging.getLogger(__name__)
@@ -121,17 +122,7 @@ class Monitor:
                 logger.info(f"Processing message from chat: {chat_title}")
 
                 # Extract session name from the client's session file
-                try:
-                    if hasattr(client.session, 'filename'):
-                        account_name = str(client.session.filename)
-                        # Remove .session extension if present
-                        if account_name.endswith('.session'):
-                            account_name = account_name[:-8]
-                    else:
-                        account_name = 'Unknown Account'
-                except Exception as e:
-                    logger.warning(f"Could not extract account name: {e}")
-                    account_name = 'Unknown Account'
+                account_name = extract_account_name(client)
 
                 # Prepare the message content for forwarding
                 text = (
