@@ -48,9 +48,12 @@ class TelegramBot:
                 raise SystemExit(str(e))
             
             # Create TelegramClient now that we're in an async context
-            if self.tbot is None:
-                self.tbot = TelegramClient('bot2', API_ID, API_HASH)
-                logger.info("TelegramClient created")
+            if self.tbot is None or not self.tbot.is_connected():
+                if self.tbot is None:
+                    self.tbot = TelegramClient('bot2', API_ID, API_HASH)
+                    logger.info("TelegramClient created")
+                elif not self.tbot.is_connected():
+                    logger.info("Reconnecting TelegramClient...")
             
             # Initialize async components now that we're in an async context
             if self.active_clients_lock is None:
@@ -156,38 +159,75 @@ class TelegramBot:
 
     async def run(self):
         """
-        Run the bot and monitor clients.
+        Run the bot and monitor clients with automatic reconnection.
         """
-        try:
-            await self.start()
-            logger.info("Bot is running...")
-            logger.info("=" * 60)
-            logger.info("✅ Bot started successfully and is ready to receive commands!")
-            logger.info("=" * 60)
-
-            # Start monitoring messages for all active clients (only once per client)
-            tasks = []
-            async with self.active_clients_lock:
-                for client in self.active_clients.values():
-                    if not hasattr(client, '_message_processing_set'):
-                        # Start monitoring tasks in background (don't await them)
-                        asyncio.create_task(self.monitor.process_messages_for_client(client))
-                        client._message_processing_set = True
-            
-            # Keep the bot running until disconnected
-            logger.info("Bot is now running and waiting for messages...")
-            logger.info("Send /start to your bot in Telegram to begin.")
-            await self.tbot.run_until_disconnected()
-        except asyncio.CancelledError:
-            logger.warning("Bot run was cancelled")
-        except Exception as e:
-            logger.error(f"Error running bot: {e}", exc_info=True)
+        max_retries = 5
+        retry_delay = 30  # seconds
+        
+        for attempt in range(max_retries):
             try:
-                await self.notify_admin(f"❌ Bot encountered an error: {str(e)[:200]}")
-            except Exception:
-                logger.error("Failed to notify admin about error")
-        finally:
-            await self.shutdown()
+                if attempt > 0:
+                    logger.info(f"Attempting to restart bot (attempt {attempt + 1}/{max_retries})...")
+                    # Reset message processing flags for reconnection
+                    async with self.active_clients_lock:
+                        for client in self.active_clients.values():
+                            if hasattr(client, '_message_processing_set'):
+                                delattr(client, '_message_processing_set')
+                    await asyncio.sleep(retry_delay)
+                
+                await self.start()
+                logger.info("Bot is running...")
+                logger.info("=" * 60)
+                logger.info("✅ Bot started successfully and is ready to receive commands!")
+                logger.info("=" * 60)
+
+                # Start monitoring messages for all active clients (only once per client)
+                async with self.active_clients_lock:
+                    for client in self.active_clients.values():
+                        if not hasattr(client, '_message_processing_set'):
+                            # Start monitoring tasks in background (don't await them)
+                            asyncio.create_task(self.monitor.process_messages_for_client(client))
+                            client._message_processing_set = True
+                
+                # Keep the bot running until disconnected
+                logger.info("Bot is now running and waiting for messages...")
+                logger.info("Send /start to your bot in Telegram to begin.")
+                await self.tbot.run_until_disconnected()
+                
+                # If we reach here, the bot disconnected
+                logger.warning("Bot disconnected. Will attempt to reconnect...")
+                
+            except asyncio.CancelledError:
+                logger.warning("Bot run was cancelled")
+                break
+            except KeyboardInterrupt:
+                logger.info("Bot stopped by user")
+                break
+            except Exception as e:
+                logger.error(f"Error running bot (attempt {attempt + 1}/{max_retries}): {e}", exc_info=True)
+                try:
+                    await self.notify_admin(f"❌ Bot encountered an error: {str(e)[:200]}")
+                except Exception:
+                    logger.error("Failed to notify admin about error")
+                
+                if attempt < max_retries - 1:
+                    logger.info(f"Waiting {retry_delay} seconds before retry...")
+                    await asyncio.sleep(retry_delay)
+                else:
+                    logger.critical(f"Max retries ({max_retries}) reached. Shutting down bot.")
+                    break
+            finally:
+                if attempt < max_retries - 1:
+                    # Don't fully shutdown on retry, just disconnect
+                    try:
+                        logger.info("Disconnecting for retry...")
+                        if self.tbot and self.tbot.is_connected():
+                            await self.tbot.disconnect()
+                    except Exception as e:
+                        logger.error(f"Error disconnecting: {e}")
+                else:
+                    # Final shutdown
+                    await self.shutdown()
 
     async def notify_admin(self, message):
         """
@@ -208,8 +248,10 @@ class TelegramBot:
         """
         try:
             logger.info("Shutting down bot...")
-            await self.client_manager.disconnect_all_clients()
-            await self.tbot.disconnect()
+            if self.client_manager:
+                await self.client_manager.disconnect_all_clients()
+            if self.tbot and self.tbot.is_connected():
+                await self.tbot.disconnect()
             logger.info("Bot shut down successfully")
         except Exception as e:
             logger.error(f"Error during shutdown: {e}")
