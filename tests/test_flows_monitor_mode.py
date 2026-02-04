@@ -270,7 +270,7 @@ class TestMonitorModeFlows:
         # Should show error
         mock_event.respond.assert_called()
         call_args = mock_event.respond.call_args[0][0]
-        assert "❌" in call_args or "error" in call_args.lower()
+        assert "cannot" in call_args.lower() or "must" in call_args.lower() or "error" in call_args.lower()
 
     @pytest.mark.asyncio
     async def test_invalid_user_id(self, mock_tbot, mock_event):
@@ -287,5 +287,5 @@ class TestMonitorModeFlows:
         # Should show error
         mock_event.respond.assert_called()
         call_args = mock_event.respond.call_args[0][0]
-        assert "❌" in call_args or "error" in call_args.lower()
+        assert "cannot" in call_args.lower() or "must" in call_args.lower() or "error" in call_args.lower()
 

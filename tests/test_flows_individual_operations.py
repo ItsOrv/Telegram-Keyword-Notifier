@@ -260,5 +260,5 @@ class TestIndividualOperationsFlows:
         # Should show error
         mock_event.respond.assert_called()
         call_args = mock_event.respond.call_args[0][0]
-        assert "❌" in call_args or "error" in call_args.lower()
+        assert "cannot" in call_args.lower() or "must" in call_args.lower() or "invalid" in call_args.lower() or "error" in call_args.lower()
 

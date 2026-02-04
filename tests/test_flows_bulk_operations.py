@@ -307,5 +307,5 @@ class TestBulkOperationsFlows:
         calls = mock_event.respond.call_args_list
         call_args_text = ' '.join([str(call[0][0]) if call[0] else '' for call in calls])
         # For invalid link, it should show error message
-        assert "❌" in call_args_text or "error" in call_args_text.lower() or "خطا" in call_args_text or "دوباره تلاش" in call_args_text
+        assert "invalid" in call_args_text.lower() or "cannot" in call_args_text.lower() or "must" in call_args_text.lower() or "error" in call_args_text.lower()
 

@@ -19,7 +19,7 @@ class TestKeyboard:
         assert "Account Management" in button_texts
         assert "Individual" in button_texts or "Bulk" in button_texts
         assert "Monitor Mode" in button_texts
-        assert "Report status" in button_texts or "Report" in button_texts
+        assert "Report Status" in button_texts or "Report" in button_texts
 
     def test_monitor_keyboard(self):
         """Test monitor keyboard structure"""
@@ -43,7 +43,7 @@ class TestKeyboard:
         assert "Poll" in button_texts
         assert "Join" in button_texts
         assert "Block" in button_texts
-        assert "Send pv" in button_texts
+        assert "Send PV" in button_texts
         assert "Comment" in button_texts
 
     def test_account_management_keyboard(self):
@@ -76,25 +76,25 @@ class TestKeyboard:
 
     def test_toggle_and_delete_keyboard_active(self):
         """Test toggle and delete keyboard for active account"""
-        status = "🟢 Active"
+        status = "Active"
         session = "test_session"
         keyboard = Keyboard.toggle_and_delete_keyboard(status, session)
         assert isinstance(keyboard, list)
         assert len(keyboard) > 0
         # Should have disable button
         button_texts = [btn.text for row in keyboard for btn in row]
-        assert "Disable" in " ".join(button_texts) or "❌ Disable" in button_texts
+        assert "Disable" in " ".join(button_texts)
 
     def test_toggle_and_delete_keyboard_inactive(self):
         """Test toggle and delete keyboard for inactive account"""
-        status = "🔴 Inactive"
+        status = "Inactive"
         session = "test_session"
         keyboard = Keyboard.toggle_and_delete_keyboard(status, session)
         assert isinstance(keyboard, list)
         assert len(keyboard) > 0
         # Should have enable button
         button_texts = [btn.text for row in keyboard for btn in row]
-        assert "Enable" in " ".join(button_texts) or "✅ Enable" in button_texts
+        assert "Enable" in " ".join(button_texts)
 
     def test_individual_keyboard(self):
         """Test individual operations keyboard"""
@@ -106,7 +106,7 @@ class TestKeyboard:
         assert "Reaction" in button_texts
         assert "Send PV" in button_texts
         assert "Join" in button_texts
-        assert "Left" in button_texts
+        assert "Leave" in button_texts
         assert "Comment" in button_texts
 
     def test_report_keyboard(self):
