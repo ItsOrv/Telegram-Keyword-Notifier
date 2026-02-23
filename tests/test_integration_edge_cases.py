@@ -299,10 +299,14 @@ class TestEdgeCases:
         
         with patch('src.Client.TelegramClient') as mock_client_class:
             mock_client = AsyncMock()
-            mock_client.is_connected = AsyncMock(return_value=False)
+            # is_connected() is a regular method, not async
+            mock_client.is_connected = MagicMock(return_value=False)
             mock_client.is_user_authorized = AsyncMock(return_value=False)
             mock_client.connect = AsyncMock()
             mock_client.disconnect = AsyncMock()
+            mock_client.get_dialogs = AsyncMock(side_effect=Exception("Session revoked"))
+            mock_client.session = MagicMock()
+            mock_client.session.save = MagicMock()
             mock_client_class.return_value = mock_client
             
             await session_manager.start_saved_clients()
