@@ -2,6 +2,8 @@
 Utility functions for common operations across the bot.
 This module contains reusable functions to reduce code duplication.
 """
+from __future__ import annotations
+
 import logging
 import asyncio
 import random
