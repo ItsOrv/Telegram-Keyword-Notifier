@@ -7,6 +7,8 @@ from __future__ import annotations
 import logging
 import asyncio
 import random
+import os
+import re
 from typing import Optional, Tuple, Callable, List, Any
 from telethon.errors import FloodWaitError, SessionRevokedError
 try:
@@ -16,6 +18,74 @@ except ImportError:
 from telethon import TelegramClient
 
 logger = logging.getLogger(__name__)
+
+
+def sanitize_session_name(session_name: str) -> str:
+    """
+    Sanitize session name to prevent path traversal attacks.
+    
+    Args:
+        session_name: Raw session name that may contain dangerous characters
+        
+    Returns:
+        Sanitized session name safe for use in file paths
+        
+    Raises:
+        ValueError: If session name is invalid or empty after sanitization
+    """
+    if not session_name or not isinstance(session_name, str):
+        raise ValueError("Session name must be a non-empty string")
+    
+    # Remove path separators and dangerous characters
+    sanitized = re.sub(r'[^\w\-_\.]', '', session_name)
+    # Remove any remaining path traversal attempts
+    sanitized = sanitized.replace('..', '').replace('/', '').replace('\\', '')
+    # Remove leading/trailing dots and dashes
+    sanitized = sanitized.strip('.-_')
+    
+    # Ensure it's not empty
+    if not sanitized:
+        raise ValueError("Invalid session name: empty after sanitization")
+    
+    # Limit length to prevent extremely long names
+    if len(sanitized) > 255:
+        sanitized = sanitized[:255]
+        logger.warning(f"Session name truncated to 255 characters")
+    
+    return sanitized
+
+
+def get_safe_session_file_path(session_name: str, project_dir: Optional[str] = None) -> str:
+    """
+    Get a safe session file path, ensuring it's within the project directory.
+    
+    Args:
+        session_name: Session name to create file path for
+        project_dir: Optional project directory (defaults to current directory)
+        
+    Returns:
+        Safe session file path
+        
+    Raises:
+        ValueError: If path traversal is detected or session name is invalid
+    """
+    # Sanitize session name first
+    sanitized = sanitize_session_name(session_name)
+    session_file = f"{sanitized}.session"
+    
+    # Get absolute paths
+    if project_dir is None:
+        project_dir = os.path.abspath('.')
+    else:
+        project_dir = os.path.abspath(project_dir)
+    
+    final_path = os.path.abspath(os.path.join(project_dir, session_file))
+    
+    # Verify the final path is within project directory
+    if not final_path.startswith(project_dir):
+        raise ValueError(f"Path traversal detected! Session name: {session_name}")
+    
+    return final_path
 
 
 def get_session_name(account: TelegramClient) -> str:
@@ -30,7 +100,9 @@ def get_session_name(account: TelegramClient) -> str:
     """
     try:
         if hasattr(account, 'session') and hasattr(account.session, 'filename'):
-            return account.session.filename
+            filename = account.session.filename
+            if filename:
+                return filename
     except (AttributeError, Exception):
         pass
     return 'Unknown'
@@ -68,6 +140,31 @@ def is_session_revoked_error(error: Exception) -> bool:
            any(keyword in error_type for keyword in ['revoked', 'auth', 'unregistered'])
 
 
+def validate_admin_id(admin_id: Any) -> int:
+    """
+    Validate and convert ADMIN_ID to integer.
+    
+    Args:
+        admin_id: Admin ID value (can be int, str, or None)
+        
+    Returns:
+        Validated admin ID as integer
+        
+    Raises:
+        ValueError: If admin_id is invalid
+    """
+    if admin_id is None:
+        raise ValueError("ADMIN_ID is not set")
+    
+    try:
+        admin_id_int = int(admin_id)
+        if admin_id_int <= 0:
+            raise ValueError(f"ADMIN_ID must be a positive integer, got: {admin_id_int}")
+        return admin_id_int
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid ADMIN_ID format: {admin_id}") from e
+
+
 async def check_admin_access(event, admin_id: int) -> bool:
     """
     Check if event sender is admin.
@@ -81,7 +178,12 @@ async def check_admin_access(event, admin_id: int) -> bool:
     """
     if admin_id == 0:
         return True  # Skip check in tests
-    return event.sender_id == admin_id
+    try:
+        validated_admin_id = validate_admin_id(admin_id)
+        return event.sender_id == validated_admin_id
+    except ValueError:
+        logger.warning(f"Invalid admin_id in check_admin_access: {admin_id}")
+        return False
 
 
 async def execute_bulk_operation(
@@ -111,7 +213,7 @@ async def execute_bulk_operation(
     revoked_sessions = []
     
     async def execute_with_account(acc):
-        nonlocal success_count, error_count
+        nonlocal success_count, error_count, revoked_sessions
         session_name = get_session_name(acc)
         
         async with semaphore:
@@ -177,22 +279,6 @@ async def format_bulk_result_message(
         return msg
 
 
-def cleanup_handlers(tbot, handler_keys: List[str], chat_id: Optional[int] = None):
-    """
-    Clean up handler keys from tbot.handlers dictionary.
-    
-    Args:
-        tbot: TelegramBot instance
-        handler_keys: List of keys to remove from handlers
-        chat_id: Optional chat_id to also clean conversation state
-    """
-    for key in handler_keys:
-        tbot.handlers.pop(key, None)
-    
-    if chat_id is not None:
-        asyncio.create_task(cleanup_conversation_state(tbot, chat_id))
-
-
 def get_bot_user_id(bot_token: str) -> Optional[int]:
     """
     Extract bot user ID from bot token.
@@ -234,6 +320,9 @@ async def cleanup_handlers_and_state(
     """
     Clean up handler keys and conversation state.
     
+    This is the main function for cleaning up handlers and conversation state.
+    The duplicate `cleanup_handlers` function has been removed.
+    
     Args:
         tbot: TelegramBot instance
         handler_keys: List of keys to remove from handlers
@@ -260,7 +349,13 @@ async def resolve_entity(peer, account):
     Raises:
         Exception: If entity cannot be resolved (e.g., revoked session)
     """
+    # Check if peer is None
+    if peer is None:
+        raise ValueError("Cannot resolve None entity")
+    
     if isinstance(peer, str):
+        if not peer.strip():
+            raise ValueError("Cannot resolve empty string entity")
         try:
             return await account.get_entity(peer)
         except Exception as e:
@@ -278,6 +373,7 @@ async def resolve_entity(peer, account):
                 logger.error(f"Session revoked or unregistered while resolving entity: {e}")
                 raise SessionRevokedError("Session revoked or unregistered")
             raise
+    # Return peer as-is if it's already a resolved entity or positive int
     return peer
 
 
@@ -344,11 +440,13 @@ def extract_account_name(client) -> str:
     """
     try:
         if hasattr(client, 'session') and hasattr(client.session, 'filename'):
-            account_name = str(client.session.filename)
-            # Remove .session extension if present
-            if account_name.endswith('.session'):
-                account_name = account_name[:-8]
-            return account_name
+            filename = client.session.filename
+            if filename:
+                account_name = str(filename)
+                # Remove .session extension if present
+                if account_name.endswith('.session'):
+                    account_name = account_name[:-8]
+                return account_name
     except Exception:
         pass
     return 'Unknown Account'
@@ -446,8 +544,6 @@ async def remove_revoked_session_completely(tbot, session_name: str):
         tbot: TelegramBot instance
         session_name: Session name/key to remove
     """
-    import os
-    
     # Remove from active_clients
     async with tbot.active_clients_lock:
         if session_name in tbot.active_clients:
@@ -474,14 +570,17 @@ async def remove_revoked_session_completely(tbot, session_name: str):
         tbot.config_manager.save_config(tbot.config)
         logger.info(f"Removed revoked session from inactive_accounts: {session_name}")
     
-    # Delete session file
-    session_file = f"{session_name}.session"
-    if os.path.exists(session_file):
-        try:
-            os.remove(session_file)
-            logger.info(f"Deleted revoked session file: {session_file}")
-        except OSError as e:
-            logger.warning(f"Could not delete session file {session_file}: {e}")
+    # Delete session file with path traversal protection
+    try:
+        session_file = get_safe_session_file_path(session_name)
+        if os.path.exists(session_file):
+            try:
+                os.remove(session_file)
+                logger.info(f"Deleted revoked session file: {session_file}")
+            except OSError as e:
+                logger.warning(f"Could not delete session file {session_file}: {e}")
+    except ValueError as e:
+        logger.error(f"Invalid session name for deletion: {e}")
     
     logger.info(f"Revoked session {session_name} completely removed from system")
 
