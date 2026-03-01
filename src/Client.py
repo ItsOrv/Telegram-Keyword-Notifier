@@ -9,7 +9,7 @@ from telethon.tl.types import Channel, Chat
 from src.Config import ConfigManager, API_ID, API_HASH, ADMIN_ID, CHANNEL_ID, CLIENTS_JSON_PATH, RATE_LIMIT_SLEEP, GROUPS_BATCH_SIZE, GROUPS_UPDATE_SLEEP, REPORT_CHECK_BOT
 from src.Keyboards import Keyboard
 from src.Validation import InputValidator
-from src.utils import send_error_message, extract_account_name, prompt_for_input, is_session_revoked_error, remove_revoked_session_completely
+from src.utils import send_error_message, extract_account_name, prompt_for_input, is_session_revoked_error, remove_revoked_session_completely, sanitize_session_name, get_safe_session_file_path
 
 
 # Set up logger for the SessionManager class
@@ -45,20 +45,30 @@ class SessionManager:
                 logger.warning("'clients' is not a dictionary. Initializing it as an empty dictionary.")
                 self.config['clients'] = {}
 
-            # If tbot has active_clients_lock, use it for thread-safety
-            if hasattr(self.tbot, 'active_clients_lock'):
-                async with self.tbot.active_clients_lock:
-                    for session_name in list(self.config['clients']):
-                        if session_name not in self.active_clients:
-                            # Initialize Telegram client for the session
-                            client = TelegramClient(session_name, API_ID, API_HASH)
-                            self.active_clients[session_name] = client
-            else:
-                # Fallback if lock is not available (shouldn't happen in production)
+            # Always use lock for thread-safety - raise error if lock is not available
+            if not hasattr(self.tbot, 'active_clients_lock'):
+                logger.error("active_clients_lock not available in tbot. This should not happen in production.")
+                raise RuntimeError("active_clients_lock not initialized")
+            
+            async with self.tbot.active_clients_lock:
                 for session_name in list(self.config['clients']):
                     if session_name not in self.active_clients:
-                        client = TelegramClient(session_name, API_ID, API_HASH)
-                        self.active_clients[session_name] = client
+                        # Sanitize session name before use
+                        try:
+                            sanitized_name = sanitize_session_name(session_name)
+                        except ValueError as e:
+                            logger.warning(f"Invalid session name '{session_name}' skipped: {e}")
+                            continue
+                        
+                        # Initialize Telegram client for the session
+                        client = TelegramClient(sanitized_name, API_ID, API_HASH)
+                        self.active_clients[sanitized_name] = client
+                        # Update config key if sanitized name differs
+                        if sanitized_name != session_name:
+                            if sanitized_name not in self.config['clients']:
+                                self.config['clients'][sanitized_name] = self.config['clients'][session_name]
+                            del self.config['clients'][session_name]
+                            self.config_manager.save_config(self.config)
             
             logger.info("Sessions detected and loaded successfully.")
         except Exception as e:
@@ -146,9 +156,10 @@ class SessionManager:
                                 del self.tbot.active_clients[session_name]
 
                         if session_name not in self.config['inactive_accounts']:
+                            import time as time_module
                             self.config['inactive_accounts'][session_name] = {
                                 'phone': session_name,
-                                'last_seen': asyncio.get_event_loop().time(),
+                                'last_seen': time_module.time(),
                                 'reason': 'auth_error',
                                 'error_details': str(e)
                             }
@@ -247,14 +258,28 @@ class SessionManager:
             self.config_manager.save_config(self.config)
 
             # Try to reload the account
-            session_file = f"{phone_number}.session"
+            try:
+                session_file = get_safe_session_file_path(phone_number)
+            except ValueError as e:
+                logger.error(f"Invalid phone number for session file: {e}")
+                await event.respond(f"Invalid phone number format.")
+                return
+            
             if os.path.exists(session_file):
                 try:
                     # Create new client instance
                     from telethon import TelegramClient
                     from src.Config import API_ID, API_HASH
 
-                    client = TelegramClient(phone_number, API_ID, API_HASH)
+                    # Sanitize phone number for use as session name
+                    try:
+                        sanitized_phone = sanitize_session_name(phone_number)
+                    except ValueError as e:
+                        logger.error(f"Invalid phone number for session name: {e}")
+                        await event.respond(f"Invalid phone number format.")
+                        return
+                    
+                    client = TelegramClient(sanitized_phone, API_ID, API_HASH)
 
                     # Try to connect and authorize
                     await client.connect()
@@ -327,15 +352,18 @@ class SessionManager:
                 del self.config['clients'][session_name]
                 self.config_manager.save_config(self.config)
 
-                session_file = f"{session_name}.session"
-                if os.path.exists(session_file):
-                    try:
-                        os.remove(session_file)
-                        logger.info(f"Session file {session_file} deleted successfully.")
-                    except OSError as e:
-                        # File is in use by another process - this is normal
-                        logger.warning(f"Session file {session_file} could not be deleted (in use by another process): {e}")
-                        logger.info(f"Session {session_name} removed from config but file remains (will be cleaned up later)")
+                try:
+                    session_file = get_safe_session_file_path(session_name)
+                    if os.path.exists(session_file):
+                        try:
+                            os.remove(session_file)
+                            logger.info(f"Session file {session_file} deleted successfully.")
+                        except OSError as e:
+                            # File is in use by another process - this is normal
+                            logger.warning(f"Session file {session_file} could not be deleted (in use by another process): {e}")
+                            logger.info(f"Session {session_name} removed from config but file remains (will be cleaned up later)")
+                except ValueError as e:
+                    logger.error(f"Invalid session name for deletion: {e}")
 
                 # Session deleted successfully - no need to send message as callback handler will respond
                 logger.info(f"Session {session_name} deleted successfully.")
@@ -399,10 +427,18 @@ class AccountHandler:
             await self.tbot.tbot.send_message(chat_id, f"{error_msg}\nPlease try again.")
             return
         
+        # Sanitize phone number for use as session name
         try:
-            # Create client with phone number as session name
+            sanitized_phone = sanitize_session_name(phone_number)
+        except ValueError as e:
+            logger.error(f"Invalid phone number format: {e}")
+            await self.tbot.tbot.send_message(chat_id, "Invalid phone number format. Please try again.")
+            return
+        
+        try:
+            # Create client with sanitized phone number as session name
             logger.info(f"PHONE_NUMBER_HANDLER: Creating client for {phone_number}")
-            client = TelegramClient(phone_number, API_ID, API_HASH)
+            client = TelegramClient(sanitized_phone, API_ID, API_HASH)
 
             logger.info("PHONE_NUMBER_HANDLER: Connecting to Telegram...")
             await client.connect()
@@ -581,7 +617,15 @@ class AccountHandler:
                 return
             
             # ✅ NOW save the session (only after all checks passed)
-            session_name = f"{phone_number}"
+            # Use sanitized phone number as session name
+            try:
+                session_name = sanitize_session_name(phone_number)
+            except ValueError as e:
+                logger.error(f"Invalid phone number for session name: {e}")
+                await self.tbot.tbot.send_message(chat_id, "Invalid phone number format.")
+                self.cleanup_temp_handlers()
+                return
+            
             client.session.save()
             logger.info(f"Session saved for {phone_number}")
 
@@ -926,7 +970,15 @@ class AccountHandler:
             for message_text, message_buttons in messages:
                 try:
                     await event.respond(message_text, buttons=message_buttons)
-                    logger.info(f"Sent account details for session: {message_text.split(' ')[1]}.")
+                    # Safely extract session name from message text for logging
+                    try:
+                        parts = message_text.split(' ')
+                        if len(parts) > 1:
+                            logger.info(f"Sent account details for session: {parts[1]}.")
+                        else:
+                            logger.info(f"Sent account details message.")
+                    except (IndexError, AttributeError):
+                        logger.info(f"Sent account details message.")
                 except Exception as e:
                     logger.error(f"Error sending message for account: {e}", exc_info=True)
 
@@ -971,7 +1023,13 @@ class AccountHandler:
                 logger.info(f"Enabling client: {session}")
                 try:
                     # Check if session file exists
-                    session_file = f"{session}.session"
+                    try:
+                        session_file = get_safe_session_file_path(session)
+                    except ValueError as e:
+                        logger.error(f"Invalid session name: {e}")
+                        await event.respond(f"Invalid session name format.")
+                        return
+                    
                     if not os.path.exists(session_file):
                         await event.respond(f"Session file for account {session} not found.")
                         logger.error(f"Session file {session_file} not found")
@@ -1008,9 +1066,10 @@ class AccountHandler:
                             await client.disconnect()
                             if 'inactive_accounts' not in self.tbot.config:
                                 self.tbot.config['inactive_accounts'] = {}
+                            import time as time_module
                             self.tbot.config['inactive_accounts'][session] = {
                                 'phone': session,
-                                'last_seen': asyncio.get_event_loop().time(),
+                                'last_seen': time_module.time(),
                                 'reason': 'not_authorized_on_reactivation',
                                 'error_details': 'Client not authorized'
                             }
@@ -1040,9 +1099,10 @@ class AccountHandler:
                             # Other error - move to inactive accounts for admin review
                             if 'inactive_accounts' not in self.tbot.config:
                                 self.tbot.config['inactive_accounts'] = {}
+                            import time as time_module
                             self.tbot.config['inactive_accounts'][session] = {
                                 'phone': session,
-                                'last_seen': asyncio.get_event_loop().time(),
+                                'last_seen': time_module.time(),
                                 'reason': 'connection_error',
                                 'error_details': str(e)
                             }
@@ -1094,15 +1154,18 @@ class AccountHandler:
                 del self.tbot.config['clients'][session]
                 self.tbot.config_manager.save_config(self.tbot.config)
 
-                session_file = f"{session}.session"
-                if os.path.exists(session_file):
-                    try:
-                        logger.info(f"Deleting session file: {session_file}")
-                        os.remove(session_file)
-                    except OSError as e:
-                        # File is in use by another process - this is normal
-                        logger.warning(f"Session file {session_file} could not be deleted (in use by another process): {e}")
-                        logger.info(f"Session {session} removed from config but file remains (will be cleaned up later)")
+                try:
+                    session_file = get_safe_session_file_path(session)
+                    if os.path.exists(session_file):
+                        try:
+                            logger.info(f"Deleting session file: {session_file}")
+                            os.remove(session_file)
+                        except OSError as e:
+                            # File is in use by another process - this is normal
+                            logger.warning(f"Session file {session_file} could not be deleted (in use by another process): {e}")
+                            logger.info(f"Session {session} removed from config but file remains (will be cleaned up later)")
+                except ValueError as e:
+                    logger.error(f"Invalid session name for deletion: {e}")
 
                 await event.respond("Account deleted successfully.")
             else:
