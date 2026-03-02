@@ -13,7 +13,7 @@ from src.actions import Actions
 from src.Validation import InputValidator
 from src.utils import (
     get_session_name, cleanup_conversation_state, is_session_revoked_error,
-    check_admin_access, is_bot_message, cleanup_handlers, prompt_for_input,
+    check_admin_access, is_bot_message, prompt_for_input,
     cleanup_handlers_and_state
 ) 
 
@@ -50,7 +50,16 @@ class CommandHandler:
         """
         logger.info(f"Start command received from user {event.sender_id}")
         try:
-            if event.sender_id != int(ADMIN_ID):
+            # Validate ADMIN_ID before comparison
+            try:
+                from src.utils import validate_admin_id
+                validated_admin_id = validate_admin_id(ADMIN_ID)
+            except ValueError as e:
+                logger.error(f"Invalid ADMIN_ID configuration: {e}")
+                await event.respond("Bot configuration error. Please contact administrator.")
+                return
+            
+            if event.sender_id != validated_admin_id:
                 logger.warning(f"Unauthorized /start from {event.sender_id}")
                 await event.respond("You are not the admin")
                 return
