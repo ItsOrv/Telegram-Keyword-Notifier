@@ -93,8 +93,10 @@ class Monitor:
                 # Extract message text or set a placeholder if empty
                 raw_message = event.message.text or "-"
                 # Sanitize message text to prevent injection attacks
+                # Use Telegram's max length (4096) minus some buffer for safety
                 from src.Validation import InputValidator
-                message = InputValidator.sanitize_input(raw_message, max_length=4000)
+                from src.constants import TELEGRAM_MAX_MESSAGE_LENGTH
+                message = InputValidator.sanitize_input(raw_message, max_length=TELEGRAM_MAX_MESSAGE_LENGTH - 100)
                 sender = await event.get_sender()
                 if sender:
                     # Safely extract and sanitize sender info
@@ -136,8 +138,16 @@ class Monitor:
                 if hasattr(chat, 'username') and chat.username:
                     message_link = f"https://t.me/{chat.username}/{event.id}"
                 else:
-                    chat_id = str(event.chat_id).replace('-100', '', 1).replace('-', '')
-                    message_link = f"https://t.me/c/{chat_id}/{event.id}"
+                    # Convert chat_id to format required for private channel links
+                    # Telegram private channels use format: t.me/c/1234567890/123
+                    # where 1234567890 is the chat_id without -100 prefix
+                    chat_id_str = str(event.chat_id)
+                    # Remove -100 prefix if present (for supergroups/channels)
+                    if chat_id_str.startswith('-100'):
+                        chat_id_str = chat_id_str[4:]  # Remove '-100' prefix
+                    # Remove any remaining minus sign
+                    chat_id_str = chat_id_str.lstrip('-')
+                    message_link = f"https://t.me/c/{chat_id_str}/{event.id}"
 
                 # Create buttons for the forwarded message
                 buttons = Keyboard.channel_message_keyboard(message_link, sender.id if sender else 0)
@@ -176,7 +186,8 @@ class Monitor:
             client._registered_handlers = []
         client._registered_handlers.append(handler)
         
-        logger.info(f"Message processing handler registered for client {client.session.filename if hasattr(client, 'session') else 'Unknown'}")
+        from src.utils import get_session_name
+        logger.info(f"Message processing handler registered for client {get_session_name(client)}")
     
     def cleanup_client_handlers(self, client):
         """
@@ -192,6 +203,7 @@ class Monitor:
                     except Exception as e:
                         logger.warning(f"Error removing event handler: {e}")
                 client._registered_handlers.clear()
-                logger.info(f"Cleaned up handlers for client {client.session.filename if hasattr(client, 'session') else 'Unknown'}")
+                from src.utils import get_session_name
+                logger.info(f"Cleaned up handlers for client {get_session_name(client)}")
         except Exception as e:
             logger.error(f"Error during handler cleanup: {e}")
