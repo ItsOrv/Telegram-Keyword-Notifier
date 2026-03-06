@@ -118,6 +118,8 @@ class InputValidator:
         Returns:
             Tuple of (is_valid, error_message, parsed_option)
         """
+        from src.constants import MIN_POLL_OPTION, MAX_POLL_OPTION
+        
         option_str = option_str.strip()
         
         if not option_str:
@@ -125,8 +127,8 @@ class InputValidator:
         
         try:
             option = int(option_str)
-            if option < 1 or option > 10:
-                return False, "Option number must be between 1 and 10", None
+            if option < MIN_POLL_OPTION or option > MAX_POLL_OPTION:
+                return False, f"Option number must be between {MIN_POLL_OPTION} and {MAX_POLL_OPTION}", None
             return True, None, option
         except ValueError:
             return False, "Option must be a valid number", None
