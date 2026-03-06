@@ -144,7 +144,17 @@ class TelegramBot:
             try:
                 sender_id = event.sender_id
                 logger.debug(f"admin_only check: sender_id={sender_id}, ADMIN_ID={ADMIN_ID}")
-                if sender_id == int(ADMIN_ID):
+                
+                # Validate ADMIN_ID before comparison
+                try:
+                    from src.utils import validate_admin_id
+                    validated_admin_id = validate_admin_id(ADMIN_ID)
+                except ValueError as e:
+                    logger.error(f"Invalid ADMIN_ID configuration: {e}")
+                    await event.respond("Bot configuration error. Please contact administrator.")
+                    return
+                
+                if sender_id == validated_admin_id:
                     await handler(event)
                 else:
                     logger.warning(f"Unauthorized access attempt from user {sender_id}")
@@ -236,9 +246,12 @@ class TelegramBot:
         :param message: The message text to send.
         """
         try:
-            admin_id = int(ADMIN_ID)  # Ensure ADMIN_ID is an integer
+            from src.utils import validate_admin_id
+            admin_id = validate_admin_id(ADMIN_ID)
             await self.tbot.send_message(admin_id, message)
             logger.info("Notification sent to admin.")
+        except ValueError as e:
+            logger.error(f"Invalid ADMIN_ID configuration: {e}")
         except Exception as e:
             logger.error(f"Error sending notification to admin: {e}")
 
