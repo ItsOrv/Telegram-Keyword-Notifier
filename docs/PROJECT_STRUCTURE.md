@@ -292,3 +292,4 @@ Session files are stored in the project root with format:
 
 Session files contain authentication data and should never be committed to version control.
 
+
