@@ -291,3 +291,4 @@ Session files are stored in the project root with format:
 - `bot2.session` for bot session
 
 Session files contain authentication data and should never be committed to version control.
+
