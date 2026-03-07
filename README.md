@@ -99,6 +99,14 @@ CHANNEL_ID=@your_channel
 python main.py
 ```
 
+Or use CLI mode (without bot):
+
+```bash
+python cli_main.py --help
+```
+
+See [CLI Documentation](docs/CLI.md) for CLI usage.
+
 ## Configuration
 
 ### Environment Variables
