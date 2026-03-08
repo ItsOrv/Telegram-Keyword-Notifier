@@ -3,6 +3,7 @@ python-dotenv==1.0.0
 aiohttp
 requests
 pysocks
+click>=8.0.0
 
 # Testing dependencies
 pytest>=7.0.0
