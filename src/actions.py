@@ -59,6 +59,26 @@ class Actions:
     
     # ==================== Helper Methods ====================
     
+    @staticmethod
+    async def _check_connection(client):
+        """
+        Check if client is connected, handling both sync and async is_connected().
+        
+        Args:
+            client: TelegramClient instance
+            
+        Returns:
+            bool: True if connected, False otherwise
+        """
+        try:
+            is_conn = client.is_connected()
+            # Handle both sync and async is_connected() for compatibility
+            if asyncio.iscoroutine(is_conn):
+                is_conn = await is_conn
+            return bool(is_conn)
+        except Exception:
+            return False
+    
     async def _handle_session_revoked_error(
         self, 
         event, 
@@ -145,7 +165,7 @@ class Actions:
         valid_accounts = []
         for acc in accounts:
             try:
-                if acc.is_connected():
+                if await self._check_connection(acc):
                     valid_accounts.append(acc)
                 else:
                     logger.warning(f"Account {get_session_name(acc)} is not connected, skipping")
@@ -713,7 +733,7 @@ class Actions:
             return
         
         async def reaction_operation(acc):
-            if not acc.is_connected():
+            if not await self._check_connection(acc):
                 raise ConnectionError(f"Account {get_session_name(acc)} is not connected")
             await self.apply_reaction(acc, link, reaction)
         
@@ -995,7 +1015,7 @@ class Actions:
         chat_entity, message_id = await self.parse_telegram_link(link, valid_accounts[0])
         
         async def vote_operation(acc):
-            if not acc.is_connected():
+            if not await self._check_connection(acc):
                 raise ConnectionError(f"Account {get_session_name(acc)} is not connected")
             peer = await resolve_entity(chat_entity, acc)
             message = await acc.get_messages(peer, ids=message_id)
@@ -1424,7 +1444,7 @@ class Actions:
                 
                 # Comment with all valid accounts
                 async def comment_operation(acc):
-                    if not acc.is_connected():
+                    if not await self._check_connection(acc):
                         raise ConnectionError(f"Account {get_session_name(acc)} is not connected")
                     peer = await resolve_entity(chat_entity, acc)
                     await acc.send_message(peer, comment_text, reply_to=message_id)
@@ -1541,7 +1561,7 @@ class Actions:
                 return
             
             async def join_operation(acc):
-                if not acc.is_connected():
+                if not await self._check_connection(acc):
                     raise ConnectionError(f"Account {get_session_name(acc)} is not connected")
                 try:
                     if hasattr(acc, 'join_chat'):
@@ -1599,7 +1619,7 @@ class Actions:
                 return
             
             async def leave_operation(acc):
-                if not acc.is_connected():
+                if not await self._check_connection(acc):
                     raise ConnectionError(f"Account {get_session_name(acc)} is not connected")
                 entity = await resolve_entity(link, acc)
                 await acc.leave_chat(entity)
@@ -1642,7 +1662,7 @@ class Actions:
             
             from telethon.tl.functions.contacts import BlockRequest
             async def block_operation(acc):
-                if not acc.is_connected():
+                if not await self._check_connection(acc):
                     raise ConnectionError(f"Account {get_session_name(acc)} is not connected")
                 entity = await resolve_entity(user_input, acc)
                 await acc(BlockRequest(entity))
@@ -1750,7 +1770,7 @@ class Actions:
                 return
             
             async def send_pv_operation(acc):
-                if not acc.is_connected():
+                if not await self._check_connection(acc):
                     raise ConnectionError(f"Account {get_session_name(acc)} is not connected")
                 entity = await resolve_entity(user_input, acc)
                 await acc.send_message(entity, message)
