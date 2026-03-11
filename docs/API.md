@@ -463,7 +463,3 @@ Provides input validation utilities.
   - `tbot`: TelegramBot instance
   - `session_name`: Session name to remove
 
-
-
-
-
