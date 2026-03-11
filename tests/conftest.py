@@ -108,7 +108,8 @@ def mock_tbot():
 def mock_telegram_client():
     """Create a mock TelegramClient"""
     mock = AsyncMock(spec=TelegramClient)
-    mock.is_connected = AsyncMock(return_value=True)
+    # is_connected() is a sync method in Telethon, not async
+    mock.is_connected = Mock(return_value=True)
     mock.is_user_authorized = AsyncMock(return_value=True)
     mock.connect = AsyncMock()
     mock.disconnect = AsyncMock()
