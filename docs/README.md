@@ -12,6 +12,8 @@ Complete documentation for Telegram Panel project.
 ### Guides
 
 - **[Usage Guide](USAGE.md)**: Comprehensive usage instructions and examples
+- **[CLI Guide](CLI.md)**: Command-line interface usage (Method 2)
+- **[Interactive CLI Guide](INTERACTIVE_CLI.md)**: Interactive CLI menu system (Method 2)
 
 ### Additional Resources
 
