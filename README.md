@@ -4,7 +4,12 @@ Enterprise-grade Telegram bot management system for monitoring messages, managin
 
 ## Overview
 
-Telegram Panel is a comprehensive management system that enables centralized control of multiple Telegram accounts through a single bot interface. It provides capabilities for account management, message monitoring, bulk operations, and individual account actions.
+Telegram Panel is a comprehensive management system that enables centralized control of multiple Telegram accounts. It provides two ways to use the system:
+
+1. **Telegram Bot Interface**: Use the bot in Telegram for easy access from anywhere
+2. **CLI (Command Line Interface)**: Use the CLI on your server or local system for direct control
+
+Both methods provide the same capabilities for account management, message monitoring, bulk operations, and individual account actions.
 
 ## Features
 
@@ -93,19 +98,108 @@ ADMIN_ID=your_user_id
 CHANNEL_ID=@your_channel
 ```
 
-5. Run the bot:
+## Usage Methods
+
+Telegram Panel supports two methods of usage:
+
+### Method 1: Telegram Bot Interface
+
+Use the bot directly in Telegram for easy access from anywhere. This is the recommended method for most users.
+
+**Start the bot:**
 
 ```bash
 python main.py
 ```
 
-Or use CLI mode (without bot):
+**Features:**
+- Interactive menu system in Telegram
+- Easy navigation with buttons
+- Access from any device with Telegram
+- Real-time notifications and feedback
+
+**Getting Started:**
+1. Start the bot with `/start` command in Telegram
+2. Navigate through the interactive menu system
+3. All features are accessible through the bot interface
+
+### Method 2: CLI (Command Line Interface)
+
+Use the CLI on your server or local system for direct control. This method is ideal for:
+- Server environments
+- Automation and scripting
+- Local system management
+- When you prefer command-line interface
+
+**Two CLI modes available:**
+
+#### A. Interactive CLI (Recommended for CLI users)
+
+Menu-driven interface similar to the Telegram bot:
+
+```bash
+python interactive_cli.py
+```
+
+Or use the convenience script:
+
+```bash
+./cli.sh
+```
+
+**Features:**
+- **Menu Navigation**: Navigate with arrow keys (↑↓) and select with Enter
+- **Visual Interface**: Rich terminal UI with colors and formatting
+- **All Features**: Access to all bot features without Telegram
+- **Easy Navigation**: Back buttons and intuitive menu structure
+
+**Navigation:**
+- Use arrow keys (↑↓) to navigate menus
+- Press Enter to select an option
+- Press Esc to cancel/go back
+- Press Ctrl+C to exit
+
+#### B. Command-line CLI
+
+Direct command execution for automation:
 
 ```bash
 python cli_main.py --help
 ```
 
-See [CLI Documentation](docs/CLI.md) for CLI usage.
+See [CLI Documentation](docs/CLI.md) for detailed command usage.
+
+**Features:**
+- Direct command execution
+- Suitable for scripting and automation
+- All operations available via commands
+- Perfect for server environments
+
+**Example commands:**
+```bash
+# List accounts
+python cli_main.py list-accounts
+
+# Add account
+python cli_main.py add-account +1234567890
+
+# Bulk reaction
+python cli_main.py bulk reaction 5 "https://t.me/c/123456/789" 👍
+```
+
+### Choosing the Right Method
+
+- **Use Telegram Bot** if you want:
+  - Easy access from anywhere
+  - Mobile-friendly interface
+  - Interactive menus and buttons
+  - Real-time notifications
+
+- **Use CLI** if you want:
+  - Direct control on your server/system
+  - Automation and scripting capabilities
+  - Command-line workflow
+  - Server-based operations
 
 ## Configuration
 
@@ -139,18 +233,35 @@ The `config.json` file stores:
 
 ## Usage
 
-### Starting the Bot
+### Using Telegram Bot (Method 1)
 
-1. Start the bot with `/start` command in Telegram
-2. Navigate through the interactive menu system
+1. Start the bot: `python main.py`
+2. Open Telegram and find your bot
+3. Send `/start` command
+4. Navigate through the interactive menu system
 
-### Main Menu Options
-
+**Main Menu Options:**
 - **Account Management**: Add, list, and manage Telegram accounts
 - **Individual**: Perform operations on a single account
 - **Bulk**: Execute operations across multiple accounts
 - **Monitor Mode**: Configure keyword monitoring and forwarding
 - **Report Status**: View statistics and account status
+
+### Using CLI (Method 2)
+
+**Interactive CLI:**
+```bash
+python interactive_cli.py
+# or
+./cli.sh
+```
+
+**Command-line CLI:**
+```bash
+python cli_main.py [COMMAND] [OPTIONS]
+```
+
+See [CLI Documentation](docs/CLI.md) and [Interactive CLI Guide](docs/INTERACTIVE_CLI.md) for detailed usage.
 
 ### Account Management
 
