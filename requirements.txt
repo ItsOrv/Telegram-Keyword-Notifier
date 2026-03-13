@@ -4,6 +4,8 @@ aiohttp
 requests
 pysocks
 click>=8.0.0
+prompt-toolkit>=3.0.0
+rich>=13.0.0
 
 # Testing dependencies
 pytest>=7.0.0

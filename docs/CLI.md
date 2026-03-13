@@ -1,6 +1,8 @@
 # CLI Usage Guide
 
-Telegram Panel CLI allows you to manage Telegram accounts and perform operations without using the Telegram bot interface.
+Telegram Panel CLI (Command Line Interface) is the second method of using Telegram Panel. It allows you to manage Telegram accounts and perform operations directly from your server or local system, without using the Telegram bot interface.
+
+**Note:** This is Method 2 of using Telegram Panel. Method 1 is using the Telegram Bot interface. Both methods provide the same functionality.
 
 ## Installation
 
