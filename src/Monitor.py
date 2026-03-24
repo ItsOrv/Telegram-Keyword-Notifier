@@ -169,11 +169,14 @@ class Monitor:
                     logger.error(f"Failed text: {text}")
                 except NameError:
                     logger.error("Failed text: (text variable not defined)")
-                await tbot_instance.send_message(
-                    channel_id,
-                    "Error processing message due to encoding issues.",
-                    link_preview=False
-                )
+                try:
+                    await tbot_instance.send_message(
+                        channel_id,
+                        "Error processing message due to encoding issues.",
+                        link_preview=False
+                    )
+                except Exception as send_err:
+                    logger.error(f"Failed to send encoding error notification: {send_err}")
             except Exception as e:
                 # Handle any unexpected errors during message processing
                 logger.error("Error processing message.", exc_info=True)
@@ -188,6 +191,8 @@ class Monitor:
         
         from src.utils import get_session_name
         logger.info(f"Message processing handler registered for client {get_session_name(client)}")
+        
+        return process_message
     
     def cleanup_client_handlers(self, client):
         """
