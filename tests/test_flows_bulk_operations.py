@@ -309,3 +309,5 @@ class TestBulkOperationsFlows:
         # For invalid link, it should show error message
         assert "invalid" in call_args_text.lower() or "cannot" in call_args_text.lower() or "must" in call_args_text.lower() or "error" in call_args_text.lower()
 
+
+print('debug')
