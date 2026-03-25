@@ -99,6 +99,8 @@ def mock_tbot():
     # Add account_handler and monitor for integration tests
     mock.account_handler = MagicMock()
     mock.monitor = MagicMock()
+    # cleanup_client_handlers is a sync method - must not be a coroutine
+    mock.monitor.cleanup_client_handlers = Mock()
     # Ensure tbot.tbot exists for AccountHandler
     if not hasattr(mock.tbot, 'tbot'):
         mock.tbot.tbot = mock.tbot
