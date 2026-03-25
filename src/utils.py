@@ -135,8 +135,11 @@ def is_session_revoked_error(error: Exception) -> bool:
     # Check for AuthKeyUnregisteredError
     if AuthKeyUnregisteredError and isinstance(error, AuthKeyUnregisteredError):
         return True
-    # Check error message and type
-    return any(keyword in error_msg for keyword in ['session', 'revoked', 'not logged in', 'auth', 'invalid', 'key is not registered', 'unregistered']) or \
+    # Check error message and type - use specific keywords to avoid false positives
+    return any(keyword in error_msg for keyword in [
+        'session', 'revoked', 'not logged in', 'auth key',
+        'authorization', 'key is not registered', 'unregistered', 'invalidated'
+    ]) or \
            any(keyword in error_type for keyword in ['revoked', 'auth', 'unregistered'])
 
 
