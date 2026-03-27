@@ -155,15 +155,19 @@ class TestGetSafeSessionFilePath:
             assert os.path.basename(result) == f"{sanitize_session_name(name)}.session"
     
     def test_path_traversal_prevention(self):
-        """Test path traversal prevention"""
+        """Test path traversal prevention - inputs are sanitized to stay within project dir"""
         attack_attempts = [
             "../../etc/passwd",
             "..\\..\\config",
             "/etc/passwd",
         ]
-        for attack in attack_attempts:
-            with pytest.raises(ValueError):
-                get_safe_session_file_path(attack)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for attack in attack_attempts:
+                # The function sanitizes dangerous inputs rather than raising ValueError
+                # The resulting path must always stay within the project directory
+                result = get_safe_session_file_path(attack, temp_dir)
+                assert result.startswith(temp_dir), f"Path {result} escaped project dir for input {attack}"
+                assert result.endswith(".session")
     
     def test_custom_project_dir(self):
         """Test with custom project directory"""
@@ -207,10 +211,12 @@ class TestGetSessionName:
         assert result == "Unknown"
     
     def test_exception_handling(self):
-        """Test exception handling"""
+        """Test exception handling when accessing session filename raises"""
+        from unittest.mock import PropertyMock
         mock_client = Mock()
-        mock_client.session = Mock()
-        mock_client.session.filename = Mock(side_effect=Exception("Error"))
+        mock_session = Mock()
+        type(mock_session).filename = PropertyMock(side_effect=Exception("Error"))
+        mock_client.session = mock_session
         result = get_session_name(mock_client)
         assert result == "Unknown"
 
@@ -220,13 +226,15 @@ class TestIsSessionRevokedError:
     
     def test_session_revoked_error(self):
         """Test SessionRevokedError"""
-        error = SessionRevokedError()
+        from unittest.mock import Mock
+        error = SessionRevokedError(Mock())
         assert is_session_revoked_error(error) is True
     
     def test_auth_key_unregistered_error(self):
         """Test AuthKeyUnregisteredError"""
+        from unittest.mock import Mock
         if AuthKeyUnregisteredError:
-            error = AuthKeyUnregisteredError()
+            error = AuthKeyUnregisteredError(Mock())
             assert is_session_revoked_error(error) is True
     
     def test_error_messages(self):
@@ -258,11 +266,14 @@ class TestIsSessionRevokedError:
     
     def test_non_revoked_errors(self):
         """Test non-revoked errors"""
+        from unittest.mock import Mock
+        flood_error = FloodWaitError(Mock())
+        flood_error.seconds = 60
         non_revoked = [
             Exception("Network error"),
             ValueError("Invalid input"),
             KeyError("key"),
-            FloodWaitError(seconds=60)
+            flood_error
         ]
         for error in non_revoked:
             if not isinstance(error, FloodWaitError):
@@ -355,13 +366,16 @@ class TestExecuteBulkOperation:
     
     async def test_flood_wait_error(self):
         """Test FloodWaitError handling"""
+        from unittest.mock import Mock
         accounts = [Mock(), Mock()]
-        operation = AsyncMock(side_effect=FloodWaitError(seconds=1))
+        flood_error = FloodWaitError(Mock())
+        flood_error.seconds = 1
+        operation = AsyncMock(side_effect=flood_error)
         semaphore = asyncio.Semaphore(3)
         counter_lock = asyncio.Lock()
         
         success, errors, revoked = await execute_bulk_operation(
-            accounts, operation, "test_operation", semaphore, counter_lock, (0.1, 0.2)
+            accounts, operation, "test_operation", semaphore, counter_lock, (0.01, 0.02)
         )
         
         assert success == 0
@@ -370,13 +384,15 @@ class TestExecuteBulkOperation:
     
     async def test_session_revoked_error(self):
         """Test SessionRevokedError handling"""
+        from unittest.mock import Mock
         accounts = [Mock(), Mock()]
         accounts[0].session = Mock()
         accounts[0].session.filename = "session1.session"
         accounts[1].session = Mock()
         accounts[1].session.filename = "session2.session"
         
-        operation = AsyncMock(side_effect=SessionRevokedError())
+        revoked_error = SessionRevokedError(Mock())
+        operation = AsyncMock(side_effect=revoked_error)
         semaphore = asyncio.Semaphore(3)
         counter_lock = asyncio.Lock()
         
@@ -390,6 +406,7 @@ class TestExecuteBulkOperation:
     
     async def test_mixed_results(self):
         """Test mixed success and error results"""
+        from unittest.mock import Mock
         accounts = [Mock(), Mock(), Mock()]
         accounts[0].session = Mock()
         accounts[0].session.filename = "session1.session"
@@ -398,20 +415,24 @@ class TestExecuteBulkOperation:
         accounts[2].session = Mock()
         accounts[2].session.filename = "session3.session"
         
-        def operation_side_effect(acc):
+        revoked_error = SessionRevokedError(Mock())
+        
+        call_count = [0]
+        async def operation_side_effect(acc):
+            call_count[0] += 1
             if acc == accounts[0]:
-                return AsyncMock()()
+                return None  # success
             elif acc == accounts[1]:
-                raise SessionRevokedError()
+                raise revoked_error
             else:
                 raise Exception("Other error")
         
-        operation = AsyncMock(side_effect=operation_side_effect)
+        operation = operation_side_effect
         semaphore = asyncio.Semaphore(3)
         counter_lock = asyncio.Lock()
         
         success, errors, revoked = await execute_bulk_operation(
-            accounts, operation, "test_operation", semaphore, counter_lock, (0.1, 0.2)
+            accounts, operation, "test_operation", semaphore, counter_lock, (0.01, 0.02)
         )
         
         assert success == 1
@@ -575,8 +596,9 @@ class TestResolveEntity:
     
     async def test_session_revoked_during_resolve(self):
         """Test session revoked error during resolve"""
+        from unittest.mock import Mock
         mock_account = AsyncMock()
-        mock_account.get_entity = AsyncMock(side_effect=SessionRevokedError())
+        mock_account.get_entity = AsyncMock(side_effect=SessionRevokedError(Mock()))
         
         with pytest.raises(SessionRevokedError):
             await resolve_entity("username", mock_account)
@@ -660,10 +682,12 @@ class TestExtractAccountName:
         assert result == "Unknown Account"
     
     def test_exception_handling(self):
-        """Test exception handling"""
+        """Test exception handling when accessing session filename raises"""
+        from unittest.mock import PropertyMock
         mock_client = Mock()
-        mock_client.session = Mock()
-        mock_client.session.filename = Mock(side_effect=Exception("Error"))
+        mock_session = Mock()
+        type(mock_session).filename = PropertyMock(side_effect=Exception("Error"))
+        mock_client.session = mock_session
         result = extract_account_name(mock_client)
         assert result == "Unknown Account"
 
