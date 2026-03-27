@@ -138,7 +138,7 @@ class TestProcessMessagesForClient:
         }
         mock_tbot.tbot.send_message = AsyncMock()
         
-        mock_new_message_event.message.text = "This message has no keyword"
+        mock_new_message_event.message.text = "This message has nothing matching"
         mock_new_message_event.chat_id = -1001234567890
         mock_new_message_event.out = False
         
