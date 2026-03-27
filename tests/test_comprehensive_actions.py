@@ -189,7 +189,6 @@ class TestReactionOperations:
         
         mock_entity = Mock()
         mock_telegram_client.get_entity = AsyncMock(return_value=mock_entity)
-        mock_telegram_client.__call__ = AsyncMock()
         
         link = "https://t.me/test/123"
         reaction = "👍"
@@ -199,7 +198,8 @@ class TestReactionOperations:
                 with patch('src.actions.ReactionEmoji', create=True):
                     await actions.apply_reaction(mock_telegram_client, link, reaction)
                     
-                    mock_telegram_client.__call__.assert_called_once()
+                    # When calling account(SendReactionRequest(...)), the mock itself is called
+                    mock_telegram_client.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -349,10 +349,10 @@ class TestBlockOperations:
         from telethon.tl.functions.contacts import BlockRequest
         
         with patch('src.actions.resolve_entity', new_callable=AsyncMock, return_value=mock_entity):
-            mock_telegram_client.__call__ = AsyncMock()
             await actions.block_user_handler(mock_event)
             
-            mock_telegram_client.__call__.assert_called_once()
+            # When calling account(BlockRequest(...)), the mock itself is called
+            mock_telegram_client.assert_called_once()
             mock_event.respond.assert_called()
 
 
@@ -592,9 +592,12 @@ class TestErrorHandling:
     
     async def test_execute_with_retry_flood_wait(self, mock_tbot, mock_telegram_client):
         """Test execute with retry on FloodWaitError"""
+        from unittest.mock import Mock
         actions = Actions(mock_tbot)
         
-        operation = AsyncMock(side_effect=[FloodWaitError(seconds=1), AsyncMock()()])
+        flood_error = FloodWaitError(Mock())
+        flood_error.seconds = 1
+        operation = AsyncMock(side_effect=[flood_error, None])
         
         with patch('asyncio.sleep', new_callable=AsyncMock):
             success, error = await actions._execute_with_retry(operation, mock_telegram_client, max_retries=2)
@@ -604,9 +607,11 @@ class TestErrorHandling:
     
     async def test_execute_with_retry_session_revoked(self, mock_tbot, mock_telegram_client):
         """Test execute with retry on SessionRevokedError"""
+        from unittest.mock import Mock
         actions = Actions(mock_tbot)
         
-        operation = AsyncMock(side_effect=SessionRevokedError())
+        revoked_error = SessionRevokedError(Mock())
+        operation = AsyncMock(side_effect=revoked_error)
         success, error = await actions._execute_with_retry(operation, mock_telegram_client)
         
         assert success is False
