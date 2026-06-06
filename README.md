@@ -9,9 +9,14 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-341%20passing-brightgreen.svg)](tests/)
 
-### 🌐 Try the Web Platform — [**telegramos.orvteam.com**](https://telegramos.orvteam.com) <kbd>BETA</kbd>
+### 🌐 TelegramOS — the full platform at [**telegramos.orvteam.com**](https://telegramos.orvteam.com) <kbd>BETA</kbd>
 
-A hosted, browser-based version of this project — no setup required. Same engine, managed for you.
+A hosted platform that goes far beyond this panel:
+
+- 🛒 **Ready-made & rentable accounts** — activate pre-warmed, aged Telegram accounts from a built-in marketplace, or bring your own.
+- 🧩 **No-code visual bot builder** — design bots and multi-step automations with a drag-and-drop flow editor; no programming required.
+- 🛡️ **Anti-ban built for scale** — safely operate large fleets of accounts, not just a handful.
+
 **[→ Open TelegramOS](https://telegramos.orvteam.com)**
 
 </div>
@@ -28,7 +33,9 @@ Telegram Panel is a self-hostable system for operating many Telegram accounts fr
 | 🖥️ **Interactive CLI** | A menu-driven terminal UI on your server | `python interactive_cli.py` |
 | ⚡ **Command CLI** | Scripting & automation | `python cli_main.py …` |
 
-> 💡 **Prefer zero setup?** The hosted web platform at **[telegramos.orvteam.com](https://telegramos.orvteam.com)** (currently in beta) gives you this same engine in your browser — no Python, no server, no `.env`.
+> ⚠️ **Planning to run more than a few accounts?** When you self-host this panel, every account connects through your **single server IP** — so to Telegram they all look like they live on one shared machine. In practice, running **more than ~3 accounts** this way often gets them **rate-limited or banned**.
+>
+> **[TelegramOS](https://telegramos.orvteam.com)** is built to solve exactly this: each account runs in its **own isolated, Windows-like environment** behind a **dedicated residential IP**, so every account looks like a real, independent device and stays safe even at high account counts — on top of a rentable-account marketplace and a no-code visual bot builder.
 
 ---
 
@@ -186,7 +193,7 @@ Released under the [MIT License](LICENSE). © 2024 ItsOrv.
 
 <div align="center">
 
-**Looking for a managed, no-setup experience?**
+**Need rentable accounts, a no-code bot builder, and ban-safe scaling to many accounts?**
 ### 🌐 [telegramos.orvteam.com](https://telegramos.orvteam.com) <kbd>BETA</kbd>
 
 ⭐ If this project helps you, consider starring the repo.
