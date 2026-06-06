@@ -207,6 +207,9 @@ class CLIManager:
             
             # Get message to verify it's a poll
             message = await account.get_messages(chat_entity, ids=message_id)
+            if message is None:
+                print("Error: Message not found")
+                return False
             if not message.poll:
                 print("Error: The provided link does not point to a poll")
                 return False
@@ -275,9 +278,8 @@ class CLIManager:
             if not account.is_connected():
                 await account.connect()
             
-            from src.utils import resolve_entity
             entity = await account.get_entity(link)
-            await account.leave_chat(entity)
+            await account.delete_dialog(entity)
             
             print(f"Successfully left {link}")
             return True
@@ -427,7 +429,7 @@ class CLIManager:
                     elif operation == 'leave':
                         from src.utils import resolve_entity
                         entity = await resolve_entity(kwargs['link'], account)
-                        await account.leave_chat(entity)
+                        await account.delete_dialog(entity)
                     elif operation == 'block':
                         from src.utils import resolve_entity
                         from telethon.tl.functions.contacts import BlockRequest
@@ -480,17 +482,27 @@ except ImportError:
     import argparse
 
 
+def run_command(operation):
+    """
+    Run a single manager operation inside one event loop.
+
+    Telethon clients (and the asyncio locks) created in ``initialize`` are bound
+    to the event loop they were created on, so initialization, the operation and
+    cleanup must all share the same loop. Using a fresh ``asyncio.run`` per step
+    would attach the clients to a closed loop and fail at runtime.
+    """
+    async def _runner():
+        manager = CLIManager()
+        await manager.initialize()
+        try:
+            return await operation(manager)
+        finally:
+            await manager.cleanup()
+    return asyncio.run(_runner())
+
+
 if HAS_CLICK:
-    _manager_instance = None
-    
-    def get_manager():
-        """Get or create CLI manager instance."""
-        global _manager_instance
-        if _manager_instance is None:
-            _manager_instance = CLIManager()
-            asyncio.run(_manager_instance.initialize())
-        return _manager_instance
-    
+
     @click.group(invoke_without_command=True)
     @click.pass_context
     def cli(ctx):
@@ -501,37 +513,25 @@ if HAS_CLICK:
     @cli.command()
     def list_accounts():
         """List all available accounts."""
-        manager = get_manager()
-        try:
-            accounts = asyncio.run(manager.list_accounts())
-            if accounts:
-                print("\nAvailable accounts:")
-                for i, acc in enumerate(accounts, 1):
-                    print(f"  {i}. {acc}")
-            else:
-                print("No accounts available")
-        finally:
-            asyncio.run(manager.cleanup())
+        accounts = run_command(lambda m: m.list_accounts())
+        if accounts:
+            print("\nAvailable accounts:")
+            for i, acc in enumerate(accounts, 1):
+                print(f"  {i}. {acc}")
+        else:
+            print("No accounts available")
     
     @cli.command()
     @click.argument('phone_number')
     def add_account(phone_number):
         """Add a new account."""
-        manager = get_manager()
-        try:
-            asyncio.run(manager.add_account(phone_number))
-        finally:
-            asyncio.run(manager.cleanup())
+        run_command(lambda m: m.add_account(phone_number))
     
     @cli.command()
     @click.argument('session_name')
     def remove_account(session_name):
         """Remove an account."""
-        manager = get_manager()
-        try:
-            asyncio.run(manager.remove_account(session_name))
-        finally:
-            asyncio.run(manager.cleanup())
+        run_command(lambda m: m.remove_account(session_name))
     
     @cli.group()
     def individual():
@@ -544,11 +544,7 @@ if HAS_CLICK:
     @click.argument('reaction', type=click.Choice(['👍', '❤️', '😂', '😮', '😢', '😡']))
     def reaction(session_name, link, reaction):
         """Apply reaction to a message."""
-        manager = get_manager()
-        try:
-            asyncio.run(manager.reaction(session_name, link, reaction))
-        finally:
-            asyncio.run(manager.cleanup())
+        run_command(lambda m: m.reaction(session_name, link, reaction))
     
     @individual.command()
     @click.argument('session_name')
@@ -556,44 +552,28 @@ if HAS_CLICK:
     @click.argument('option', type=int)
     def vote(session_name, link, option):
         """Vote in a poll."""
-        manager = get_manager()
-        try:
-            asyncio.run(manager.vote_poll(session_name, link, option))
-        finally:
-            asyncio.run(manager.cleanup())
+        run_command(lambda m: m.vote_poll(session_name, link, option))
     
     @individual.command()
     @click.argument('session_name')
     @click.argument('link')
     def join(session_name, link):
         """Join a group or channel."""
-        manager = get_manager()
-        try:
-            asyncio.run(manager.join_chat(session_name, link))
-        finally:
-            asyncio.run(manager.cleanup())
+        run_command(lambda m: m.join_chat(session_name, link))
     
     @individual.command()
     @click.argument('session_name')
     @click.argument('link')
     def leave(session_name, link):
         """Leave a group or channel."""
-        manager = get_manager()
-        try:
-            asyncio.run(manager.leave_chat(session_name, link))
-        finally:
-            asyncio.run(manager.cleanup())
+        run_command(lambda m: m.leave_chat(session_name, link))
     
     @individual.command()
     @click.argument('session_name')
     @click.argument('user_input')
     def block(session_name, user_input):
         """Block a user."""
-        manager = get_manager()
-        try:
-            asyncio.run(manager.block_user(session_name, user_input))
-        finally:
-            asyncio.run(manager.cleanup())
+        run_command(lambda m: m.block_user(session_name, user_input))
     
     @individual.command()
     @click.argument('session_name')
@@ -601,11 +581,7 @@ if HAS_CLICK:
     @click.argument('message')
     def send_pv(session_name, user_input, message):
         """Send a private message."""
-        manager = get_manager()
-        try:
-            asyncio.run(manager.send_message(session_name, user_input, message))
-        finally:
-            asyncio.run(manager.cleanup())
+        run_command(lambda m: m.send_message(session_name, user_input, message))
     
     @individual.command()
     @click.argument('session_name')
@@ -613,11 +589,7 @@ if HAS_CLICK:
     @click.argument('comment_text')
     def comment(session_name, link, comment_text):
         """Post a comment on a message."""
-        manager = get_manager()
-        try:
-            asyncio.run(manager.comment(session_name, link, comment_text))
-        finally:
-            asyncio.run(manager.cleanup())
+        run_command(lambda m: m.comment(session_name, link, comment_text))
     
     @cli.group()
     def bulk():
@@ -630,11 +602,7 @@ if HAS_CLICK:
     @click.argument('reaction', type=click.Choice(['👍', '❤️', '😂', '😮', '😢', '😡']))
     def reaction(num_accounts, link, reaction):
         """Apply reaction with multiple accounts."""
-        manager = get_manager()
-        try:
-            asyncio.run(manager.bulk_operation('reaction', num_accounts, link=link, reaction=reaction))
-        finally:
-            asyncio.run(manager.cleanup())
+        run_command(lambda m: m.bulk_operation('reaction', num_accounts, link=link, reaction=reaction))
     
     @bulk.command()
     @click.argument('num_accounts', type=int)
@@ -642,44 +610,28 @@ if HAS_CLICK:
     @click.argument('option', type=int)
     def vote(num_accounts, link, option):
         """Vote in a poll with multiple accounts."""
-        manager = get_manager()
-        try:
-            asyncio.run(manager.bulk_operation('vote', num_accounts, link=link, option=option))
-        finally:
-            asyncio.run(manager.cleanup())
+        run_command(lambda m: m.bulk_operation('vote', num_accounts, link=link, option=option))
     
     @bulk.command()
     @click.argument('num_accounts', type=int)
     @click.argument('link')
     def join(num_accounts, link):
         """Join a group/channel with multiple accounts."""
-        manager = get_manager()
-        try:
-            asyncio.run(manager.bulk_operation('join', num_accounts, link=link))
-        finally:
-            asyncio.run(manager.cleanup())
+        run_command(lambda m: m.bulk_operation('join', num_accounts, link=link))
     
     @bulk.command()
     @click.argument('num_accounts', type=int)
     @click.argument('link')
     def leave(num_accounts, link):
         """Leave a group/channel with multiple accounts."""
-        manager = get_manager()
-        try:
-            asyncio.run(manager.bulk_operation('leave', num_accounts, link=link))
-        finally:
-            asyncio.run(manager.cleanup())
+        run_command(lambda m: m.bulk_operation('leave', num_accounts, link=link))
     
     @bulk.command()
     @click.argument('num_accounts', type=int)
     @click.argument('user_input')
     def block(num_accounts, user_input):
         """Block a user with multiple accounts."""
-        manager = get_manager()
-        try:
-            asyncio.run(manager.bulk_operation('block', num_accounts, user_input=user_input))
-        finally:
-            asyncio.run(manager.cleanup())
+        run_command(lambda m: m.bulk_operation('block', num_accounts, user_input=user_input))
     
     @bulk.command()
     @click.argument('num_accounts', type=int)
@@ -687,11 +639,7 @@ if HAS_CLICK:
     @click.argument('message')
     def send_pv(num_accounts, user_input, message):
         """Send private message with multiple accounts."""
-        manager = get_manager()
-        try:
-            asyncio.run(manager.bulk_operation('send_pv', num_accounts, user_input=user_input, message=message))
-        finally:
-            asyncio.run(manager.cleanup())
+        run_command(lambda m: m.bulk_operation('send_pv', num_accounts, user_input=user_input, message=message))
     
     @bulk.command()
     @click.argument('num_accounts', type=int)
@@ -699,11 +647,7 @@ if HAS_CLICK:
     @click.argument('comment_text')
     def comment(num_accounts, link, comment_text):
         """Post comment with multiple accounts."""
-        manager = get_manager()
-        try:
-            asyncio.run(manager.bulk_operation('comment', num_accounts, link=link, comment_text=comment_text))
-        finally:
-            asyncio.run(manager.cleanup())
+        run_command(lambda m: m.bulk_operation('comment', num_accounts, link=link, comment_text=comment_text))
     
     def main():
         """Main CLI entry point."""
@@ -810,59 +754,59 @@ else:
             parser.print_help()
             return
         
-        manager = CLIManager()
-        asyncio.run(manager.initialize())
-        
+        # Build a single async operation for the requested command so that
+        # initialization, execution and cleanup all share one event loop.
+        operation = None
+        if args.command == 'list-accounts':
+            operation = lambda m: m.list_accounts()
+        elif args.command == 'add-account':
+            operation = lambda m: m.add_account(args.phone_number)
+        elif args.command == 'remove-account':
+            operation = lambda m: m.remove_account(args.session_name)
+        elif args.command == 'individual':
+            if args.operation == 'reaction':
+                operation = lambda m: m.reaction(args.session_name, args.link, args.reaction)
+            elif args.operation == 'vote':
+                operation = lambda m: m.vote_poll(args.session_name, args.link, args.option)
+            elif args.operation == 'join':
+                operation = lambda m: m.join_chat(args.session_name, args.link)
+            elif args.operation == 'leave':
+                operation = lambda m: m.leave_chat(args.session_name, args.link)
+            elif args.operation == 'block':
+                operation = lambda m: m.block_user(args.session_name, args.user_input)
+            elif args.operation == 'send-pv':
+                operation = lambda m: m.send_message(args.session_name, args.user_input, args.message)
+            elif args.operation == 'comment':
+                operation = lambda m: m.comment(args.session_name, args.link, args.comment_text)
+        elif args.command == 'bulk':
+            if args.operation == 'reaction':
+                operation = lambda m: m.bulk_operation('reaction', args.num_accounts, link=args.link, reaction=args.reaction)
+            elif args.operation == 'vote':
+                operation = lambda m: m.bulk_operation('vote', args.num_accounts, link=args.link, option=args.option)
+            elif args.operation == 'join':
+                operation = lambda m: m.bulk_operation('join', args.num_accounts, link=args.link)
+            elif args.operation == 'leave':
+                operation = lambda m: m.bulk_operation('leave', args.num_accounts, link=args.link)
+            elif args.operation == 'block':
+                operation = lambda m: m.bulk_operation('block', args.num_accounts, user_input=args.user_input)
+            elif args.operation == 'send-pv':
+                operation = lambda m: m.bulk_operation('send_pv', args.num_accounts, user_input=args.user_input, message=args.message)
+            elif args.operation == 'comment':
+                operation = lambda m: m.bulk_operation('comment', args.num_accounts, link=args.link, comment_text=args.comment_text)
+
+        if operation is None:
+            parser.print_help()
+            return
+
         try:
+            result = run_command(operation)
             if args.command == 'list-accounts':
-                accounts = asyncio.run(manager.list_accounts())
-                if accounts:
+                if result:
                     print("\nAvailable accounts:")
-                    for i, acc in enumerate(accounts, 1):
+                    for i, acc in enumerate(result, 1):
                         print(f"  {i}. {acc}")
                 else:
                     print("No accounts available")
-            
-            elif args.command == 'add-account':
-                asyncio.run(manager.add_account(args.phone_number))
-            
-            elif args.command == 'remove-account':
-                asyncio.run(manager.remove_account(args.session_name))
-            
-            elif args.command == 'individual':
-                if args.operation == 'reaction':
-                    asyncio.run(manager.reaction(args.session_name, args.link, args.reaction))
-                elif args.operation == 'vote':
-                    asyncio.run(manager.vote_poll(args.session_name, args.link, args.option))
-                elif args.operation == 'join':
-                    asyncio.run(manager.join_chat(args.session_name, args.link))
-                elif args.operation == 'leave':
-                    asyncio.run(manager.leave_chat(args.session_name, args.link))
-                elif args.operation == 'block':
-                    asyncio.run(manager.block_user(args.session_name, args.user_input))
-                elif args.operation == 'send-pv':
-                    asyncio.run(manager.send_message(args.session_name, args.user_input, args.message))
-                elif args.operation == 'comment':
-                    asyncio.run(manager.comment(args.session_name, args.link, args.comment_text))
-            
-            elif args.command == 'bulk':
-                if args.operation == 'reaction':
-                    asyncio.run(manager.bulk_operation('reaction', args.num_accounts, link=args.link, reaction=args.reaction))
-                elif args.operation == 'vote':
-                    asyncio.run(manager.bulk_operation('vote', args.num_accounts, link=args.link, option=args.option))
-                elif args.operation == 'join':
-                    asyncio.run(manager.bulk_operation('join', args.num_accounts, link=args.link))
-                elif args.operation == 'leave':
-                    asyncio.run(manager.bulk_operation('leave', args.num_accounts, link=args.link))
-                elif args.operation == 'block':
-                    asyncio.run(manager.bulk_operation('block', args.num_accounts, user_input=args.user_input))
-                elif args.operation == 'send-pv':
-                    asyncio.run(manager.bulk_operation('send_pv', args.num_accounts, user_input=args.user_input, message=args.message))
-                elif args.operation == 'comment':
-                    asyncio.run(manager.bulk_operation('comment', args.num_accounts, link=args.link, comment_text=args.comment_text))
-            
-            asyncio.run(manager.cleanup())
-            
         except KeyboardInterrupt:
             print("\nOperation cancelled by user")
         except Exception as e:
