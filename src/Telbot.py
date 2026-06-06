@@ -92,8 +92,11 @@ class TelegramBot:
             logger.info("Saved clients started")
             
             try:
-                await self.notify_admin("Bot started successfully and all clients have been detected. Use /start to begin.")
-                logger.info("Admin notification sent")
+                sent = await self.notify_admin("Bot started successfully and all clients have been detected. Use /start to begin.")
+                if sent:
+                    logger.info("Admin notification sent")
+                else:
+                    logger.info("Admin notification not delivered (admin may need to /start the bot first)")
             except Exception as e:
                 logger.warning(f"Failed to send admin notification: {e}")
             
@@ -252,21 +255,32 @@ class TelegramBot:
                     # Final shutdown
                     await self.shutdown()
 
-    async def notify_admin(self, message):
+    async def notify_admin(self, message) -> bool:
         """
         Send a notification message to the admin.
 
         :param message: The message text to send.
+        :return: True if the message was sent, False otherwise.
         """
+        from src.utils import validate_admin_id
+        # Validate the configured ADMIN_ID first; a failure here really is a
+        # configuration problem.
         try:
-            from src.utils import validate_admin_id
             admin_id = validate_admin_id(ADMIN_ID)
-            await self.tbot.send_message(admin_id, message)
-            logger.info("Notification sent to admin.")
         except ValueError as e:
             logger.error(f"Invalid ADMIN_ID configuration: {e}")
+            return False
+        # A send failure is usually NOT a bad ADMIN_ID — most often the admin has
+        # never started a chat with the bot, so Telegram won't let it message them.
+        try:
+            await self.tbot.send_message(admin_id, message)
+            logger.info("Notification sent to admin.")
+            return True
         except Exception as e:
-            logger.error(f"Error sending notification to admin: {e}")
+            logger.warning(
+                f"Could not send admin notification (has the admin sent /start to the bot?): {e}"
+            )
+            return False
 
     async def shutdown(self):
         """
