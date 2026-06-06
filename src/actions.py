@@ -402,10 +402,12 @@ class Actions:
         chat_and_msg = parts[1].split('/')
         if len(chat_and_msg) < 2:
             return None
-        
+
         try:
             chat_id_str = chat_and_msg[0].strip()
-            message_id_str = chat_and_msg[1].strip()
+            # For forum/topic links (t.me/c/<chat>/<topic>/<msg>) the real message
+            # id is the LAST segment, not the topic id in the middle.
+            message_id_str = chat_and_msg[-1].strip()
             
             if not chat_id_str.isdigit() or not message_id_str.isdigit():
                 logger.error(f"Invalid chat_id or message_id format in private link")
@@ -448,10 +450,12 @@ class Actions:
         rest = parts[1].split('/')
         if len(rest) < 2:
             return None
-        
+
         try:
             chat_username = rest[0].strip()
-            message_id_str = rest[1].strip()
+            # For topic/comment links (t.me/<user>/<topic>/<msg>) the real message
+            # id is the LAST segment.
+            message_id_str = rest[-1].strip()
             
             if not message_id_str.isdigit():
                 logger.error(f"Invalid message_id format in public link")
@@ -516,9 +520,13 @@ class Actions:
         Args:
             revoked_sessions: List of session names/filenames to remove
         """
+        # Resolve the actual active_clients keys under the lock, then release it
+        # before removal: remove_revoked_session_completely acquires the same
+        # (non-reentrant) lock internally, so calling it while holding the lock
+        # would deadlock.
+        session_keys = []
         async with self.tbot.active_clients_lock:
             for session_name in revoked_sessions:
-                # Find the actual key in active_clients
                 removed_key = None
                 for key, client in list(self.tbot.active_clients.items()):
                     try:
@@ -529,12 +537,11 @@ class Actions:
                     except (AttributeError, KeyError, Exception) as e:
                         logger.debug(f"Error checking session for {key}: {e}")
                         pass
-                
-                # Use the key we found or the session_name directly
-                session_key = removed_key if removed_key else session_name
-                
-                # Use the centralized removal function
-                await remove_revoked_session_completely(self.tbot, session_key)
+                session_keys.append(removed_key if removed_key else session_name)
+
+        for session_key in session_keys:
+            # Use the centralized removal function (handles its own locking)
+            await remove_revoked_session_completely(self.tbot, session_key)
 
     async def prompt_group_action(self, event, action_name):
         """
@@ -967,7 +974,9 @@ class Actions:
             
             chat_entity = await resolve_entity(chat_entity, account)
             message = await account.get_messages(chat_entity, ids=message_id)
-            
+
+            if message is None:
+                return False, "Message not found.", None
             if not message.poll:
                 return False, "The provided link does not point to a poll.", None
             
@@ -1019,9 +1028,14 @@ class Actions:
                 raise ConnectionError(f"Account {get_session_name(acc)} is not connected")
             peer = await resolve_entity(chat_entity, acc)
             message = await acc.get_messages(peer, ids=message_id)
-            if not message.poll:
+            if message is None or not message.poll:
                 raise ValueError("Link does not point to a poll")
-            await acc(SendVoteRequest(peer=peer, msg_id=message_id, options=[bytes([option])]))
+            answers = message.poll.poll.answers
+            if option < 0 or option >= len(answers):
+                raise ValueError("Poll option is out of range")
+            # Telegram identifies an answer by its creator-defined option bytes,
+            # not by the index, so send the actual answer's option bytes.
+            await acc(SendVoteRequest(peer=peer, msg_id=message_id, options=[answers[option].option]))
         
         success_count, error_count, revoked_sessions = await self._execute_bulk_operation(
             valid_accounts, vote_operation, 'vote'
@@ -1063,12 +1077,17 @@ class Actions:
         try:
             chat_entity = await resolve_entity(chat_entity, account)
             message = await account.get_messages(chat_entity, ids=message_id)
-            
-            if message.poll:
+
+            if message is not None and message.poll:
+                answers = message.poll.poll.answers
+                if option < 0 or option >= len(answers):
+                    await event.respond(f"Invalid option number. Poll has {len(answers)} options.")
+                    return
+                # Send the answer's creator-defined option bytes, not the index.
                 await account(SendVoteRequest(
                     peer=chat_entity,
                     msg_id=message_id,
-                    options=[bytes([option])]
+                    options=[answers[option].option]
                 ))
                 account_name = get_session_name(account)
                 await event.respond(f"Voted for option {option_num} successfully with account {account_name}.")
