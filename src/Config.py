@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 class ConfigManager:
-    def __init__(self, filename: str = "config.json", config: Optional[Dict[str, Any]] = None):
+    def __init__(self, filename: str = "clients.json", config: Optional[Dict[str, Any]] = None):
         """
         Initialize the ConfigManager class.
         Handles loading, saving, and managing configuration settings.
@@ -72,12 +72,24 @@ class ConfigManager:
         :param config: Configuration dictionary to save.
         """
         try:
-            # Update self.config to match the saved config
-            self.config = config.copy()
             # Ensure directory exists
-            os.makedirs(os.path.dirname(self.filepath) if os.path.dirname(self.filepath) else '.', exist_ok=True)
-            with open(self.filepath, 'w', encoding='utf-8') as f:
-                json.dump(config, f, indent=4, ensure_ascii=False)
+            target_dir = os.path.dirname(self.filepath) or '.'
+            os.makedirs(target_dir, exist_ok=True)
+            # Write atomically: serialize to a temp file in the same directory and
+            # os.replace() it into place, so a crash/disk-full mid-write can never
+            # leave a truncated config that load_config would discard.
+            import tempfile
+            fd, tmp_path = tempfile.mkstemp(dir=target_dir, suffix='.tmp')
+            try:
+                with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                    json.dump(config, f, indent=4, ensure_ascii=False)
+                os.replace(tmp_path, self.filepath)
+            except BaseException:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+                raise
+            # Only update the in-memory copy once the on-disk write succeeded.
+            self.config = config.copy()
             logger.info("Configuration saved successfully.")
         except OSError as e:
             logger.error(f"Failed to save config file '{self.filepath}': {e}")
@@ -216,9 +228,12 @@ def get_env_int(name: str, default: int = 0) -> int:
     """
     try:
         value = get_env_variable(name, default=str(default))
-        if value in ['x', 'your_api_id_here', 'your_admin_user_id_here', '0', '']:
+        # Only map placeholder credential strings to the default. A real "0"
+        # must be honoured (e.g. RATE_LIMIT_SLEEP=0); an empty/invalid string
+        # falls through to the ValueError handler below.
+        if value in ['x', 'your_api_id_here', 'your_admin_user_id_here']:
             return default
-        return int(value)
+        return int(value.strip())
     except (ValueError, TypeError):
         return default
 
