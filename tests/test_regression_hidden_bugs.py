@@ -179,3 +179,135 @@ class TestSessionManagerWiring:
         # If the wrapper (with active_clients_lock) is wired correctly, the
         # session is loaded; the old bug raised RuntimeError and loaded nothing.
         assert "acct1" in mock_tbot.active_clients
+
+
+# ===========================================================================
+# Pass 3 — deeper bugs (config store, env parsing, markdown, UI labels, routing)
+# ===========================================================================
+import json
+from telethon.tl.types import User, Channel
+
+from src.Config import ConfigManager, get_env_int
+from src.Keyboards import Keyboard
+from src.Monitor import Monitor
+
+
+class TestConfigStore:
+    def test_configmanager_defaults_to_clients_json(self):
+        # CLI and bot must share the same store; default must not be config.json
+        assert ConfigManager.__init__.__defaults__[0] == "clients.json"
+
+    def test_save_config_is_atomic_and_leaves_no_temp(self, tmp_path):
+        path = tmp_path / "clients.json"
+        cm = ConfigManager(str(path))
+        cm.save_config({"clients": {"a": []}, "KEYWORDS": ["x"]})
+
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert data["clients"] == {"a": []}
+        assert data["KEYWORDS"] == ["x"]
+        # the atomic temp file must be cleaned up
+        assert list(tmp_path.glob("*.tmp")) == []
+
+
+class TestEnvIntParsing:
+    def test_zero_is_honoured(self, monkeypatch):
+        monkeypatch.setenv("RATE_LIMIT_SLEEP", "0")
+        assert get_env_int("RATE_LIMIT_SLEEP", default=60) == 0
+
+    def test_whitespace_zero_is_honoured(self, monkeypatch):
+        monkeypatch.setenv("GROUPS_BATCH_SIZE", " 0 ")
+        assert get_env_int("GROUPS_BATCH_SIZE", default=10) == 0
+
+    def test_placeholder_falls_back_to_default(self, monkeypatch):
+        monkeypatch.setenv("API_ID", "your_api_id_here")
+        assert get_env_int("API_ID", default=0) == 0
+
+    def test_empty_falls_back_to_default(self, monkeypatch):
+        monkeypatch.setenv("RATE_LIMIT_SLEEP", "")
+        assert get_env_int("RATE_LIMIT_SLEEP", default=60) == 60
+
+
+class TestToggleLabel:
+    def test_inactive_account_shows_enable(self):
+        rows = Keyboard.toggle_and_delete_keyboard("Inactive", "sess")
+        assert rows[0][0].text == "Enable"
+
+    def test_inactive_auth_error_shows_enable(self):
+        rows = Keyboard.toggle_and_delete_keyboard("Inactive (Auth Error)", "sess")
+        assert rows[0][0].text == "Enable"
+
+    def test_active_account_shows_disable(self):
+        rows = Keyboard.toggle_and_delete_keyboard("Active", "sess")
+        assert rows[0][0].text == "Disable"
+
+
+@pytest.mark.asyncio
+class TestCallbackRoutingNoFanOut:
+    async def test_individual_action_on_missing_account_does_not_fan_out(self, mock_tbot, mock_callback_event):
+        from src.Handlers import CallbackHandler
+        mock_tbot.active_clients = {}
+        handler = CallbackHandler(mock_tbot)
+        handler.actions.handle_group_action = AsyncMock()
+
+        # digit-only suffix is a phone-shaped session key whose account is gone;
+        # it must NOT be reinterpreted as a bulk count of ~10^11 accounts.
+        mock_callback_event.data = b"reaction_989121234567"
+        await handler.callback_handler(mock_callback_event)
+
+        handler.actions.handle_group_action.assert_not_called()
+        mock_callback_event.respond.assert_awaited()
+
+
+@pytest.mark.asyncio
+class TestStartClearsState:
+    async def test_start_command_clears_conversation_state(self, mock_tbot, mock_event):
+        from src.Handlers import CommandHandler
+        mock_event.chat_id = 555
+        mock_event.sender_id = 999
+        mock_tbot._conversations = {555: "poll_link_handler"}
+
+        handler = CommandHandler(mock_tbot)
+        with patch("src.utils.validate_admin_id", return_value=999):
+            await handler.start_command(mock_event)
+
+        assert 555 not in mock_tbot._conversations
+        mock_event.respond.assert_awaited()
+
+
+@pytest.mark.asyncio
+class TestMonitorMarkdownSafe:
+    async def test_message_with_markdown_chars_is_still_forwarded(self, mock_tbot, mock_new_message_event, mock_telegram_client):
+        monitor = Monitor(mock_tbot)
+        monitor.channel_id = 123456789
+        mock_tbot.config = {"KEYWORDS": ["test"], "IGNORE_USERS": []}
+        mock_tbot.tbot.send_message = AsyncMock()
+
+        # content with unbalanced markdown that would break default parse mode
+        mock_new_message_event.message.text = "test *bold _italic [link `code"
+        mock_new_message_event.chat_id = -1001234567890
+        mock_new_message_event.out = False
+        mock_new_message_event.id = 7
+
+        sender = Mock(spec=User)
+        sender.id = 987654321
+        sender.first_name = "A*B"
+        sender.last_name = "C_D"
+        mock_new_message_event.get_sender = AsyncMock(return_value=sender)
+
+        chat = Mock(spec=Channel)
+        chat.id = -1001234567890
+        chat.title = "Chat[1]"
+        chat.username = "testchannel"
+        mock_new_message_event.get_chat = AsyncMock(return_value=chat)
+
+        handler = await monitor.process_messages_for_client(mock_telegram_client)
+        await handler(mock_new_message_event)
+
+        # must be forwarded (not silently dropped) and sent literally.
+        mock_tbot.tbot.send_message.assert_called_once()
+        kwargs = mock_tbot.tbot.send_message.call_args.kwargs
+        # parse_mode must be EXPLICITLY disabled (key present), not merely absent,
+        # so user markdown can't break the real send and drop the message.
+        assert "parse_mode" in kwargs and kwargs["parse_mode"] is None
+        sent_text = mock_tbot.tbot.send_message.call_args[0][1]
+        assert "*bold" in sent_text  # user content preserved verbatim
