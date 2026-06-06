@@ -64,6 +64,10 @@ class CommandHandler:
                 await event.respond("You are not the admin")
                 return
 
+            # /start resets any in-progress conversation so the next message is a
+            # fresh interaction (other entry points already do this).
+            await cleanup_conversation_state(self.bot, event.chat_id)
+
             buttons = Keyboard.start_keyboard()
             await event.respond(
                 "Telegram Management Bot\n\n",
@@ -263,7 +267,7 @@ class MessageHandler:
         try:
             admin_id = int(ADMIN_ID) if isinstance(ADMIN_ID, str) else ADMIN_ID
             if not await check_admin_access(event, admin_id):
-                logger.warning(f"Non-admin message from {event.sender_id}: {event.message.text[:50]}...")
+                logger.warning(f"Non-admin message from {event.sender_id}: {(event.message.text or '')[:50]}...")
                 await event.respond("You are not the admin")
                 return False
         except (ValueError, TypeError):
@@ -811,11 +815,18 @@ class CallbackHandler:
                     individual_actions = ['reaction', 'send_pv', 'join', 'left', 'block', 'comment']
                     bulk_actions = ['reaction', 'poll', 'join', 'leave', 'block', 'comment', 'send_pv']
 
+                    async with self.tbot.active_clients_lock:
+                        active_count = len(self.tbot.active_clients)
+
                     if account is not None and action_name in individual_actions:
                         # Individual operation on the selected account
                         await getattr(self.actions, action_name)(account, event)
-                    elif suffix.isdigit() and action_name in bulk_actions:
-                        # Bulk operation with the given number of accounts
+                    elif (suffix.isdigit() and action_name in bulk_actions
+                          and int(suffix) <= active_count):
+                        # Bulk operation with the given number of accounts. The
+                        # count bound prevents a digit-only session key (a phone
+                        # number) whose account vanished from being misread as a
+                        # huge bulk count and fanning out to every account.
                         await self.actions.handle_group_action(event, action_name, int(suffix))
                     elif action_name in individual_actions:
                         # Looked like an individual selection but the account is gone
