@@ -6,8 +6,7 @@ logger.setLevel(logging.INFO)
 
 # Create logs directory if it doesn't exist
 LOG_DIR = "logs"
-if not os.path.exists(LOG_DIR):
-    os.makedirs(LOG_DIR)
+os.makedirs(LOG_DIR, exist_ok=True)
 
 # Setup logging configuration
 def setup_logging(log_filename: str = "bot.log") -> None:
@@ -27,7 +26,7 @@ def setup_logging(log_filename: str = "bot.log") -> None:
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[
-            logging.FileHandler(log_path),
+            logging.FileHandler(log_path, encoding='utf-8'),
             logging.StreamHandler()
         ]
     )
