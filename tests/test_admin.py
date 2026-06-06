@@ -3,10 +3,10 @@
 import os
 
 # Set environment variables
-os.environ['API_ID'] = '20019286'
-os.environ['API_HASH'] = '***REMOVED***'
-os.environ['BOT_TOKEN'] = '***REMOVED***'
-os.environ['ADMIN_ID'] = '7718839318'
+os.environ['API_ID'] = '12345678'
+os.environ['API_HASH'] = '0123456789abcdef0123456789abcdef'
+os.environ['BOT_TOKEN'] = 'test_token'
+os.environ['ADMIN_ID'] = '111111111'
 os.environ['CHANNEL_ID'] = 'your_channel_id_or_username'
 
 print("=" * 60)
