@@ -158,7 +158,7 @@ class Actions:
         
         if not accounts:
             if event:
-                await event.respond("No active accounts found.")
+                await Keyboard.edit_or_respond(event, "No active accounts found.", buttons=Keyboard.back_button())
             return [], False
         
         # Validate accounts are connected
@@ -174,7 +174,7 @@ class Actions:
         
         if not valid_accounts:
             if event:
-                await event.respond("No connected accounts available for this operation.")
+                await Keyboard.edit_or_respond(event, "No connected accounts available for this operation.", buttons=Keyboard.back_button())
             return [], False
         
         return valid_accounts, True
@@ -248,7 +248,7 @@ class Actions:
         result_message = await format_bulk_result_message(
             operation_name, success_count, error_count, revoked_sessions
         )
-        await event.respond(result_message)
+        await Keyboard.edit_or_respond(event, result_message, buttons=Keyboard.back_button())
         
         await self._cleanup_operation_state(cleanup_keys, event.chat_id)
     
@@ -551,7 +551,7 @@ class Actions:
             total_accounts = len(self.tbot.active_clients)
 
         if total_accounts == 0:
-            await Keyboard.edit_or_respond(event, "No accounts available for this operation.")
+            await Keyboard.edit_or_respond(event, "No accounts available for this operation.", buttons=Keyboard.back_button())
             return
 
         message = f"There are {total_accounts} accounts available.\n\nPlease choose how many accounts (from 1 to {total_accounts}) will perform the {action_name} action:"
@@ -581,7 +581,7 @@ class Actions:
             sessions = list(self.tbot.active_clients.keys())
         
         if not sessions:
-            await event.respond("No accounts available for this operation.")
+            await Keyboard.edit_or_respond(event, "No accounts available for this operation.", buttons=Keyboard.back_button())
             return
         
         # Organize buttons in rows of 2 for better layout
@@ -760,7 +760,7 @@ class Actions:
         result_message = await format_bulk_result_message(
             f'reaction {reaction}', success_count, error_count, revoked_sessions
         )
-        await event.respond(result_message)
+        await Keyboard.edit_or_respond(event, result_message, buttons=Keyboard.back_button())
         
         cleanup_keys = [
             HandlerKeys.REACTION_LINK,
@@ -1053,7 +1053,7 @@ class Actions:
         result_message = await format_bulk_result_message(
             f'Vote for option {option_num}', success_count, error_count, revoked_sessions
         )
-        await event.respond(result_message)
+        await Keyboard.edit_or_respond(event, result_message, buttons=Keyboard.back_button())
         
         cleanup_keys = [HandlerKeys.POLL_LINK, HandlerKeys.POLL_NUM_ACCOUNTS, HandlerKeys.POLL_IS_BULK]
         await self._cleanup_operation_state(cleanup_keys, event.chat_id)
@@ -1490,7 +1490,7 @@ class Actions:
                 result_message = await format_bulk_result_message(
                     'Comment', success_count, error_count, revoked_sessions
                 )
-                await event.respond(result_message)
+                await Keyboard.edit_or_respond(event, result_message, buttons=Keyboard.back_button())
                 
                 cleanup_keys = [
                     HandlerKeys.COMMENT_LINK,

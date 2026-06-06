@@ -831,9 +831,10 @@ class TestCheckAccountsAvailable:
         
         accounts = []
         result = await check_accounts_available(mock_tbot, mock_event, accounts)
-        
+
         assert result is False
-        mock_event.respond.assert_called_once()
+        # Error is shown via edit-in-place (with a Back button) or a new message
+        assert mock_event.edit.called or mock_event.respond.called
 
 
 @pytest.mark.asyncio

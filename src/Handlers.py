@@ -393,11 +393,11 @@ class StatsHandler:
             for key, value in stats.items():
                 text += f"• {key}: {value}\n"
 
-            await event.respond(text)
+            await Keyboard.edit_or_respond(event, text, buttons=Keyboard.back_button())
 
         except Exception as e:
             logger.error(f"Error showing stats: {e}")
-            await event.respond("Error showing statistics")
+            await Keyboard.edit_or_respond(event, "Error showing statistics", buttons=Keyboard.back_button())
 
     async def show_groups(self, event):
         """Show all groups for all clients"""
@@ -406,7 +406,7 @@ class StatsHandler:
             clients_data = self.tbot.config.get('clients', {})
             
             if not isinstance(clients_data, dict) or not clients_data:
-                await event.respond("No groups found. Please run 'Update Groups' first.")
+                await Keyboard.edit_or_respond(event, "No groups found. Please run 'Update Groups' first.", buttons=Keyboard.back_button())
                 return
             
             text = "Groups per Account:\n\n"
@@ -437,11 +437,11 @@ class StatsHandler:
                 text += f"• {phone}: {groups_count} groups\n"
             
             text += f"\nTotal: {total_groups} groups"
-            await event.respond(text)
+            await Keyboard.edit_or_respond(event, text, buttons=Keyboard.back_button())
 
         except Exception as e:
             logger.error(f"Error showing groups: {e}")
-            await event.respond("Error showing groups")
+            await Keyboard.edit_or_respond(event, "Error showing groups", buttons=Keyboard.back_button())
 
     async def show_keywords(self, event):
         """Show all configured keywords"""
@@ -450,18 +450,18 @@ class StatsHandler:
             keywords = self.tbot.config.get('KEYWORDS', [])
             
             if not keywords:
-                await event.respond("No keywords configured yet.")
+                await Keyboard.edit_or_respond(event, "No keywords configured yet.", buttons=Keyboard.back_button())
                 return
-            
+
             text = "Configured Keywords:\n\n"
             for idx, keyword in enumerate(keywords, 1):
                 text += f"{idx}. {keyword}\n"
-            
-            await event.respond(text)
+
+            await Keyboard.edit_or_respond(event, text, buttons=Keyboard.back_button())
 
         except Exception as e:
             logger.error(f"Error showing keywords: {e}")
-            await event.respond("Error showing keywords")
+            await Keyboard.edit_or_respond(event, "Error showing keywords", buttons=Keyboard.back_button())
 
     async def show_ignores(self, event):
         """Show all ignored users"""
@@ -470,18 +470,18 @@ class StatsHandler:
             ignored_users = self.tbot.config.get('IGNORE_USERS', [])
             
             if not ignored_users:
-                await event.respond("No users are currently ignored.")
+                await Keyboard.edit_or_respond(event, "No users are currently ignored.", buttons=Keyboard.back_button())
                 return
-            
+
             text = "Ignored Users:\n\n"
             for idx, user_id in enumerate(ignored_users, 1):
-                text += f"{idx}. User ID: `{user_id}`\n"
-            
-            await event.respond(text)
+                text += f"{idx}. User ID: {user_id}\n"
+
+            await Keyboard.edit_or_respond(event, text, buttons=Keyboard.back_button())
 
         except Exception as e:
             logger.error(f"Error showing ignored users: {e}")
-            await event.respond("Error showing ignored users")
+            await Keyboard.edit_or_respond(event, "Error showing ignored users", buttons=Keyboard.back_button())
 
 
 class CallbackHandler:

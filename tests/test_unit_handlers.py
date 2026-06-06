@@ -153,9 +153,10 @@ class TestStatsHandler:
         
         handler = StatsHandler(mock_tbot)
         await handler.show_stats(mock_event)
-        
-        mock_event.respond.assert_called_once()
-        call_args = mock_event.respond.call_args[0][0]
+
+        # Info screens edit the menu in place (with a Back button)
+        assert mock_event.edit.called or mock_event.respond.called
+        call_args = (mock_event.edit.call_args or mock_event.respond.call_args)[0][0]
         assert "Total Accounts" in call_args
         assert "Active Accounts" in call_args
 
@@ -171,20 +172,20 @@ class TestStatsHandler:
         
         handler = StatsHandler(mock_tbot)
         await handler.show_groups(mock_event)
-        
-        mock_event.respond.assert_called_once()
-        call_args = mock_event.respond.call_args[0][0]
+
+        assert mock_event.edit.called or mock_event.respond.called
+        call_args = (mock_event.edit.call_args or mock_event.respond.call_args)[0][0]
         assert "Groups" in call_args
 
     @pytest.mark.asyncio
     async def test_show_groups_empty(self, mock_tbot, mock_event):
         """Test showing groups when none exist"""
         mock_tbot.config = {"clients": {}}
-        
+
         handler = StatsHandler(mock_tbot)
         await handler.show_groups(mock_event)
-        
-        mock_event.respond.assert_called_once()
+
+        assert mock_event.edit.called or mock_event.respond.called
 
     @pytest.mark.asyncio
     async def test_show_keywords(self, mock_tbot, mock_event):
@@ -193,20 +194,20 @@ class TestStatsHandler:
         
         handler = StatsHandler(mock_tbot)
         await handler.show_keywords(mock_event)
-        
-        mock_event.respond.assert_called_once()
-        call_args = mock_event.respond.call_args[0][0]
+
+        assert mock_event.edit.called or mock_event.respond.called
+        call_args = (mock_event.edit.call_args or mock_event.respond.call_args)[0][0]
         assert "test" in call_args or "keyword" in call_args
 
     @pytest.mark.asyncio
     async def test_show_keywords_empty(self, mock_tbot, mock_event):
         """Test showing keywords when none exist"""
         mock_tbot.config = {"KEYWORDS": []}
-        
+
         handler = StatsHandler(mock_tbot)
         await handler.show_keywords(mock_event)
-        
-        mock_event.respond.assert_called_once()
+
+        assert mock_event.edit.called or mock_event.respond.called
 
     @pytest.mark.asyncio
     async def test_show_ignores(self, mock_tbot, mock_event):
@@ -215,9 +216,9 @@ class TestStatsHandler:
         
         handler = StatsHandler(mock_tbot)
         await handler.show_ignores(mock_event)
-        
-        mock_event.respond.assert_called_once()
-        call_args = mock_event.respond.call_args[0][0]
+
+        assert mock_event.edit.called or mock_event.respond.called
+        call_args = (mock_event.edit.call_args or mock_event.respond.call_args)[0][0]
         assert "123456789" in call_args or "987654321" in call_args
 
 

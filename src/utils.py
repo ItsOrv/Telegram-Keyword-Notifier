@@ -641,7 +641,8 @@ async def check_accounts_available(
         True if accounts available, False otherwise
     """
     if not accounts:
-        await event.respond(error_message)
+        from src.Keyboards import Keyboard
+        await Keyboard.edit_or_respond(event, error_message, buttons=Keyboard.back_button())
         await cleanup_conversation_state(tbot, event.chat_id)
         return False
     return True

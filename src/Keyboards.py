@@ -232,6 +232,16 @@ class Keyboard:
         ]
 
     @staticmethod
+    def back_button(back_action='back_to_start'):
+        """
+        A single-row keyboard with just a Back button.
+
+        Use it on terminal/info screens (stats, lists, "no accounts" notices,
+        operation results) so the user always has a way back to the menu.
+        """
+        return [[Button.inline("Back", back_action, style=PRIMARY)]]
+
+    @staticmethod
     def add_back_button(buttons, back_action='back_to_start'):
         """
         Add a back button to a keyboard layout.

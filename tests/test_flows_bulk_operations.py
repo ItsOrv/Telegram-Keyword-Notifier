@@ -144,7 +144,8 @@ class TestBulkOperationsFlows:
         # Verify join was called for both accounts
         assert mock_client1.join_chat.call_count >= 1
         assert mock_client2.join_chat.call_count >= 1
-        mock_event.respond.assert_called()
+        # Result is shown via edit-in-place (with Back) or a new message
+        assert mock_event.edit.called or mock_event.respond.called
 
     @pytest.mark.asyncio
     async def test_bulk_block_flow(self, mock_tbot, mock_callback_event, mock_event):
@@ -179,9 +180,9 @@ class TestBulkOperationsFlows:
         
         with patch('telethon.tl.functions.contacts.BlockRequest') as mock_block:
             await actions.bulk_block_user_handler(mock_event)
-            
-            # Verify block was called
-            mock_event.respond.assert_called()
+
+            # Verify block produced a result (edit-in-place with Back, or a message)
+            assert mock_event.edit.called or mock_event.respond.called
 
     @pytest.mark.asyncio
     async def test_bulk_send_pv_flow(self, mock_tbot, mock_callback_event, mock_event):
