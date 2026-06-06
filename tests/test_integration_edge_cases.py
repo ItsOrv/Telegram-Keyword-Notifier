@@ -337,10 +337,9 @@ class TestEdgeCases:
         actions = Actions(mock_tbot)
         
         await actions.prompt_group_action(mock_callback_event, 'reaction')
-        
-        # Should show error message - check all calls
-        mock_callback_event.respond.assert_called()
-        calls = mock_callback_event.respond.call_args_list
+
+        # Should show an error message, via edit-in-place or a new message
+        calls = mock_callback_event.respond.call_args_list + mock_callback_event.edit.call_args_list
         call_args_text = ' '.join([str(call[0][0]) if call[0] else '' for call in calls])
         assert "No accounts" in call_args_text or "❌" in call_args_text or "0 accounts" in call_args_text
 

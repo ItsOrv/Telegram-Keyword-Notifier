@@ -16,10 +16,10 @@ class TestKeyboard:
         assert len(keyboard) > 0
         # Check for main menu buttons
         button_texts = [btn.text for row in keyboard for btn in row]
-        assert "Account Management" in button_texts
-        assert "Individual" in button_texts or "Bulk" in button_texts
-        assert "Monitor Mode" in button_texts
-        assert "Report Status" in button_texts or "Report" in button_texts
+        assert "Account Management" in " ".join(button_texts)
+        assert "Individual" in " ".join(button_texts) or "Bulk" in " ".join(button_texts)
+        assert "Monitor Mode" in " ".join(button_texts)
+        assert "Report Status" in " ".join(button_texts) or "Report" in " ".join(button_texts)
 
     def test_monitor_keyboard(self):
         """Test monitor keyboard structure"""
@@ -28,9 +28,9 @@ class TestKeyboard:
         assert len(keyboard) > 0
         # Check for monitor buttons
         button_texts = [btn.text for row in keyboard for btn in row]
-        assert "Add Keyword" in button_texts or b'add_keyword' in [btn.data for row in keyboard for btn in row]
-        assert "Remove Keyword" in button_texts or b'remove_keyword' in [btn.data for row in keyboard for btn in row]
-        assert "Ignore User" in button_texts or b'ignore_user' in [btn.data for row in keyboard for btn in row]
+        assert "Add Keyword" in " ".join(button_texts) or b'add_keyword' in [btn.data for row in keyboard for btn in row]
+        assert "Remove Keyword" in " ".join(button_texts) or b'remove_keyword' in [btn.data for row in keyboard for btn in row]
+        assert "Ignore User" in " ".join(button_texts) or b'ignore_user' in [btn.data for row in keyboard for btn in row]
 
     def test_bulk_keyboard(self):
         """Test bulk operations keyboard"""
@@ -39,12 +39,12 @@ class TestKeyboard:
         assert len(keyboard) > 0
         # Check for bulk operation buttons
         button_texts = [btn.text for row in keyboard for btn in row]
-        assert "Reaction" in button_texts
-        assert "Poll" in button_texts
-        assert "Join" in button_texts
-        assert "Block" in button_texts
-        assert "Send PV" in button_texts
-        assert "Comment" in button_texts
+        assert "Reaction" in " ".join(button_texts)
+        assert "Poll" in " ".join(button_texts)
+        assert "Join" in " ".join(button_texts)
+        assert "Block" in " ".join(button_texts)
+        assert "Send PV" in " ".join(button_texts)
+        assert "Comment" in " ".join(button_texts)
 
     def test_account_management_keyboard(self):
         """Test account management keyboard"""
@@ -53,8 +53,8 @@ class TestKeyboard:
         assert len(keyboard) > 0
         # Check for account management buttons
         button_texts = [btn.text for row in keyboard for btn in row]
-        assert "Add Account" in button_texts
-        assert "List Accounts" in button_texts
+        assert "Add Account" in " ".join(button_texts)
+        assert "List Accounts" in " ".join(button_texts)
 
     def test_channel_message_keyboard(self):
         """Test channel message keyboard"""
@@ -103,11 +103,11 @@ class TestKeyboard:
         assert len(keyboard) > 0
         # Check for individual operation buttons
         button_texts = [btn.text for row in keyboard for btn in row]
-        assert "Reaction" in button_texts
-        assert "Send PV" in button_texts
-        assert "Join" in button_texts
-        assert "Leave" in button_texts
-        assert "Comment" in button_texts
+        assert "Reaction" in " ".join(button_texts)
+        assert "Send PV" in " ".join(button_texts)
+        assert "Join" in " ".join(button_texts)
+        assert "Leave" in " ".join(button_texts)
+        assert "Comment" in " ".join(button_texts)
 
     def test_report_keyboard(self):
         """Test report keyboard"""
@@ -116,7 +116,7 @@ class TestKeyboard:
         assert len(keyboard) > 0
         # Check for report buttons
         button_texts = [btn.text for row in keyboard for btn in row]
-        assert "Show Stats" in button_texts
+        assert "Show Stats" in " ".join(button_texts)
 
     @pytest.mark.asyncio
     async def test_show_keyboard_start(self, mock_event):

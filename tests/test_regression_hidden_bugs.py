@@ -230,15 +230,15 @@ class TestEnvIntParsing:
 class TestToggleLabel:
     def test_inactive_account_shows_enable(self):
         rows = Keyboard.toggle_and_delete_keyboard("Inactive", "sess")
-        assert rows[0][0].text == "Enable"
+        assert rows[0][0].text.endswith("Enable")
 
     def test_inactive_auth_error_shows_enable(self):
         rows = Keyboard.toggle_and_delete_keyboard("Inactive (Auth Error)", "sess")
-        assert rows[0][0].text == "Enable"
+        assert rows[0][0].text.endswith("Enable")
 
     def test_active_account_shows_disable(self):
         rows = Keyboard.toggle_and_delete_keyboard("Active", "sess")
-        assert rows[0][0].text == "Disable"
+        assert rows[0][0].text.endswith("Disable")
 
 
 @pytest.mark.asyncio

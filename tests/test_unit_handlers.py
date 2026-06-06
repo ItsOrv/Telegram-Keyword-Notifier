@@ -246,7 +246,9 @@ class TestCallbackHandler:
         await handler.callback_handler(mock_callback_event)
         
         assert mock_callback_event.chat_id not in mock_tbot._conversations
-        mock_callback_event.delete.assert_called_once()
+        # Cancel now edits the message in place back to the main menu
+        # (instead of deleting it and sending a brand new message).
+        mock_callback_event.edit.assert_called()
 
     @pytest.mark.asyncio
     async def test_callback_handler_list_accounts(self, mock_tbot, mock_callback_event):

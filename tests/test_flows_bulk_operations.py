@@ -277,11 +277,8 @@ class TestBulkOperationsFlows:
         callback_handler = CallbackHandler(mock_tbot)
         await callback_handler.callback_handler(mock_callback_event)
         
-        # Should show error message
-        mock_callback_event.respond.assert_called()
-        call_args = mock_callback_event.respond.call_args[0][0]
-        # Check all calls - handler may send multiple messages
-        calls = mock_callback_event.respond.call_args_list
+        # Should show an error message, via edit-in-place or a new message
+        calls = mock_callback_event.respond.call_args_list + mock_callback_event.edit.call_args_list
         call_args_text = ' '.join([str(call[0][0]) if call[0] else '' for call in calls])
         assert "No accounts" in call_args_text or "❌" in call_args_text or "0 accounts" in call_args_text
 
