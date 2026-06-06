@@ -549,7 +549,11 @@ class Actions:
         """
         async with self.tbot.active_clients_lock:
             total_accounts = len(self.tbot.active_clients)
-        
+
+        if total_accounts == 0:
+            await Keyboard.edit_or_respond(event, "No accounts available for this operation.")
+            return
+
         message = f"There are {total_accounts} accounts available.\n\nPlease choose how many accounts (from 1 to {total_accounts}) will perform the {action_name} action:"
         # Organize buttons in rows of 3 for better layout
         buttons = []
@@ -562,7 +566,8 @@ class Actions:
             buttons.append(row)
         # Add cancel button
         buttons = Keyboard.add_cancel_button(buttons)
-        await event.respond(message, buttons=buttons)
+        # Edit the menu in place so the prompt replaces it instead of stacking.
+        await Keyboard.edit_or_respond(event, message, buttons=buttons)
 
     async def prompt_individual_action(self, event, action_name: str) -> None:
         """
@@ -589,7 +594,8 @@ class Actions:
         
         # Add cancel button
         buttons = Keyboard.add_cancel_button(buttons)
-        await event.respond("Please select an account to perform the action:", buttons=buttons)
+        # Edit the menu in place so the prompt replaces it instead of stacking.
+        await Keyboard.edit_or_respond(event, "Please select an account to perform the action:", buttons=buttons)
 
     async def handle_group_action(self, event, action_name, num_accounts):
         """

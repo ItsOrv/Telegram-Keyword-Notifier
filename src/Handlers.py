@@ -538,14 +538,8 @@ class CallbackHandler:
 
     async def handle_back_to_start(self, event):
         """Handle back to start navigation with cleanup"""
-        # Clean up any active conversations and temporary keyboards
-        await cleanup_conversation_state(self.tbot, event.chat_id)
-        # Try to delete the current message if it's a callback
-        try:
-            if hasattr(event, 'message') and event.message:
-                await event.message.delete()
-        except Exception as e:
-            logger.debug(f"Could not delete message when going back: {e}")
+        # show_start_keyboard cleans up conversation state and edits the current
+        # message in place into the main menu (no stale message left behind).
         await self.show_start_keyboard(event)
 
     async def show_monitor_keyboard(self, event):
@@ -738,15 +732,8 @@ class CallbackHandler:
                 chat_id = event.chat_id
                 # Clean up conversation state
                 await cleanup_conversation_state(self.tbot, chat_id)
-                # Try to delete the message
-                try:
-                    if hasattr(event, 'message') and event.message:
-                        await event.message.delete()
-                    elif hasattr(event, 'delete'):
-                        await event.delete()
-                except Exception as e:
-                    logger.debug(f"Could not delete message when canceling: {e}")
-                # Return to start keyboard
+                # Edit the current message back into the main menu in place, so the
+                # cancelled prompt/menu is replaced rather than left behind.
                 await self.show_start_keyboard(event)
                 return
 
