@@ -708,8 +708,9 @@ class TestPromptForInput:
             mock_tbot, mock_event,
             "Enter value:", "test_state", cancel_button=True
         )
-        
-        mock_event.respond.assert_called_once()
+
+        # Prompt is shown by editing the menu in place (falls back to respond)
+        assert mock_event.edit.called or mock_event.respond.called
         assert mock_tbot._conversations[mock_event.chat_id] == "test_state"
     
     async def test_without_cancel_button(self):
@@ -724,8 +725,8 @@ class TestPromptForInput:
             mock_tbot, mock_event,
             "Enter value:", "test_state", cancel_button=False
         )
-        
-        mock_event.respond.assert_called_once()
+
+        assert mock_event.edit.called or mock_event.respond.called
 
 
 @pytest.mark.asyncio

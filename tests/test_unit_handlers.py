@@ -32,7 +32,8 @@ class TestKeywordHandler:
         """Test adding keyword via callback"""
         handler = KeywordHandler(mock_tbot)
         await handler.add_keyword_handler(mock_callback_event)
-        mock_callback_event.respond.assert_called_once()
+        # Prompt edits the menu in place (falls back to respond)
+        assert mock_callback_event.edit.called or mock_callback_event.respond.called
         assert mock_tbot._conversations.get(mock_callback_event.chat_id) == 'add_keyword_handler'
 
     @pytest.mark.asyncio
