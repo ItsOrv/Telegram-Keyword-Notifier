@@ -152,8 +152,14 @@ class SessionManager:
                         # True authentication/session errors
                         logger.warning(f"Client {session_name} has authentication issues. Moving to inactive.")
                         async with self.tbot.active_clients_lock:
-                            if session_name in self.tbot.active_clients:
-                                del self.tbot.active_clients[session_name]
+                            removed_client = self.tbot.active_clients.pop(session_name, None)
+                        # Disconnect outside the lock to release the connection
+                        # opened earlier (avoids leaking the socket/reader task).
+                        if removed_client is not None:
+                            try:
+                                await removed_client.disconnect()
+                            except Exception as disc_err:
+                                logger.debug(f"Error disconnecting {session_name}: {disc_err}")
 
                         if session_name not in self.config['inactive_accounts']:
                             import time as time_module
@@ -290,10 +296,11 @@ class SessionManager:
                         async with self.tbot.active_clients_lock:
                             self.tbot.active_clients[sanitized_phone] = client
 
-                        # Add back to config
+                        # Add back to config without wiping any previously
+                        # discovered groups/metadata for this account.
                         if 'clients' not in self.config:
                             self.config['clients'] = {}
-                        self.config['clients'][sanitized_phone] = []  # Empty groups list
+                        self.config['clients'].setdefault(sanitized_phone, [])
                         self.config_manager.save_config(self.config)
 
                         await event.respond(f"Account {phone_number} successfully reactivated!")
