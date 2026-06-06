@@ -314,11 +314,11 @@ class TestJoinLeaveOperations:
         
         mock_entity = Mock()
         mock_telegram_client.get_entity = AsyncMock(return_value=mock_entity)
-        mock_telegram_client.leave_chat = AsyncMock()
-        
+        mock_telegram_client.delete_dialog = AsyncMock()
+
         await actions.left_link_handler(mock_event)
-        
-        mock_telegram_client.leave_chat.assert_called_once()
+
+        mock_telegram_client.delete_dialog.assert_called_once()
         mock_event.respond.assert_called()
 
 

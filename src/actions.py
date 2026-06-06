@@ -1142,6 +1142,7 @@ class Actions:
         """
         Handle the join link input.
         """
+        account = None
         try:
             link = event.message.text.strip()
             
@@ -1174,6 +1175,7 @@ class Actions:
                         event, account, 'join',
                         [HandlerKeys.JOIN_ACCOUNT], event.chat_id
                     )
+                    return
                 raise
             account_name = get_session_name(account)
             await event.respond(f"Successfully joined {link} with account {account_name}.")
@@ -1202,6 +1204,7 @@ class Actions:
         """
         Handle the leave link input.
         """
+        account = None
         try:
             link = event.message.text.strip()
             
@@ -1220,7 +1223,7 @@ class Actions:
             # Leave the group/channel
             try:
                 entity = await account.get_entity(link)
-                await account.leave_chat(entity)
+                await account.delete_dialog(entity)
                 account_name = get_session_name(account)
                 await event.respond(f"Successfully left {link} with account {account_name}.")
             except Exception as e:
@@ -1256,6 +1259,7 @@ class Actions:
         """
         Handle the block user input.
         """
+        account = None
         try:
             user_input = event.message.text.strip()
             account = self._get_handler_value(HandlerKeys.BLOCK_ACCOUNT)
@@ -1319,6 +1323,7 @@ class Actions:
         """
         Handle the send_pv message input.
         """
+        account = None
         try:
             message = event.message.text.strip()
             
@@ -1403,6 +1408,7 @@ class Actions:
         """
         Handle the comment text input.
         """
+        account = None
         try:
             comment_text = event.message.text.strip()
             
@@ -1622,7 +1628,7 @@ class Actions:
                 if not await self._check_connection(acc):
                     raise ConnectionError(f"Account {get_session_name(acc)} is not connected")
                 entity = await resolve_entity(link, acc)
-                await acc.leave_chat(entity)
+                await acc.delete_dialog(entity)
             
             await self._execute_bulk_operation_with_validation(
                 event, num_accounts, leave_operation, 'Leave',

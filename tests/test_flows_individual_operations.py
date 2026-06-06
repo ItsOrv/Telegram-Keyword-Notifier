@@ -155,7 +155,7 @@ class TestIndividualOperationsFlows:
         await actions.left_link_handler(mock_event)
         
         # Verify leave was called
-        mock_client.leave_chat.assert_called_once_with(mock_entity)
+        mock_client.delete_dialog.assert_called_once_with(mock_entity)
         mock_event.respond.assert_called()
 
     @pytest.mark.asyncio
