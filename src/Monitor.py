@@ -1,5 +1,6 @@
 import logging
 from telethon import TelegramClient, events, Button
+from telethon.utils import get_peer_id
 from src.Config import CHANNEL_ID
 from src.Keyboards import Keyboard
 from src.utils import extract_account_name
@@ -41,20 +42,21 @@ class Monitor:
             logger.warning("CHANNEL_ID is not configured. Message forwarding will be disabled.")
             return
 
-        if isinstance(CHANNEL_ID, str) and not CHANNEL_ID.isdigit():
+        # Numeric IDs (including the -100... supergroup/channel form) parse via int().
+        # Anything else is treated as a username and resolved to a peer ID.
+        try:
+            self.channel_id = int(CHANNEL_ID)
+            logger.info(f"Using numeric channel ID '{self.channel_id}'")
+        except (TypeError, ValueError):
             try:
-                # Resolve username to numeric ID
+                # Resolve username to a normalized peer ID (-100... form for channels)
                 entity = await self.tbot.tbot.get_entity(CHANNEL_ID)
-                self.channel_id = entity.id
-                self.channel_username = entity.username
+                self.channel_id = get_peer_id(entity)
+                self.channel_username = getattr(entity, 'username', None)
                 logger.info(f"Resolved channel username '{CHANNEL_ID}' to ID '{self.channel_id}'")
             except Exception as e:
                 logger.error(f"Error resolving channel username '{CHANNEL_ID}': {e}")
                 raise
-        else:
-            # Use numeric ID directly
-            self.channel_id = int(CHANNEL_ID)
-            logger.info(f"Using numeric channel ID '{self.channel_id}'")
 
     async def process_messages_for_client(self, client):
         """

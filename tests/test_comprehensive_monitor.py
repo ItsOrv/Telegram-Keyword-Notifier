@@ -35,11 +35,13 @@ class TestResolveChannelId:
         mock_entity.id = 123456789
         mock_entity.username = "testchannel"
         mock_tbot.tbot.get_entity = AsyncMock(return_value=mock_entity)
-        
-        with patch('src.Monitor.CHANNEL_ID', 'testchannel'):
+
+        with patch('src.Monitor.CHANNEL_ID', 'testchannel'), \
+                patch('src.Monitor.get_peer_id', return_value=-100123456789) as mock_peer_id:
             await monitor.resolve_channel_id()
-            
-            assert monitor.channel_id == 123456789
+
+            mock_peer_id.assert_called_once_with(mock_entity)
+            assert monitor.channel_id == -100123456789
             assert monitor.channel_username == "testchannel"
     
     async def test_resolve_numeric_id(self, mock_tbot):
