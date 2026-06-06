@@ -364,12 +364,6 @@ class MessageHandler:
             elif handler_name == 'bulk_block_user_handler':
                 await self.actions.bulk_block_user_handler(event)
                 return True
-            elif handler_name == 'bulk_send_pv_user_handler':
-                await self.actions.bulk_send_pv_user_handler(event)
-                return True
-            elif handler_name == 'bulk_send_pv_message_handler':
-                await self.actions.bulk_send_pv_message_handler(event)
-                return True
 
         return False
 
@@ -793,51 +787,46 @@ class CallbackHandler:
                     logger.error(f"Error deleting session {session}: {e}")
                     await event.respond(f"Error deleting account {session}: {str(e)}")
                 return
-            # Check if it's a known callback action (before parsing underscores)
-            elif data in self.callback_actions:
-                action = self.callback_actions[data]
-                await action(event)
-                return
             # Handle bulk action callbacks (e.g., "reaction_3" means 3 accounts for reaction)
             elif '_' in data:
                 parts = data.split('_')
                 if len(parts) >= 2:
-                    # Check for special action names that contain underscores (e.g., 'send_pv')
+                    # Determine the action name and the suffix that follows it.
+                    # 'send_pv' is special-cased because the action name itself
+                    # contains an underscore.
                     if len(parts) >= 3 and parts[0] == 'send' and parts[1] == 'pv':
-                        # Handle send_pv_action_session format
                         action_name = 'send_pv'
-                        session = '_'.join(parts[2:])
-                        async with self.tbot.active_clients_lock:
-                            account = self.tbot.active_clients.get(session)
-                        
-                        if account:
-                            await getattr(self.actions, action_name)(account, event)
-                        else:
-                            await event.respond(f"Account {session} not found.")
+                        suffix = '_'.join(parts[2:])
                     else:
                         action_name = parts[0]
-                        # Check if second part is a digit (bulk operation with number of accounts)
-                        if parts[1].isdigit() and action_name in ['reaction', 'poll', 'join', 'leave', 'block', 'comment', 'send_pv']:
-                            num_accounts = int(parts[1])
-                            await self.actions.handle_group_action(event, action_name, num_accounts)
-                        # Check if it's an individual operation with session name (may contain underscores)
-                        elif action_name in ['reaction', 'send_pv', 'join', 'left', 'block', 'comment']:
-                            # Session name is everything after the first underscore
-                            session = '_'.join(parts[1:])
-                            async with self.tbot.active_clients_lock:
-                                account = self.tbot.active_clients.get(session)
-                            
-                            if account:
-                                await getattr(self.actions, action_name)(account, event)
-                            else:
-                                await event.respond(f"Account {session} not found.")
+                        suffix = '_'.join(parts[1:])
+
+                    # Disambiguate individual vs bulk by checking the suffix against
+                    # the active accounts FIRST. Session keys are phone numbers (all
+                    # digits), so an isdigit() check alone would misread an individual
+                    # selection as a bulk account count.
+                    async with self.tbot.active_clients_lock:
+                        account = self.tbot.active_clients.get(suffix)
+
+                    individual_actions = ['reaction', 'send_pv', 'join', 'left', 'block', 'comment']
+                    bulk_actions = ['reaction', 'poll', 'join', 'leave', 'block', 'comment', 'send_pv']
+
+                    if account is not None and action_name in individual_actions:
+                        # Individual operation on the selected account
+                        await getattr(self.actions, action_name)(account, event)
+                    elif suffix.isdigit() and action_name in bulk_actions:
+                        # Bulk operation with the given number of accounts
+                        await self.actions.handle_group_action(event, action_name, int(suffix))
+                    elif action_name in individual_actions:
+                        # Looked like an individual selection but the account is gone
+                        await event.respond(f"Account {suffix} not found.")
+                    else:
+                        action = self.callback_actions.get(data)
+                        if action:
+                            await action(event)
                         else:
-                            action = self.callback_actions.get(data)
-                            if action:
-                                await action(event)
-                            else:
-                                logger.warning(f"No handler found for callback data: {data} (after parsing underscores)")
-                                await event.respond("Command not recognized. Please try again.")
+                            logger.warning(f"No handler found for callback data: {data} (after parsing underscores)")
+                            await event.respond("Command not recognized. Please try again.")
                 else:
                     action = self.callback_actions.get(data)
                     if action:
