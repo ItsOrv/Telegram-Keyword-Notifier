@@ -1,414 +1,194 @@
+<div align="center">
+
 # Telegram Panel
 
-Enterprise-grade Telegram bot management system for monitoring messages, managing multiple accounts, and performing bulk operations.
+**Centralized management for multiple Telegram accounts — monitoring, bulk operations, and automation from a single control plane.**
+
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
+[![Telethon](https://img.shields.io/badge/built%20with-Telethon-2CA5E0.svg)](https://github.com/LonamiWebs/Telethon)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-341%20passing-brightgreen.svg)](tests/)
+
+### 🌐 Try the Web Platform — [**telegramos.orvteam.com**](https://telegramos.orvteam.com) <kbd>BETA</kbd>
+
+A hosted, browser-based version of this project — no setup required. Same engine, managed for you.
+**[→ Open TelegramOS](https://telegramos.orvteam.com)**
+
+</div>
+
+---
 
 ## Overview
 
-Telegram Panel is a comprehensive management system that enables centralized control of multiple Telegram accounts. It provides two ways to use the system:
+Telegram Panel is a self-hostable system for operating many Telegram accounts from one place. It exposes the **same feature set through three interfaces**, so you can pick whatever fits your workflow:
 
-1. **Telegram Bot Interface**: Use the bot in Telegram for easy access from anywhere
-2. **CLI (Command Line Interface)**: Use the CLI on your server or local system for direct control
+| Interface | Best for | Entry point |
+|-----------|----------|-------------|
+| 🤖 **Telegram Bot** | Access from any device, on the go | `python main.py` |
+| 🖥️ **Interactive CLI** | A menu-driven terminal UI on your server | `python interactive_cli.py` |
+| ⚡ **Command CLI** | Scripting & automation | `python cli_main.py …` |
 
-Both methods provide the same capabilities for account management, message monitoring, bulk operations, and individual account actions.
+> 💡 **Prefer zero setup?** The hosted web platform at **[telegramos.orvteam.com](https://telegramos.orvteam.com)** (currently in beta) gives you this same engine in your browser — no Python, no server, no `.env`.
+
+---
 
 ## Features
 
-### Account Management
-- Multi-account support with dynamic enable/disable
-- Session persistence and automatic recovery
-- Account status monitoring and reporting
-- Automatic detection of revoked sessions
+- **Account management** — add, enable/disable, and persist multiple accounts; automatic recovery of saved sessions and detection/cleanup of revoked ones.
+- **Message monitoring** — keyword-based filtering across all active accounts with real-time forwarding to a designated channel and a per-user ignore list.
+- **Bulk operations** — run an action across N accounts at once: reactions, poll votes, join/leave, block, private messages, and comments.
+- **Individual operations** — target a single account for any of the same actions.
+- **Statistics & reporting** — account health, groups per account, keyword overview, and status reports.
+- **Resilient by design** — concurrency limits, FloodWait handling, graceful degradation, and structured logging.
 
-### Message Monitoring
-- Keyword-based message filtering
-- Automatic forwarding to designated channels
-- User ignore list management
-- Real-time monitoring across all active accounts
+---
 
-### Bulk Operations
-- Reactions: Apply reactions to messages across multiple accounts
-- Polls: Vote in polls using multiple accounts
-- Join/Leave: Manage group memberships in bulk
-- Block: Block users across multiple accounts
-- Private Messages: Send messages to users from multiple accounts
-- Comments: Post comments on messages using multiple accounts
+## Quick Start
 
-### Individual Operations
-- Account-specific actions for targeted operations
-- Per-account control and monitoring
-
-### Statistics and Reporting
-- Bot statistics and status overview
-- Groups per account listing
-- Keyword configuration overview
-- Account health monitoring
-
-## Requirements
-
-- Python 3.8 or higher
-- Telegram API credentials from [my.telegram.org](https://my.telegram.org/apps)
-- Bot token from [@BotFather](https://t.me/BotFather)
-- Telegram user account for admin access
-
-## Installation
-
-### Prerequisites
-
-Ensure Python 3.8+ is installed:
+> Requires **Python 3.8+**, Telegram API credentials from [my.telegram.org](https://my.telegram.org/apps), and a bot token from [@BotFather](https://t.me/BotFather).
 
 ```bash
-python3 --version
-```
-
-### Setup
-
-1. Clone the repository:
-
-```bash
-git clone <repository-url>
+# 1. Clone
+git clone https://github.com/ItsOrv/Telegram-Panel.git
 cd Telegram-Panel
-```
 
-2. Create and activate virtual environment:
-
-```bash
+# 2. Create an isolated environment
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+source venv/bin/activate          # Windows: venv\Scripts\activate
 
-3. Install dependencies:
-
-```bash
+# 3. Install dependencies
 pip install -r requirements.txt
+
+# 4. Configure
+cp env.example .env               # then edit .env (see below)
+
+# 5. Run (choose one)
+python main.py                    # Telegram bot
+python interactive_cli.py         # Interactive terminal UI
+python cli_main.py --help         # Command-line interface
 ```
 
-4. Configure environment:
-
-```bash
-cp env.example .env
-```
-
-Edit `.env` with your credentials:
+Minimal `.env`:
 
 ```env
 API_ID=your_api_id
 API_HASH=your_api_hash
 BOT_TOKEN=your_bot_token
-ADMIN_ID=your_user_id
-CHANNEL_ID=@your_channel
+ADMIN_ID=your_telegram_user_id
+CHANNEL_ID=@your_channel          # optional, for message forwarding
 ```
 
-## Usage Methods
+---
 
-Telegram Panel supports two methods of usage:
+## Configuration
 
-### Method 1: Telegram Bot Interface
+| Variable | Required | Default | Description |
+|----------|:--------:|---------|-------------|
+| `API_ID` | ✅ | — | Telegram API ID from my.telegram.org |
+| `API_HASH` | ✅ | — | Telegram API Hash from my.telegram.org |
+| `BOT_TOKEN` | ✅ | — | Bot token from @BotFather |
+| `ADMIN_ID` | ✅ | — | Your Telegram user ID (only this user may control the bot) |
+| `CHANNEL_ID` | ➖ | — | Channel ID/username for forwarded messages |
+| `BOT_SESSION_NAME` | ➖ | `bot_session` | Bot session filename |
+| `CLIENTS_JSON_PATH` | ➖ | `clients.json` | Path to the accounts/config file |
+| `RATE_LIMIT_SLEEP` | ➖ | `60` | Rate-limit delay (seconds) |
+| `GROUPS_BATCH_SIZE` | ➖ | `10` | Batch size for group scans |
+| `GROUPS_UPDATE_SLEEP` | ➖ | `60` | Group update interval (seconds) |
+| `REPORT_CHECK_BOT` | ➖ | — | Bot username/ID used for report-status checks |
 
-Use the bot directly in Telegram for easy access from anywhere. This is the recommended method for most users.
+Runtime state lives in **`clients.json`**: `TARGET_GROUPS`, `KEYWORDS`, `IGNORE_USERS`, `clients`, and `inactive_accounts`.
 
-**Start the bot:**
+---
+
+## Usage
+
+### Telegram bot
 
 ```bash
 python main.py
 ```
 
-**Features:**
-- Interactive menu system in Telegram
-- Easy navigation with buttons
-- Access from any device with Telegram
-- Real-time notifications and feedback
+Send `/start` to your bot (only `ADMIN_ID` is authorized) and navigate the inline menu: **Account Management**, **Individual**, **Bulk**, **Monitor Mode**, and **Report Status**.
 
-**Getting Started:**
-1. Start the bot with `/start` command in Telegram
-2. Navigate through the interactive menu system
-3. All features are accessible through the bot interface
-
-### Method 2: CLI (Command Line Interface)
-
-Use the CLI on your server or local system for direct control. This method is ideal for:
-- Server environments
-- Automation and scripting
-- Local system management
-- When you prefer command-line interface
-
-**Two CLI modes available:**
-
-#### A. Interactive CLI (Recommended for CLI users)
-
-Menu-driven interface similar to the Telegram bot:
+### Command-line examples
 
 ```bash
-python interactive_cli.py
-```
-
-Or use the convenience script:
-
-```bash
-./cli.sh
-```
-
-**Features:**
-- **Menu Navigation**: Navigate with arrow keys (↑↓) and select with Enter
-- **Visual Interface**: Rich terminal UI with colors and formatting
-- **All Features**: Access to all bot features without Telegram
-- **Easy Navigation**: Back buttons and intuitive menu structure
-
-**Navigation:**
-- Use arrow keys (↑↓) to navigate menus
-- Press Enter to select an option
-- Press Esc to cancel/go back
-- Press Ctrl+C to exit
-
-#### B. Command-line CLI
-
-Direct command execution for automation:
-
-```bash
-python cli_main.py --help
-```
-
-See [CLI Documentation](docs/CLI.md) for detailed command usage.
-
-**Features:**
-- Direct command execution
-- Suitable for scripting and automation
-- All operations available via commands
-- Perfect for server environments
-
-**Example commands:**
-```bash
-# List accounts
+# List configured accounts
 python cli_main.py list-accounts
 
-# Add account
+# Add an account (interactive login)
 python cli_main.py add-account +1234567890
 
-# Bulk reaction
+# React with 5 accounts to a message
 python cli_main.py bulk reaction 5 "https://t.me/c/123456/789" 👍
+
+# Vote in a poll with a single account
+python cli_main.py individual vote my_session "https://t.me/channel/42" 2
 ```
 
-### Choosing the Right Method
+Full command reference: [docs/CLI.md](docs/CLI.md) · Interactive guide: [docs/INTERACTIVE_CLI.md](docs/INTERACTIVE_CLI.md)
 
-- **Use Telegram Bot** if you want:
-  - Easy access from anywhere
-  - Mobile-friendly interface
-  - Interactive menus and buttons
-  - Real-time notifications
+---
 
-- **Use CLI** if you want:
-  - Direct control on your server/system
-  - Automation and scripting capabilities
-  - Command-line workflow
-  - Server-based operations
-
-## Configuration
-
-### Environment Variables
-
-Required variables:
-
-- `API_ID`: Telegram API ID from my.telegram.org
-- `API_HASH`: Telegram API Hash from my.telegram.org
-- `BOT_TOKEN`: Bot token from @BotFather
-- `ADMIN_ID`: Your Telegram user ID (get from @userinfobot)
-
-Optional variables:
-
-- `CHANNEL_ID`: Channel ID or username for message forwarding
-- `BOT_SESSION_NAME`: Bot session filename (default: bot_session)
-- `CLIENTS_JSON_PATH`: Path to clients configuration file (default: clients.json)
-- `RATE_LIMIT_SLEEP`: Rate limit delay in seconds (default: 60)
-- `GROUPS_BATCH_SIZE`: Batch size for group operations (default: 10)
-- `GROUPS_UPDATE_SLEEP`: Group update interval in seconds (default: 60)
-- `REPORT_CHECK_BOT`: Bot username or ID for report status checking
-
-### Configuration File
-
-The `config.json` file stores:
-
-- `TARGET_GROUPS`: List of target groups for monitoring
-- `KEYWORDS`: List of keywords for message filtering
-- `IGNORE_USERS`: List of user IDs to ignore
-- `clients`: Dictionary of client configurations
-
-## Usage
-
-### Using Telegram Bot (Method 1)
-
-1. Start the bot: `python main.py`
-2. Open Telegram and find your bot
-3. Send `/start` command
-4. Navigate through the interactive menu system
-
-**Main Menu Options:**
-- **Account Management**: Add, list, and manage Telegram accounts
-- **Individual**: Perform operations on a single account
-- **Bulk**: Execute operations across multiple accounts
-- **Monitor Mode**: Configure keyword monitoring and forwarding
-- **Report Status**: View statistics and account status
-
-### Using CLI (Method 2)
-
-**Interactive CLI:**
-```bash
-python interactive_cli.py
-# or
-./cli.sh
-```
-
-**Command-line CLI:**
-```bash
-python cli_main.py [COMMAND] [OPTIONS]
-```
-
-See [CLI Documentation](docs/CLI.md) and [Interactive CLI Guide](docs/INTERACTIVE_CLI.md) for detailed usage.
-
-### Account Management
-
-1. Select "Account Management" from main menu
-2. Choose "Add Account" to add a new Telegram account
-3. Enter phone number when prompted
-4. Enter verification code received via Telegram
-5. Enter 2FA password if enabled
-6. Account will be saved and activated automatically
-
-### Bulk Operations
-
-1. Select "Bulk" from main menu
-2. Choose operation type (reaction, poll, join, etc.)
-3. Select number of accounts to use
-4. Follow prompts to complete operation
-
-### Monitor Mode
-
-1. Select "Monitor Mode" from main menu
-2. Add keywords to monitor
-3. Configure target groups
-4. Set up ignore list if needed
-5. Messages containing keywords will be forwarded to configured channel
-
-## Project Structure
+## Architecture
 
 ```
 Telegram-Panel/
-├── main.py                 # Application entry point
-├── requirements.txt        # Python dependencies
-├── env.example            # Environment variables template
-├── config.json            # Runtime configuration
-├── clients.json           # Client session data
-├── src/                   # Source code
-│   ├── Config.py         # Configuration management
-│   ├── Telbot.py         # Main bot orchestrator
-│   ├── Client.py         # Session and account management
-│   ├── Handlers.py       # Event handlers
-│   ├── Keyboards.py      # UI keyboard layouts
-│   ├── Monitor.py        # Message monitoring
-│   ├── actions.py        # Bulk and individual operations
-│   ├── Validation.py     # Input validation
-│   ├── Logger.py         # Logging configuration
-│   └── utils.py          # Utility functions
-├── tests/                 # Test suite
-├── docs/                  # Documentation
-└── logs/                  # Log files
+├── main.py                # Bot entry point
+├── cli_main.py            # Command-line entry point
+├── interactive_cli.py     # Interactive TUI entry point
+├── src/
+│   ├── Telbot.py          # Orchestrator: startup, handlers, reconnection
+│   ├── Client.py          # Session & account lifecycle (SessionManager)
+│   ├── Handlers.py        # Command / callback / message routing
+│   ├── actions.py         # Bulk & individual operations
+│   ├── Monitor.py         # Keyword monitoring & forwarding
+│   ├── Keyboards.py       # Inline keyboard layouts
+│   ├── Config.py          # Environment & config management
+│   ├── Validation.py      # Input validation & sanitization
+│   ├── utils.py           # Shared helpers
+│   └── Logger.py          # Logging setup
+├── tests/                 # Test suite (341 tests)
+└── docs/                  # Documentation
 ```
+
+Built on [Telethon](https://github.com/LonamiWebs/Telethon) with an `asyncio`-first design: a single event loop per CLI invocation, a bounded concurrency semaphore for bulk work, and lock-guarded shared state.
+
+---
 
 ## Testing
 
-Run the test suite:
-
 ```bash
-pytest tests/
+pytest tests/                                   # run the suite
+pytest tests/ --cov=src --cov-report=html       # with coverage
 ```
 
-Run with coverage report:
+---
 
-```bash
-pytest tests/ --cov=src --cov-report=html
-```
+## Security
 
-## Security Considerations
+- Never commit `.env` or `*.session` files — both are git-ignored by default.
+- Only `ADMIN_ID` can control the bot; all other users are rejected.
+- Keep session files secure and back them up; rotate credentials if exposed.
+- Keep dependencies up to date for security patches.
 
-- Never commit `.env` or `.session` files to version control
-- Use strong 2FA passwords for Telegram accounts
-- Keep session files secure and backed up
-- Regularly update dependencies for security patches
-- Limit access to admin user ID only
-- Use secure channels for credential transmission
+---
 
-## Error Handling
+## Contributing
 
-The system includes comprehensive error handling:
-
-- Automatic retry for transient errors
-- Flood wait detection and handling
-- Session revocation detection and cleanup
-- Rate limiting to prevent API abuse
-- Graceful degradation on failures
-
-## Logging
-
-Logs are written to `logs/bot.log` with the following levels:
-
-- `INFO`: General operational information
-- `WARNING`: Non-critical issues
-- `ERROR`: Error conditions
-- `CRITICAL`: Critical failures
-
-## Troubleshooting
-
-### Bot Not Starting
-
-- Verify all required environment variables are set
-- Check that `.env` file exists and is properly formatted
-- Ensure bot token is valid and bot is started via @BotFather
-
-### Account Authentication Fails
-
-- Verify phone number format is correct
-- Check that verification code is entered promptly
-- Ensure 2FA password is correct if enabled
-
-### Session Revoked Errors
-
-- Sessions are automatically detected and removed
-- Re-add account through Account Management menu
-- Check for Telegram security notifications
-
-### Rate Limiting
-
-- System automatically handles FloodWait errors
-- Operations include delays to prevent rate limiting
-- Reduce concurrent operations if issues persist
-
-## Development
-
-### Code Structure
-
-- Modular design with separation of concerns
-- Async/await for concurrent operations
-- Comprehensive error handling
-- Type hints for better code clarity
-
-### Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Please run the test suite before opening a pull request.
 
 ## License
 
-See [LICENSE](LICENSE) file for details.
+Released under the [MIT License](LICENSE). © 2024 ItsOrv.
 
-## Documentation
+---
 
-Additional documentation available in the `docs/` directory:
+<div align="center">
 
-- [Project Structure](docs/PROJECT_STRUCTURE.md)
-- [Documentation Index](docs/README.md)
+**Looking for a managed, no-setup experience?**
+### 🌐 [telegramos.orvteam.com](https://telegramos.orvteam.com) <kbd>BETA</kbd>
 
-## Support
+⭐ If this project helps you, consider starring the repo.
 
-For issues and questions:
-
-1. Check existing documentation
-2. Review error logs in `logs/bot.log`
-3. Consult test suite for usage examples
-4. Open an issue on the repository
+</div>
