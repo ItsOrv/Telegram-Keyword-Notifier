@@ -105,7 +105,7 @@ class Monitor:
                     first_name = InputValidator.sanitize_input(getattr(sender, 'first_name', '') or '', max_length=50)
                     last_name = InputValidator.sanitize_input(getattr(sender, 'last_name', '') or '', max_length=50)
                     sender_id = getattr(sender, 'id', 0)
-                    sender_info = f"User: {first_name} {last_name}\n• User ID: `{sender_id}`\n"
+                    sender_info = f"User: {first_name} {last_name}\n• User ID: {sender_id}\n"
                 else:
                     sender_info = "User: -\n• User ID: -\n"
 
@@ -154,12 +154,16 @@ class Monitor:
                 # Create buttons for the forwarded message
                 buttons = Keyboard.channel_message_keyboard(message_link, sender.id if sender else 0)
 
-                # Forward the message to the configured channel
+                # Forward the message to the configured channel.
+                # parse_mode=None sends the (user-controlled) text literally so a
+                # stray '*', '_', '[' or backtick can't break markdown parsing and
+                # cause the whole forward to be silently dropped.
                 await tbot_instance.send_message(
                     channel_id,
                     text,
                     buttons=buttons,
-                    link_preview=False
+                    link_preview=False,
+                    parse_mode=None
                 )
 
                 logger.info(f"Forwarded message from user {getattr(sender, 'id', '-') if sender else '-'} in chat {chat_title}.")
