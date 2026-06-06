@@ -64,7 +64,9 @@ class TelegramBot:
             
             # Initialize managers now that we have locks and client
             if self.client_manager is None:
-                self.client_manager = SessionManager(self.config, self.active_clients, self.tbot)
+                # SessionManager needs the bot wrapper (for active_clients_lock,
+                # monitor, config_manager and the .tbot client), not the raw client.
+                self.client_manager = SessionManager(self.config, self.active_clients, self)
             if self.account_handler is None:
                 self.account_handler = AccountHandler(self)
             if self.monitor is None:
