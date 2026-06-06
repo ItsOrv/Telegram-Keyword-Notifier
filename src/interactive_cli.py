@@ -421,41 +421,36 @@ class InteractiveCLI:
         """Get user input with optional validation and cancel option."""
         if self.has_prompt_toolkit:
             def get_input_sync():
-                try:
-                    # Add cancel hint to prompt
-                    full_prompt = f"{prompt_text} (Ctrl+C to cancel)" if allow_cancel else prompt_text
-                    
-                    if password:
-                        value = pt_prompt(full_prompt, is_password=True)
-                    else:
-                        value = pt_prompt(full_prompt)
-                    
-                    # Check for cancel command
-                    if allow_cancel and (value.lower() in ['cancel', 'c', 'back', 'b']):
-                        return None
-                    
-                    if validator:
-                        is_valid, error_msg = validator(value)
-                        if not is_valid:
-                            if self.has_rich and self.console:
-                                self.console.print(f"[red]{error_msg}[/red]")
-                            else:
-                                print(f"Error: {error_msg}")
+                # Loop inside the worker thread so a failed validation re-prompts
+                # instead of being indistinguishable from a cancel.
+                while True:
+                    try:
+                        # Add cancel hint to prompt
+                        full_prompt = f"{prompt_text} (Ctrl+C to cancel)" if allow_cancel else prompt_text
+
+                        if password:
+                            value = pt_prompt(full_prompt, is_password=True)
+                        else:
+                            value = pt_prompt(full_prompt)
+
+                        # Only the explicit word 'cancel' cancels (matches the hint);
+                        # otherwise 'c'/'b'/'back' would clobber legitimate input.
+                        if allow_cancel and value.strip().lower() == 'cancel':
                             return None
-                    return value
-                except KeyboardInterrupt:
-                    return None
-            
-            while True:
-                result = await asyncio.to_thread(get_input_sync)
-                if result is not None:
-                    return result
-                # If None and allow_cancel, return None (user cancelled)
-                if allow_cancel:
-                    return None
-                if validator:
-                    continue
-                return None
+
+                        if validator:
+                            is_valid, error_msg = validator(value)
+                            if not is_valid:
+                                if self.has_rich and self.console:
+                                    self.console.print(f"[red]{error_msg}[/red]")
+                                else:
+                                    print(f"Error: {error_msg}")
+                                continue
+                        return value
+                    except KeyboardInterrupt:
+                        return None
+
+            return await asyncio.to_thread(get_input_sync)
         elif self.has_rich and self.console:
             def get_input_sync():
                 while True:
@@ -467,9 +462,9 @@ class InteractiveCLI:
                             value = Prompt.ask(full_prompt, password=True)
                         else:
                             value = Prompt.ask(full_prompt)
-                        
-                        # Check for cancel command
-                        if allow_cancel and (value.lower() in ['cancel', 'c', 'back', 'b']):
+
+                        # Only the explicit word 'cancel' cancels (matches the hint)
+                        if allow_cancel and value.strip().lower() == 'cancel':
                             return None
                         
                         if validator:
@@ -494,9 +489,9 @@ class InteractiveCLI:
                             value = getpass.getpass(full_prompt)
                         else:
                             value = input(full_prompt).strip()
-                        
-                        # Check for cancel command
-                        if allow_cancel and (value.lower() in ['cancel', 'c', 'back', 'b']):
+
+                        # Only the explicit word 'cancel' cancels (matches the hint)
+                        if allow_cancel and value.strip().lower() == 'cancel':
                             return None
                         
                         if validator:
@@ -588,13 +583,14 @@ class InteractiveCLI:
             self._clear_screen()
             return
         
+        client = None
         try:
             session_name = sanitize_session_name(phone)
-            
+
             if session_name in self.active_clients:
                 self._print_error(f"Account {session_name} already exists")
                 return
-            
+
             # Show loading while connecting
             client = TelegramClient(session_name, API_ID, API_HASH)
             await self._show_loading("Connecting to Telegram", client.connect())
@@ -636,7 +632,14 @@ class InteractiveCLI:
         except Exception as e:
             logger.error(f"Error adding account: {e}")
             self._print_error(str(e))
-    
+            # Don't leak a connected client / half-added session on failure
+            if client is not None:
+                try:
+                    if client.is_connected():
+                        await client.disconnect()
+                except Exception as disc_err:
+                    logger.debug(f"Error disconnecting failed client: {disc_err}")
+
     async def list_accounts_flow(self):
         """List accounts flow."""
         self._print_header("Account List")
