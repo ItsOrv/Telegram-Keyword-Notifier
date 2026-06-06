@@ -284,14 +284,16 @@ class SessionManager:
                     # Try to connect and authorize
                     await client.connect()
                     if await client.is_user_authorized():
-                        # Add to active clients
+                        # Use the sanitized name as the key, consistent with
+                        # detect_sessions/finalize_client_setup and the actual
+                        # session file Telethon opens.
                         async with self.tbot.active_clients_lock:
-                            self.tbot.active_clients[phone_number] = client
+                            self.tbot.active_clients[sanitized_phone] = client
 
                         # Add back to config
                         if 'clients' not in self.config:
                             self.config['clients'] = {}
-                        self.config['clients'][phone_number] = []  # Empty groups list
+                        self.config['clients'][sanitized_phone] = []  # Empty groups list
                         self.config_manager.save_config(self.config)
 
                         await event.respond(f"Account {phone_number} successfully reactivated!")
@@ -692,7 +694,7 @@ class AccountHandler:
                 "TARGET_GROUPS": [],
                 "KEYWORDS": [],
                 "IGNORE_USERS": [],
-                "clients": []
+                "clients": {}
             }
 
             if os.path.exists(CLIENTS_JSON_PATH):
@@ -700,11 +702,16 @@ class AccountHandler:
                     with open(CLIENTS_JSON_PATH, "r", encoding='utf-8') as json_file:
                         loaded_data = json.loads(json_file.read())
                         json_data.update(loaded_data)
-                        if isinstance(json_data["clients"], list):
-                            json_data["clients"] = {session: [] for session in json_data["clients"]}
                     logger.info("Loaded existing client data from clients.json.")
                 except json.JSONDecodeError as e:
                     logger.error("Error decoding clients.json.", exc_info=True)
+
+            # Normalize the clients section to dict format regardless of where it
+            # came from (missing file, legacy list format, or new dict format).
+            if isinstance(json_data["clients"], list):
+                json_data["clients"] = {session: [] for session in json_data["clients"]}
+            elif not isinstance(json_data["clients"], dict):
+                json_data["clients"] = {}
 
             # Get a snapshot of active clients to avoid holding the lock during long operations
             async with self.tbot.active_clients_lock:
@@ -762,11 +769,14 @@ class AccountHandler:
                     continue
 
             for session_name, group_ids in groups_per_client.items():
-                if session_name in json_data["clients"]:
-                    existing_groups = json_data["clients"][session_name]
-                    if not isinstance(existing_groups, list):
-                        existing_groups = []
-                    json_data["clients"][session_name] = list(set(existing_groups + group_ids))
+                existing = json_data["clients"].get(session_name)
+                if isinstance(existing, dict):
+                    # New format: preserve metadata (e.g. is_reported) and merge groups
+                    existing_groups = existing.get('groups', [])
+                    existing['groups'] = list(set(existing_groups + group_ids))
+                    json_data["clients"][session_name] = existing
+                elif isinstance(existing, list):
+                    json_data["clients"][session_name] = list(set(existing + group_ids))
                 else:
                     json_data["clients"][session_name] = group_ids
 
