@@ -740,9 +740,11 @@ class CallbackHandler:
             # Handle special cases (e.g., phone number request, toggle, delete, ignore)
             elif data == 'request_phone_number':
                 logger.info("request_phone_number in callback_handler")
-                await event.respond("Please enter your phone number:")
-                async with self.tbot._conversations_lock:
-                    self.tbot._conversations[event.chat_id] = 'phone_number_handler'
+                await prompt_for_input(
+                    self.tbot, event,
+                    "Please enter your phone number:",
+                    'phone_number_handler'
+                )
                 return
             # Handle reaction button selections (must be before other handlers)
             elif data in ['reaction_thumbsup', 'reaction_heart', 'reaction_laugh', 'reaction_wow', 'reaction_sad', 'reaction_angry']:

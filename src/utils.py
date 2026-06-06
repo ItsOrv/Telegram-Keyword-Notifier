@@ -481,8 +481,12 @@ async def prompt_for_input(
         cancel_button: Whether to show cancel button
     """
     from telethon import Button
-    buttons = [Button.inline("Cancel", 'cancel')] if cancel_button else None
-    await event.respond(prompt_message, buttons=buttons)
+    from src.Keyboards import Keyboard
+    buttons = [[Button.inline("🔴 Cancel", 'cancel')]] if cancel_button else None
+    # Edit the menu in place into the prompt (falls back to a new message when the
+    # event isn't an editable bot message) so prompts replace the menu instead of
+    # stacking new messages on top of the old keyboard.
+    await Keyboard.edit_or_respond(event, prompt_message, buttons=buttons)
     async with tbot._conversations_lock:
         tbot._conversations[event.chat_id] = conversation_state
 

@@ -88,7 +88,7 @@ class Keyboard:
                 Button.inline('🏷 Show Keywords', 'show_keyword')
             ],
             [Button.inline("🚫 Show Ignores", 'show_ignores')],
-            [Button.inline("🔙 Back", 'back_to_start')]
+            [Button.inline("🔵 Back", 'back_to_start')]
         ]
 
     @staticmethod
@@ -113,7 +113,7 @@ class Keyboard:
                 Button.inline('✉️ Send PV', 'bulk_send_pv')
             ],
             [Button.inline('💬 Comment', 'bulk_comment')],
-            [Button.inline("🔙 Back", 'back_to_start')]
+            [Button.inline("🔵 Back", 'back_to_start')]
         ]
 
     @staticmethod
@@ -131,10 +131,10 @@ class Keyboard:
             List of button rows for account management
         """
         buttons = [
-            [Button.inline('➕ Add Account', 'add_account')],
+            [Button.inline('🟢 Add Account', 'add_account')],
             [Button.inline('📋 List Accounts', 'list_accounts')],
             [Button.inline('💤 Inactive Accounts', 'inactive_accounts')],
-            [Button.inline("🔙 Back", 'back_to_start')]
+            [Button.inline("🔵 Back", 'back_to_start')]
         ]
 
         if tbot and chat_id and chat_id in tbot._conversations:
@@ -179,7 +179,7 @@ class Keyboard:
         return [
             [
                 Button.inline(
-                    "⛔ Disable" if is_active else "✅ Enable",
+                    "🔴 Disable" if is_active else "🟢 Enable",
                     data=f"toggle_{session}"
                 ),
                 Button.inline("🗑 Delete", data=f"delete_{session}")
@@ -207,7 +207,7 @@ class Keyboard:
                 Button.inline("🚫 Block", 'block'),
                 Button.inline("💬 Comment", 'comment')
             ],
-            [Button.inline("🔙 Back", 'back_to_start')]
+            [Button.inline("🔵 Back", 'back_to_start')]
         ]
 
     @staticmethod
@@ -221,7 +221,7 @@ class Keyboard:
         return [
             [Button.inline("📈 Show Stats", 'show_stats')],
             [Button.inline("🛡 Check Report Status", 'check_report_status')],
-            [Button.inline("🔙 Back", 'back_to_start')]
+            [Button.inline("🔵 Back", 'back_to_start')]
         ]
 
     @staticmethod
@@ -243,7 +243,7 @@ class Keyboard:
         result = [row[:] for row in buttons]
 
         # Add back button as a new row
-        result.append([Button.inline("🔙 Back", back_action)])
+        result.append([Button.inline("🔵 Back", back_action)])
 
         return result
 
@@ -265,7 +265,7 @@ class Keyboard:
         result = [row[:] for row in buttons]
 
         # Add cancel button as a new row
-        result.append([Button.inline("❌ Cancel", 'cancel')])
+        result.append([Button.inline("🔴 Cancel", 'cancel')])
 
         return result
 
