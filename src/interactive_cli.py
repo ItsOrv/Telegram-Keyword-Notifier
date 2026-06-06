@@ -792,7 +792,7 @@ class InteractiveCLI:
             return
         
         option_str = await self._get_input("Enter option number (1-10)", 
-                                          lambda x: InputValidator.validate_poll_option(x),
+                                          lambda x: InputValidator.validate_poll_option(x)[:2],
                                           allow_cancel=True)
         if not option_str:
             self._clear_screen()
@@ -819,6 +819,9 @@ class InteractiveCLI:
                 chat_entity = await resolve_entity(chat_entity, account)
                 
                 message = await account.get_messages(chat_entity, ids=message_id)
+                if message is None:
+                    self._print_error("Message not found")
+                    return
                 if not message.poll:
                     self._print_error("The provided link does not point to a poll")
                     return
@@ -881,7 +884,7 @@ class InteractiveCLI:
                 
                 from src.utils import resolve_entity
                 entity = await account.get_entity(link)
-                await account.leave_chat(entity)
+                await account.delete_dialog(entity)
                 
                 self._print_success(f"Successfully left {link}")
             except Exception as e:
@@ -1070,7 +1073,7 @@ class InteractiveCLI:
             return
         
         option_str = await self._get_input("Enter option number (1-10)", 
-                                          lambda x: InputValidator.validate_poll_option(x),
+                                          lambda x: InputValidator.validate_poll_option(x)[:2],
                                           allow_cancel=True)
         if not option_str:
             self._clear_screen()
@@ -1222,7 +1225,7 @@ class InteractiveCLI:
                         elif operation == 'leave':
                             from src.utils import resolve_entity
                             entity = await resolve_entity(kwargs['link'], account)
-                            await account.leave_chat(entity)
+                            await account.delete_dialog(entity)
                         elif operation == 'block':
                             from src.utils import resolve_entity
                             from telethon.tl.functions.contacts import BlockRequest
@@ -1276,7 +1279,7 @@ class InteractiveCLI:
                     elif operation == 'leave':
                         from src.utils import resolve_entity
                         entity = await resolve_entity(kwargs['link'], account)
-                        await account.leave_chat(entity)
+                        await account.delete_dialog(entity)
                     elif operation == 'block':
                         from src.utils import resolve_entity
                         from telethon.tl.functions.contacts import BlockRequest
@@ -1594,12 +1597,15 @@ class InteractiveCLI:
                     self.config['clients'] = {}
                 
                 for session_name, groups in groups_per_client.items():
-                    if session_name not in self.config['clients']:
-                        self.config['clients'][session_name] = {}
-                    self.config['clients'][session_name] = groups
-                
+                    entry = self.config['clients'].get(session_name)
+                    if isinstance(entry, dict):
+                        # Preserve existing metadata (phone, enabled, ...)
+                        entry['groups'] = groups
+                    else:
+                        self.config['clients'][session_name] = {'groups': groups}
+
                 self.config_manager.save_config(self.config)
-                
+
                 total_groups = sum(len(groups) for groups in groups_per_client.values())
                 progress.update(task, description=f"[green]✓ Complete: {total_groups} total groups[/green]")
         else:
@@ -1633,10 +1639,13 @@ class InteractiveCLI:
                 self.config['clients'] = {}
             
             for session_name, groups in groups_per_client.items():
-                if session_name not in self.config['clients']:
-                    self.config['clients'][session_name] = {}
-                self.config['clients'][session_name] = groups
-            
+                entry = self.config['clients'].get(session_name)
+                if isinstance(entry, dict):
+                    # Preserve existing metadata (phone, enabled, ...)
+                    entry['groups'] = groups
+                else:
+                    self.config['clients'][session_name] = {'groups': groups}
+
             self.config_manager.save_config(self.config)
             
             total_groups = sum(len(groups) for groups in groups_per_client.values())
@@ -1676,7 +1685,8 @@ class InteractiveCLI:
                             continue
                 
                 phone = session.replace('.session', '') if session else 'Unknown'
-                groups_count = len(groups) if isinstance(groups, list) else 0
+                group_list = groups.get('groups', []) if isinstance(groups, dict) else (groups if isinstance(groups, list) else [])
+                groups_count = len(group_list)
                 total_groups += groups_count
                 groups_table.add_row(phone, str(groups_count))
             
@@ -1696,7 +1706,8 @@ class InteractiveCLI:
                             continue
                 
                 phone = session.replace('.session', '') if session else 'Unknown'
-                groups_count = len(groups) if isinstance(groups, list) else 0
+                group_list = groups.get('groups', []) if isinstance(groups, dict) else (groups if isinstance(groups, list) else [])
+                groups_count = len(group_list)
                 total_groups += groups_count
                 print(f"  • {phone}: {groups_count} groups")
             
