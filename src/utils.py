@@ -482,7 +482,7 @@ async def prompt_for_input(
     """
     from telethon import Button
     from src.Keyboards import Keyboard
-    buttons = [[Button.inline("🔴 Cancel", 'cancel')]] if cancel_button else None
+    buttons = [[Button.inline("Cancel", 'cancel', style='danger')]] if cancel_button else None
     # Edit the menu in place into the prompt (falls back to a new message when the
     # event isn't an editable bot message) so prompts replace the menu instead of
     # stacking new messages on top of the old keyboard.

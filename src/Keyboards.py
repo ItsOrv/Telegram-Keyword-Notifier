@@ -4,6 +4,12 @@ from telethon.errors import MessageIdInvalidError
 
 logger = logging.getLogger(__name__)
 
+# Inline-button colour styles (Bot API 9.4 / Telethon 1.43+). Older Telegram
+# clients simply render these as normal buttons, so they are safe to always send.
+PRIMARY = 'primary'  # blue  — navigation / neutral
+SUCCESS = 'success'  # green — create / enable / positive
+DANGER = 'danger'    # red   — destructive / cancel
+
 # Header text shown above each named keyboard.
 KEYBOARD_MESSAGES = {
     'start': "🤖 Telegram Management Bot\n\nPlease select an option:",
@@ -56,13 +62,13 @@ class Keyboard:
             List of button rows for the main menu
         """
         return [
-            [Button.inline("👤 Account Management", 'account_management')],
+            [Button.inline("👤 Account Management", 'account_management', style=PRIMARY)],
             [
-                Button.inline("🎯 Individual", 'individual_keyboard'),
-                Button.inline("⚡ Bulk", 'bulk_operations')
+                Button.inline("🎯 Individual", 'individual_keyboard', style=PRIMARY),
+                Button.inline("⚡ Bulk", 'bulk_operations', style=PRIMARY)
             ],
-            [Button.inline("📡 Monitor Mode", 'monitor_mode')],
-            [Button.inline("📊 Report Status", 'report')]
+            [Button.inline("📡 Monitor Mode", 'monitor_mode', style=PRIMARY)],
+            [Button.inline("📊 Report Status", 'report', style=PRIMARY)]
         ]
 
     @staticmethod
@@ -75,20 +81,20 @@ class Keyboard:
         """
         return [
             [
-                Button.inline('➕ Add Keyword', 'add_keyword'),
-                Button.inline('➖ Remove Keyword', 'remove_keyword')
+                Button.inline('➕ Add Keyword', 'add_keyword', style=SUCCESS),
+                Button.inline('➖ Remove Keyword', 'remove_keyword', style=DANGER)
             ],
             [
                 Button.inline('🔇 Ignore User', 'ignore_user'),
-                Button.inline('🔊 Remove Ignore', 'remove_ignore_user')
+                Button.inline('🔊 Remove Ignore', 'remove_ignore_user', style=DANGER)
             ],
-            [Button.inline("🔄 Update Groups", 'update_groups')],
+            [Button.inline("🔄 Update Groups", 'update_groups', style=PRIMARY)],
             [
                 Button.inline('📁 Show Groups', 'show_groups'),
                 Button.inline('🏷 Show Keywords', 'show_keyword')
             ],
             [Button.inline("🚫 Show Ignores", 'show_ignores')],
-            [Button.inline("🔵 Back", 'back_to_start')]
+            [Button.inline("Back", 'back_to_start', style=PRIMARY)]
         ]
 
     @staticmethod
@@ -105,15 +111,15 @@ class Keyboard:
                 Button.inline('📊 Poll', 'bulk_poll')
             ],
             [
-                Button.inline('➕ Join', 'bulk_join'),
-                Button.inline('🚪 Leave', 'bulk_leave')
+                Button.inline('➕ Join', 'bulk_join', style=SUCCESS),
+                Button.inline('🚪 Leave', 'bulk_leave', style=DANGER)
             ],
             [
-                Button.inline('🚫 Block', 'bulk_block'),
+                Button.inline('🚫 Block', 'bulk_block', style=DANGER),
                 Button.inline('✉️ Send PV', 'bulk_send_pv')
             ],
             [Button.inline('💬 Comment', 'bulk_comment')],
-            [Button.inline("🔵 Back", 'back_to_start')]
+            [Button.inline("Back", 'back_to_start', style=PRIMARY)]
         ]
 
     @staticmethod
@@ -131,10 +137,10 @@ class Keyboard:
             List of button rows for account management
         """
         buttons = [
-            [Button.inline('🟢 Add Account', 'add_account')],
+            [Button.inline('➕ Add Account', 'add_account', style=SUCCESS)],
             [Button.inline('📋 List Accounts', 'list_accounts')],
             [Button.inline('💤 Inactive Accounts', 'inactive_accounts')],
-            [Button.inline("🔵 Back", 'back_to_start')]
+            [Button.inline("Back", 'back_to_start', style=PRIMARY)]
         ]
 
         if tbot and chat_id and chat_id in tbot._conversations:
@@ -158,7 +164,7 @@ class Keyboard:
         """
         return [
             [Button.url("🔗 View Message", url=message_link)],
-            [Button.inline("🔇 Ignore", data=f"ignore_{sender_id}")]
+            [Button.inline("🔇 Ignore", data=f"ignore_{sender_id}", style=DANGER)]
         ]
 
     @staticmethod
@@ -176,13 +182,14 @@ class Keyboard:
         # Exact match: "Active" is a substring of "Inactive", so a loose `in`
         # check would label inactive accounts "Disable".
         is_active = status.strip() == "Active"
+        if is_active:
+            toggle_button = Button.inline("Disable", data=f"toggle_{session}", style=DANGER)
+        else:
+            toggle_button = Button.inline("Enable", data=f"toggle_{session}", style=SUCCESS)
         return [
             [
-                Button.inline(
-                    "🔴 Disable" if is_active else "🟢 Enable",
-                    data=f"toggle_{session}"
-                ),
-                Button.inline("🗑 Delete", data=f"delete_{session}")
+                toggle_button,
+                Button.inline("🗑 Delete", data=f"delete_{session}", style=DANGER)
             ]
         ]
 
@@ -200,14 +207,14 @@ class Keyboard:
                 Button.inline("✉️ Send PV", 'send_pv')
             ],
             [
-                Button.inline("➕ Join", 'join'),
-                Button.inline("🚪 Leave", 'left')
+                Button.inline("➕ Join", 'join', style=SUCCESS),
+                Button.inline("🚪 Leave", 'left', style=DANGER)
             ],
             [
-                Button.inline("🚫 Block", 'block'),
+                Button.inline("🚫 Block", 'block', style=DANGER),
                 Button.inline("💬 Comment", 'comment')
             ],
-            [Button.inline("🔵 Back", 'back_to_start')]
+            [Button.inline("Back", 'back_to_start', style=PRIMARY)]
         ]
 
     @staticmethod
@@ -221,7 +228,7 @@ class Keyboard:
         return [
             [Button.inline("📈 Show Stats", 'show_stats')],
             [Button.inline("🛡 Check Report Status", 'check_report_status')],
-            [Button.inline("🔵 Back", 'back_to_start')]
+            [Button.inline("Back", 'back_to_start', style=PRIMARY)]
         ]
 
     @staticmethod
@@ -243,7 +250,7 @@ class Keyboard:
         result = [row[:] for row in buttons]
 
         # Add back button as a new row
-        result.append([Button.inline("🔵 Back", back_action)])
+        result.append([Button.inline("Back", back_action, style=PRIMARY)])
 
         return result
 
@@ -265,7 +272,7 @@ class Keyboard:
         result = [row[:] for row in buttons]
 
         # Add cancel button as a new row
-        result.append([Button.inline("🔴 Cancel", 'cancel')])
+        result.append([Button.inline("Cancel", 'cancel', style=DANGER)])
 
         return result
 

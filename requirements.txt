@@ -1,4 +1,4 @@
-telethon==1.36.0
+telethon==1.43.2  # >=1.43 required for colored inline buttons (Bot API 9.4 style field)
 python-dotenv==1.0.0
 aiohttp
 requests
