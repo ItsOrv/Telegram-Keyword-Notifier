@@ -29,6 +29,7 @@ class TelegramBot:
             self.client_manager = None
             self.account_handler = None
             self.monitor = None
+            self._handlers_registered = False
 
             logger.info("Bot initialized successfully")
         except Exception as e:
@@ -103,6 +104,11 @@ class TelegramBot:
         """
         Initialize all event handlers for the bot.
         """
+        # The bot client is reused across reconnections, so registering again
+        # would stack duplicate handlers and process every event multiple times.
+        if self._handlers_registered:
+            logger.info("Handlers already registered, skipping re-registration")
+            return
         try:
             # Register command handler first (with pattern) - this will catch /start before generic handler
             command_handler = CommandHandler(self)
@@ -128,7 +134,8 @@ class TelegramBot:
                 events.NewMessage()
             )
             logger.info("Registered generic message handler")
-            
+
+            self._handlers_registered = True
             logger.info("Handlers initialized successfully")
         except Exception as e:
             logger.error(f"Error initializing handlers: {e}")
@@ -178,9 +185,13 @@ class TelegramBot:
             try:
                 if attempt > 0:
                     logger.info(f"Attempting to restart bot (attempt {attempt + 1}/{max_retries})...")
-                    # Reset message processing flags for reconnection
+                    # Reset message processing flags for reconnection and remove
+                    # the previously registered handlers so they don't stack up
+                    # (which would forward each message multiple times).
                     async with self.active_clients_lock:
                         for client in self.active_clients.values():
+                            if self.monitor:
+                                self.monitor.cleanup_client_handlers(client)
                             if hasattr(client, '_message_processing_set'):
                                 delattr(client, '_message_processing_set')
                     await asyncio.sleep(retry_delay)
