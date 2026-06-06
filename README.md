@@ -2,20 +2,20 @@
 
 # Telegram Panel
 
-**Centralized management for multiple Telegram accounts — monitoring, bulk operations, and automation from a single control plane.**
+**Centralized management for multiple Telegram accounts: monitoring, bulk operations, and automation from a single control plane.**
 
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
 [![Telethon](https://img.shields.io/badge/built%20with-Telethon-2CA5E0.svg)](https://github.com/LonamiWebs/Telethon)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-341%20passing-brightgreen.svg)](tests/)
 
-### 🌐 TelegramOS — the full platform at [**telegramos.orvteam.com**](https://telegramos.orvteam.com) <kbd>BETA</kbd>
+### 🌐 TelegramOS: the full platform at [**telegramos.orvteam.com**](https://telegramos.orvteam.com) <kbd>BETA</kbd>
 
 A hosted platform that goes far beyond this panel:
 
-- 🛒 **Ready-made & rentable accounts** — activate pre-warmed, aged Telegram accounts from a built-in marketplace, or bring your own.
-- 🧩 **No-code visual bot builder** — design bots and multi-step automations with a drag-and-drop flow editor; no programming required.
-- 🛡️ **Anti-ban built for scale** — safely operate large fleets of accounts, not just a handful.
+- 🛒 **Ready-made & rentable accounts:** activate pre-warmed, aged Telegram accounts from a built-in marketplace, or bring your own.
+- 🧩 **No-code visual bot builder:** design bots and multi-step automations with a drag-and-drop flow editor, no programming required.
+- 🛡️ **Anti-ban built for scale:** safely operate large fleets of accounts, not just a handful.
 
 **[→ Open TelegramOS](https://telegramos.orvteam.com)**
 
@@ -33,20 +33,20 @@ Telegram Panel is a self-hostable system for operating many Telegram accounts fr
 | 🖥️ **Interactive CLI** | A menu-driven terminal UI on your server | `python interactive_cli.py` |
 | ⚡ **Command CLI** | Scripting & automation | `python cli_main.py …` |
 
-> ⚠️ **Planning to run more than a few accounts?** When you self-host this panel, every account connects through the **same server IP** *and* the **same device signature** — and Telegram sees both the IP and the device fingerprint of each session. So all your accounts look like they share one machine, and in practice running **more than ~3 accounts** this way often gets them **rate-limited or banned**.
+> ⚠️ **Planning to run more than a few accounts?** When you self-host this panel, every account connects through the **same server IP** and the **same device signature**. Telegram sees both the IP and the device fingerprint of each session, so all your accounts look like they share one machine. In practice, running **more than ~3 accounts** this way often gets them **rate-limited or banned**.
 >
-> **[TelegramOS](https://telegramos.orvteam.com)** is built to solve exactly this: each account runs in its **own isolated, Windows-like environment** (a distinct device fingerprint per account) behind a **dedicated residential IP**, so every account looks like a real, independent device on a real connection and stays safe even at high account counts — on top of a rentable-account marketplace and a no-code visual bot builder.
+> **[TelegramOS](https://telegramos.orvteam.com)** is built to solve exactly this. Each account runs in its **own isolated, Windows-like environment** (a distinct device fingerprint per account) behind a **dedicated residential IP**, so every account looks like a real, independent device on a real connection and stays safe even at high account counts. It also includes a rentable-account marketplace and a no-code visual bot builder.
 
 ---
 
 ## Features
 
-- **Account management** — add, enable/disable, and persist multiple accounts; automatic recovery of saved sessions and detection/cleanup of revoked ones.
-- **Message monitoring** — keyword-based filtering across all active accounts with real-time forwarding to a designated channel and a per-user ignore list.
-- **Bulk operations** — run an action across N accounts at once: reactions, poll votes, join/leave, block, private messages, and comments.
-- **Individual operations** — target a single account for any of the same actions.
-- **Statistics & reporting** — account health, groups per account, keyword overview, and status reports.
-- **Resilient by design** — concurrency limits, FloodWait handling, graceful degradation, and structured logging.
+- **Account management:** add, enable/disable, and persist multiple accounts, with automatic recovery of saved sessions and detection/cleanup of revoked ones.
+- **Message monitoring:** keyword-based filtering across all active accounts, with real-time forwarding to a designated channel and a per-user ignore list.
+- **Bulk operations:** run an action across N accounts at once (reactions, poll votes, join/leave, block, private messages, and comments).
+- **Individual operations:** target a single account for any of the same actions.
+- **Statistics & reporting:** account health, groups per account, keyword overview, and status reports.
+- **Resilient by design:** concurrency limits, FloodWait handling, graceful degradation, and structured logging.
 
 ---
 
@@ -174,7 +174,7 @@ pytest tests/ --cov=src --cov-report=html       # with coverage
 
 ## Security
 
-- Never commit `.env` or `*.session` files — both are git-ignored by default.
+- Never commit `.env` or `*.session` files; both are git-ignored by default.
 - Only `ADMIN_ID` can control the bot; all other users are rejected.
 - Keep session files secure and back them up; rotate credentials if exposed.
 - Keep dependencies up to date for security patches.
@@ -183,7 +183,7 @@ pytest tests/ --cov=src --cov-report=html       # with coverage
 
 ## Contributing
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Please run the test suite before opening a pull request.
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md), and please run the test suite before opening a pull request.
 
 ## License
 
