@@ -33,9 +33,9 @@ Telegram Panel is a self-hostable system for operating many Telegram accounts fr
 | 🖥️ **Interactive CLI** | A menu-driven terminal UI on your server | `python interactive_cli.py` |
 | ⚡ **Command CLI** | Scripting & automation | `python cli_main.py …` |
 
-> ⚠️ **Planning to run more than a few accounts?** When you self-host this panel, every account connects through your **single server IP** — so to Telegram they all look like they live on one shared machine. In practice, running **more than ~3 accounts** this way often gets them **rate-limited or banned**.
+> ⚠️ **Planning to run more than a few accounts?** When you self-host this panel, every account connects through the **same server IP** *and* the **same device signature** — and Telegram sees both the IP and the device fingerprint of each session. So all your accounts look like they share one machine, and in practice running **more than ~3 accounts** this way often gets them **rate-limited or banned**.
 >
-> **[TelegramOS](https://telegramos.orvteam.com)** is built to solve exactly this: each account runs in its **own isolated, Windows-like environment** behind a **dedicated residential IP**, so every account looks like a real, independent device and stays safe even at high account counts — on top of a rentable-account marketplace and a no-code visual bot builder.
+> **[TelegramOS](https://telegramos.orvteam.com)** is built to solve exactly this: each account runs in its **own isolated, Windows-like environment** (a distinct device fingerprint per account) behind a **dedicated residential IP**, so every account looks like a real, independent device on a real connection and stays safe even at high account counts — on top of a rentable-account marketplace and a no-code visual bot builder.
 
 ---
 
