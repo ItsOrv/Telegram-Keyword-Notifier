@@ -102,7 +102,8 @@ class ConfigManager:
         :param new_config: Dictionary containing configuration updates.
         """
         try:
-            # Reload current config from file to ensure we have the latest
+            # Reload current config from file to ensure we have the latest,
+            # then merge into it so externally-changed keys are not lost.
             current_config = self.load_config()
             for key, value in new_config.items():
                 if key in current_config and isinstance(current_config[key], list) and isinstance(value, list):
@@ -115,9 +116,10 @@ class ConfigManager:
                         if item not in seen:
                             seen.add(item)
                             result.append(item)
-                    self.config[key] = result
+                    current_config[key] = result
                 else:
-                    self.config[key] = value
+                    current_config[key] = value
+            self.config = current_config
             self.save_config(self.config)
         except Exception as e:
             logger.error(f"Error merging config: {e}")
