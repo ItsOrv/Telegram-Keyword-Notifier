@@ -234,8 +234,10 @@ async def execute_bulk_operation(
             except FloodWaitError as e:
                 async with counter_lock:
                     error_count += 1
-                logger.warning(f"FloodWaitError for account {session_name}: waiting {e.seconds} seconds")
-                await asyncio.sleep(e.seconds)
+                # The operation is counted as failed and not retried, so do NOT
+                # sleep here: sleeping would hold a concurrency slot for the full
+                # flood-wait window and throttle the rest of the batch for nothing.
+                logger.warning(f"FloodWaitError for account {session_name}: {e.seconds}s (skipped, not retried)")
             except (SessionRevokedError, ValueError) as e:
                 if is_session_revoked_error(e):
                     async with counter_lock:
@@ -553,35 +555,57 @@ async def remove_revoked_session_completely(tbot, session_name: str):
         tbot: TelegramBot instance
         session_name: Session name/key to remove
     """
-    # Remove from active_clients
+    # Callers may pass either the active_clients/config key (e.g. 'foo') or the
+    # Telethon session filename (e.g. 'foo.session'). Normalize both forms so the
+    # same session is matched in every store.
+    base_name = session_name[:-len('.session')] if session_name.endswith('.session') else session_name
+
+    # Pop the client out under the lock, then disconnect outside the lock so
+    # network teardown does not block other coroutines needing active_clients.
+    client_to_disconnect = None
     async with tbot.active_clients_lock:
-        if session_name in tbot.active_clients:
-            client = tbot.active_clients[session_name]
-            # Cleanup handlers before disconnecting
-            if hasattr(tbot, 'monitor'):
-                tbot.monitor.cleanup_client_handlers(client)
-            try:
-                await client.disconnect()
-            except Exception as e:
-                logger.debug(f"Error disconnecting client {session_name}: {e}")
-            del tbot.active_clients[session_name]
-            logger.info(f"Removed revoked session from active_clients: {session_name}")
-    
-    # Remove from config['clients']
-    if session_name in tbot.config.get('clients', {}):
-        del tbot.config['clients'][session_name]
-        tbot.config_manager.save_config(tbot.config)
-        logger.info(f"Removed revoked session from config: {session_name}")
-    
-    # Remove from inactive_accounts if present
-    if 'inactive_accounts' in tbot.config and session_name in tbot.config['inactive_accounts']:
-        del tbot.config['inactive_accounts'][session_name]
-        tbot.config_manager.save_config(tbot.config)
-        logger.info(f"Removed revoked session from inactive_accounts: {session_name}")
-    
-    # Delete session file with path traversal protection
+        resolved_key = None
+        for candidate in (session_name, base_name):
+            if candidate in tbot.active_clients:
+                resolved_key = candidate
+                break
+        if resolved_key is None:
+            for key, client in list(tbot.active_clients.items()):
+                try:
+                    if get_session_name(client) in (session_name, base_name):
+                        resolved_key = key
+                        break
+                except Exception:
+                    pass
+        if resolved_key is not None:
+            client_to_disconnect = tbot.active_clients.pop(resolved_key)
+            # config/active_clients share the same key convention
+            base_name = resolved_key
+            logger.info(f"Removed revoked session from active_clients: {resolved_key}")
+
+    if client_to_disconnect is not None:
+        if hasattr(tbot, 'monitor'):
+            tbot.monitor.cleanup_client_handlers(client_to_disconnect)
+        try:
+            await client_to_disconnect.disconnect()
+        except Exception as e:
+            logger.debug(f"Error disconnecting client {base_name}: {e}")
+
+    # Remove from config['clients'] / inactive_accounts (try both key forms)
+    for key in {session_name, base_name}:
+        if key in tbot.config.get('clients', {}):
+            del tbot.config['clients'][key]
+            tbot.config_manager.save_config(tbot.config)
+            logger.info(f"Removed revoked session from config: {key}")
+        if 'inactive_accounts' in tbot.config and key in tbot.config['inactive_accounts']:
+            del tbot.config['inactive_accounts'][key]
+            tbot.config_manager.save_config(tbot.config)
+            logger.info(f"Removed revoked session from inactive_accounts: {key}")
+
+    # Delete session file with path traversal protection (use the base name so we
+    # don't build 'foo.session.session')
     try:
-        session_file = get_safe_session_file_path(session_name)
+        session_file = get_safe_session_file_path(base_name)
         if os.path.exists(session_file):
             try:
                 os.remove(session_file)
