@@ -95,9 +95,10 @@ class InputValidator:
         if not link:
             return False, "Link cannot be empty"
         
-        # Check if it's a valid Telegram link or username
+        # Check if it's a valid Telegram link or username.
+        # The '+' is required for modern private invite links (t.me/+AbCdEf).
         telegram_patterns = [
-            r'^https?://t\.me/[\w/-]+$',  # https://t.me/username or https://t.me/c/123/456
+            r'^(https?://)?t\.me/[\w+/-]+$',  # t.me/username, t.me/c/123/456, t.me/+invitehash
             r'^@[\w]+$',  # @username
             r'^[\w]+$',  # username
         ]
