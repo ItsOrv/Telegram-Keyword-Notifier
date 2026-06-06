@@ -177,10 +177,16 @@ async def check_admin_access(event, admin_id: int) -> bool:
         admin_id: Admin user ID
         
     Returns:
-        True if sender is admin or admin_id is 0 (for tests)
+        True if sender is admin. When admin_id is 0 (unset) the check fails
+        closed in production, and is only bypassed while running under pytest.
     """
     if admin_id == 0:
-        return True  # Skip check in tests
+        # Fail closed unless we're inside a test run, otherwise an unset
+        # ADMIN_ID would grant admin access to every user.
+        if os.environ.get('PYTEST_CURRENT_TEST'):
+            return True
+        logger.error("ADMIN_ID is not configured; denying admin access.")
+        return False
     try:
         validated_admin_id = validate_admin_id(admin_id)
         return event.sender_id == validated_admin_id
