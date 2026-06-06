@@ -141,7 +141,9 @@ class Keyboard:
         return [
             [
                 Button.inline(
-                    "Disable" if "Active" in status else "Enable",
+                    # Exact match: "Active" is a substring of "Inactive", so a
+                    # loose `in` check would label inactive accounts "Disable".
+                    "Disable" if status.strip() == "Active" else "Enable",
                     data=f"toggle_{session}"
                 ),
                 Button.inline("Delete", data=f"delete_{session}")
