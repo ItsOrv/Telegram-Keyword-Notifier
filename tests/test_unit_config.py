@@ -6,7 +6,7 @@ import json
 import os
 import tempfile
 import shutil
-from src.Config import ConfigManager
+from src.config import ConfigManager
 
 
 class TestConfigManager:

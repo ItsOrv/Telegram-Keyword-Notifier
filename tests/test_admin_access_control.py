@@ -1,7 +1,7 @@
 """Only the configured admin may drive the bot."""
 import pytest
 
-from src.Handlers import CallbackHandler
+from src.handlers import CallbackHandler
 from src.utils import check_admin_access, validate_admin_id
 
 ADMIN_ID = 123456789
@@ -41,7 +41,7 @@ def test_valid_admin_id_is_normalized(value, expected):
 
 @pytest.mark.asyncio
 async def test_callback_from_non_admin_is_refused(mock_tbot, mock_callback_event, monkeypatch):
-    monkeypatch.setattr('src.Handlers.ADMIN_ID', ADMIN_ID)
+    monkeypatch.setattr('src.handlers.ADMIN_ID', ADMIN_ID)
     handler = CallbackHandler(mock_tbot)
     mock_callback_event.sender_id = NON_ADMIN_ID
     mock_callback_event.data = b'add_account'

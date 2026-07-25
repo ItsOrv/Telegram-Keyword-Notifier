@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import pytest
 from telethon import TelegramClient
 
-from src.Validation import InputValidator
+from src.validation import InputValidator
 from src.actions import Actions
 from src.utils import remove_revoked_session_completely
 
@@ -166,14 +166,14 @@ class TestPollVoteOptionBytes:
 @pytest.mark.asyncio
 class TestSessionManagerWiring:
     async def test_detect_sessions_loads_with_wrapper(self, mock_tbot):
-        from src.Client import SessionManager
+        from src.client import SessionManager
 
         mock_tbot.config = {"clients": {"acct1": []}}
         mock_tbot.active_clients = {}
 
         manager = SessionManager(mock_tbot.config, mock_tbot.active_clients, mock_tbot)
 
-        with patch("src.Client.TelegramClient", return_value=MagicMock()):
+        with patch("src.client.TelegramClient", return_value=MagicMock()):
             await manager.detect_sessions()
 
         # If the wrapper (with active_clients_lock) is wired correctly, the
@@ -187,9 +187,9 @@ class TestSessionManagerWiring:
 import json
 from telethon.tl.types import User, Channel
 
-from src.Config import ConfigManager, get_env_int
-from src.Keyboards import Keyboard
-from src.Monitor import Monitor
+from src.config import ConfigManager, get_env_int
+from src.keyboards import Keyboard
+from src.monitor import Monitor
 
 
 class TestConfigStore:
@@ -244,7 +244,7 @@ class TestToggleLabel:
 @pytest.mark.asyncio
 class TestCallbackRoutingNoFanOut:
     async def test_individual_action_on_missing_account_does_not_fan_out(self, mock_tbot, mock_callback_event):
-        from src.Handlers import CallbackHandler
+        from src.handlers import CallbackHandler
         mock_tbot.active_clients = {}
         handler = CallbackHandler(mock_tbot)
         handler.actions.handle_group_action = AsyncMock()
@@ -261,7 +261,7 @@ class TestCallbackRoutingNoFanOut:
 @pytest.mark.asyncio
 class TestStartClearsState:
     async def test_start_command_clears_conversation_state(self, mock_tbot, mock_event):
-        from src.Handlers import CommandHandler
+        from src.handlers import CommandHandler
         mock_event.chat_id = 555
         mock_event.sender_id = 999
         mock_tbot._conversations = {555: "poll_link_handler"}

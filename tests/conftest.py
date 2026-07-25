@@ -63,7 +63,7 @@ def reset_module_state():
     
     # Save original modules
     original_modules = {}
-    modules_to_reload = ['src.Config', 'src.Handlers']
+    modules_to_reload = ['src.config', 'src.handlers']
     
     # Reload modules to reset any cached values
     for module_name in modules_to_reload:
@@ -232,7 +232,7 @@ def mock_env_vars(monkeypatch):
 @pytest.fixture
 def mock_config_manager(temp_config_file):
     """Create a mock ConfigManager"""
-    from src.Config import ConfigManager
+    from src.config import ConfigManager
     manager = ConfigManager(temp_config_file)
     return manager
 
@@ -265,7 +265,7 @@ def mock_actions():
 @pytest.fixture
 def mock_session_manager(mock_tbot):
     """Create a mock SessionManager"""
-    from src.Client import SessionManager
+    from src.client import SessionManager
     manager = SessionManager(
         TEST_CONFIG.copy(),
         mock_tbot.active_clients,
@@ -276,28 +276,28 @@ def mock_session_manager(mock_tbot):
 @pytest.fixture
 def mock_account_handler(mock_tbot):
     """Create a mock AccountHandler"""
-    from src.Client import AccountHandler
+    from src.client import AccountHandler
     handler = AccountHandler(mock_tbot)
     return handler
 
 @pytest.fixture
 def mock_message_handler(mock_tbot):
     """Create a mock MessageHandler"""
-    from src.Handlers import MessageHandler
+    from src.handlers import MessageHandler
     handler = MessageHandler(mock_tbot)
     return handler
 
 @pytest.fixture
 def mock_callback_handler(mock_tbot):
     """Create a mock CallbackHandler"""
-    from src.Handlers import CallbackHandler
+    from src.handlers import CallbackHandler
     handler = CallbackHandler(mock_tbot)
     return handler
 
 @pytest.fixture
 def mock_monitor(mock_tbot):
     """Create a mock Monitor"""
-    from src.Monitor import Monitor
+    from src.monitor import Monitor
     monitor = Monitor(mock_tbot)
     return monitor
 

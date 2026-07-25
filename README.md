@@ -145,16 +145,16 @@ Telegram-Panel/
 ├── cli_main.py            # Command-line entry point
 ├── interactive_cli.py     # Interactive TUI entry point
 ├── src/
-│   ├── Telbot.py          # Orchestrator: startup, handlers, reconnection
-│   ├── Client.py          # Session & account lifecycle (SessionManager)
-│   ├── Handlers.py        # Command / callback / message routing
+│   ├── telbot.py          # Orchestrator: startup, handlers, reconnection
+│   ├── client.py          # Session & account lifecycle (SessionManager)
+│   ├── handlers.py        # Command / callback / message routing
 │   ├── actions.py         # Bulk & individual operations
-│   ├── Monitor.py         # Keyword monitoring & forwarding
-│   ├── Keyboards.py       # Inline keyboard layouts
-│   ├── Config.py          # Environment & config management
-│   ├── Validation.py      # Input validation & sanitization
+│   ├── monitor.py         # Keyword monitoring & forwarding
+│   ├── keyboards.py       # Inline keyboard layouts
+│   ├── config.py          # Environment & config management
+│   ├── validation.py      # Input validation & sanitization
 │   ├── utils.py           # Shared helpers
-│   └── Logger.py          # Logging setup
+│   └── logger.py          # Logging setup
 ├── tests/                 # Test suite
 └── docs/                  # Documentation
 ```

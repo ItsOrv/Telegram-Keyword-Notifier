@@ -2,8 +2,8 @@ import asyncio
 import logging
 import os
 from pathlib import Path
-from src.Telbot import TelegramBot
-from src.Logger import setup_logging
+from src.telbot import TelegramBot
+from src.logger import setup_logging
 
 def main():
     try:

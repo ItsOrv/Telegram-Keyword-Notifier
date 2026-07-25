@@ -510,7 +510,7 @@ async def prompt_for_input(
         cancel_button: Whether to show cancel button
     """
     from telethon import Button
-    from src.Keyboards import Keyboard
+    from src.keyboards import Keyboard
     buttons = [[Button.inline("Cancel", 'cancel', style='danger')]] if cancel_button else None
     # Edit the menu in place into the prompt (falls back to a new message when the
     # event isn't an editable bot message) so prompts replace the menu instead of
@@ -670,7 +670,7 @@ async def check_accounts_available(
         True if accounts available, False otherwise
     """
     if not accounts:
-        from src.Keyboards import Keyboard
+        from src.keyboards import Keyboard
         await Keyboard.edit_or_respond(event, error_message, buttons=Keyboard.back_button())
         await cleanup_conversation_state(tbot, event.chat_id)
         return False

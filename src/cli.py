@@ -12,12 +12,12 @@ from typing import List, Optional
 from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError
 
-from src.Config import ConfigManager, API_ID, API_HASH, CLIENTS_JSON_PATH
+from src.config import ConfigManager, API_ID, API_HASH, CLIENTS_JSON_PATH
 from src.actions import Actions
-from src.Client import SessionManager
-from src.Validation import InputValidator
+from src.client import SessionManager
+from src.validation import InputValidator
 from src.utils import get_session_name, sanitize_session_name
-from src.Logger import setup_logging
+from src.logger import setup_logging
 
 logger = logging.getLogger(__name__)
 

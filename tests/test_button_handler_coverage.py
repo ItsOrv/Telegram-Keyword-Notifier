@@ -1,8 +1,8 @@
 """Every keyboard button must be routable by callback_handler."""
 import pytest
 
-from src.Handlers import CallbackHandler
-from src.Keyboards import Keyboard
+from src.handlers import CallbackHandler
+from src.keyboards import Keyboard
 
 KEYBOARDS = [
     'start_keyboard',

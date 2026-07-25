@@ -6,11 +6,11 @@ from datetime import datetime
 from telethon import TelegramClient, events, Button
 from telethon.errors import SessionPasswordNeededError, FloodWaitError
 from telethon.tl.types import Channel, Chat
-from src.Config import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID, ADMIN_ID ,CLIENTS_JSON_PATH, RATE_LIMIT_SLEEP, GROUPS_BATCH_SIZE, GROUPS_UPDATE_SLEEP
-from src.Client import SessionManager ,AccountHandler
-from src.Keyboards import Keyboard
+from src.config import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID, ADMIN_ID ,CLIENTS_JSON_PATH, RATE_LIMIT_SLEEP, GROUPS_BATCH_SIZE, GROUPS_UPDATE_SLEEP
+from src.client import SessionManager ,AccountHandler
+from src.keyboards import Keyboard
 from src.actions import Actions
-from src.Validation import InputValidator
+from src.validation import InputValidator
 from src.utils import (
     get_session_name, cleanup_conversation_state, is_session_revoked_error,
     check_admin_access, is_bot_message, prompt_for_input,

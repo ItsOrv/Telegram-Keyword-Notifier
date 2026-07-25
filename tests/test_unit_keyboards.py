@@ -3,7 +3,7 @@ Unit tests for Keyboard class
 """
 import pytest
 from telethon import Button
-from src.Keyboards import Keyboard
+from src.keyboards import Keyboard
 
 
 class TestKeyboard:

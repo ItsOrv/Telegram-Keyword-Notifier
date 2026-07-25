@@ -12,8 +12,8 @@ from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError, FloodWaitError, SessionRevokedError
 from telethon.tl.types import User, Channel, Chat
 
-from src.Client import SessionManager, AccountHandler
-from src.Config import ConfigManager
+from src.client import SessionManager, AccountHandler
+from src.config import ConfigManager
 
 
 @pytest.mark.asyncio
@@ -40,7 +40,7 @@ class TestSessionManager:
         config = {"clients": {"session1": [], "session2": []}}
         manager = SessionManager(config, mock_tbot.active_clients, mock_tbot.tbot)
         
-        with patch('src.Client.TelegramClient', return_value=mock_telegram_client):
+        with patch('src.client.TelegramClient', return_value=mock_telegram_client):
             await manager.detect_sessions()
             
             assert len(mock_tbot.active_clients) == 2
@@ -52,7 +52,7 @@ class TestSessionManager:
         config = {"clients": {"../invalid": [], "valid_session": []}}
         manager = SessionManager(config, mock_tbot.active_clients, mock_tbot.tbot)
         
-        with patch('src.Client.TelegramClient') as mock_client_class:
+        with patch('src.client.TelegramClient') as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value = mock_client
             
@@ -71,7 +71,7 @@ class TestSessionManager:
         mock_telegram_client.is_user_authorized = AsyncMock(return_value=True)
         mock_telegram_client.get_dialogs = AsyncMock(return_value=[])
         
-        with patch('src.Client.TelegramClient', return_value=mock_telegram_client):
+        with patch('src.client.TelegramClient', return_value=mock_telegram_client):
             await manager.start_saved_clients()
             
             assert len(mock_tbot.active_clients) == 1
@@ -92,8 +92,8 @@ class TestSessionManager:
         revoked_error = SessionRevokedError(Mock())
         mock_telegram_client.get_dialogs = AsyncMock(side_effect=revoked_error)
         
-        with patch('src.Client.TelegramClient', return_value=mock_telegram_client):
-            with patch('src.Client.get_safe_session_file_path', return_value="session1.session"):
+        with patch('src.client.TelegramClient', return_value=mock_telegram_client):
+            with patch('src.client.get_safe_session_file_path', return_value="session1.session"):
                 with patch('os.path.exists', return_value=True):
                     with patch('os.remove'):
                         await manager.start_saved_clients()
@@ -113,7 +113,7 @@ class TestSessionManager:
         flood_error.seconds = 1
         mock_telegram_client.is_user_authorized = AsyncMock(side_effect=flood_error)
         
-        with patch('src.Client.TelegramClient', return_value=mock_telegram_client):
+        with patch('src.client.TelegramClient', return_value=mock_telegram_client):
             await manager.start_saved_clients()
             
             # Should handle flood wait gracefully
@@ -151,7 +151,7 @@ class TestSessionManager:
         
         manager = SessionManager(config, mock_tbot.active_clients, mock_tbot.tbot)
         
-        with patch('src.Client.get_safe_session_file_path', return_value="session1.session"):
+        with patch('src.client.get_safe_session_file_path', return_value="session1.session"):
             with patch('os.path.exists', return_value=True):
                 with patch('os.remove'):
                     await manager.delete_session("session1")
@@ -202,10 +202,10 @@ class TestSessionManager:
         mock_telegram_client.is_user_authorized = AsyncMock(return_value=True)
         mock_telegram_client.get_me = AsyncMock(return_value=Mock(id=123, first_name="Test"))
         
-        with patch('src.Client.get_safe_session_file_path', return_value="session1.session"):
+        with patch('src.client.get_safe_session_file_path', return_value="session1.session"):
             with patch('os.path.exists', return_value=True):
-                with patch('src.Client.TelegramClient', return_value=mock_telegram_client):
-                    with patch('src.Client.sanitize_session_name', return_value="session1"):
+                with patch('src.client.TelegramClient', return_value=mock_telegram_client):
+                    with patch('src.client.sanitize_session_name', return_value="session1"):
                         await manager.reactivate_account(mock_event, "session1")
                         
                         assert "session1" not in config.get("inactive_accounts", {})
@@ -221,10 +221,10 @@ class TestSessionManager:
         
         mock_telegram_client.is_user_authorized = AsyncMock(return_value=False)
         
-        with patch('src.Client.get_safe_session_file_path', return_value="session1.session"):
+        with patch('src.client.get_safe_session_file_path', return_value="session1.session"):
             with patch('os.path.exists', return_value=True):
-                with patch('src.Client.TelegramClient', return_value=mock_telegram_client):
-                    with patch('src.Client.sanitize_session_name', return_value="session1"):
+                with patch('src.client.TelegramClient', return_value=mock_telegram_client):
+                    with patch('src.client.sanitize_session_name', return_value="session1"):
                         await manager.reactivate_account(mock_event, "session1")
                         
                         mock_event.respond.assert_called()
@@ -244,7 +244,7 @@ class TestAccountHandler:
         """Test adding account"""
         handler = AccountHandler(mock_tbot)
         
-        with patch('src.Client.prompt_for_input', new_callable=AsyncMock) as mock_prompt:
+        with patch('src.client.prompt_for_input', new_callable=AsyncMock) as mock_prompt:
             await handler.add_account(mock_event)
             
             # prompt_for_input should be called to ask for phone number
@@ -260,8 +260,8 @@ class TestAccountHandler:
         mock_telegram_client.send_code_request = AsyncMock()
         mock_tbot.tbot.send_message = AsyncMock()
         
-        with patch('src.Client.TelegramClient', return_value=mock_telegram_client):
-            with patch('src.Client.sanitize_session_name', return_value="+1234567890"):
+        with patch('src.client.TelegramClient', return_value=mock_telegram_client):
+            with patch('src.client.sanitize_session_name', return_value="+1234567890"):
                 await handler.phone_number_handler(mock_event)
                 
                 assert mock_tbot.handlers.get('temp_client') is not None
@@ -293,8 +293,8 @@ class TestAccountHandler:
         mock_telegram_client.is_user_authorized = AsyncMock(return_value=True)
         mock_telegram_client.get_me = AsyncMock(return_value=Mock(id=123, first_name="Test", username="test"))
         
-        with patch('src.Client.TelegramClient', return_value=mock_telegram_client):
-            with patch('src.Client.sanitize_session_name', return_value="+1234567890"):
+        with patch('src.client.TelegramClient', return_value=mock_telegram_client):
+            with patch('src.client.sanitize_session_name', return_value="+1234567890"):
                 with patch.object(handler, 'finalize_client_setup', new_callable=AsyncMock):
                     await handler.phone_number_handler(mock_event)
                     
@@ -403,7 +403,7 @@ class TestAccountHandler:
         mock_tbot.monitor.process_messages_for_client = AsyncMock()
         mock_tbot.tbot.send_message = AsyncMock()
         
-        with patch('src.Client.sanitize_session_name', return_value="+1234567890"):
+        with patch('src.client.sanitize_session_name', return_value="+1234567890"):
             await handler.finalize_client_setup(mock_telegram_client, "+1234567890", 123)
             
             assert "+1234567890" in mock_tbot.active_clients
@@ -469,8 +469,8 @@ class TestAccountHandler:
         
         mock_telegram_client.iter_dialogs = mock_iter_dialogs
         
-        with patch('src.Client.CLIENTS_JSON_PATH', 'test_clients.json'):
-            with patch('src.Client.GROUPS_UPDATE_SLEEP', 0):
+        with patch('src.client.CLIENTS_JSON_PATH', 'test_clients.json'):
+            with patch('src.client.GROUPS_UPDATE_SLEEP', 0):
                 with patch('builtins.open', create=True) as mock_open:
                     mock_file = MagicMock()
                     mock_file.read.return_value = '{"clients": {}}'
@@ -518,9 +518,9 @@ class TestAccountHandler:
         mock_telegram_client.is_user_authorized = AsyncMock(return_value=True)
         mock_telegram_client.is_connected = Mock(return_value=False)
         
-        with patch('src.Client.get_safe_session_file_path', return_value="session1.session"):
+        with patch('src.client.get_safe_session_file_path', return_value="session1.session"):
             with patch('os.path.exists', return_value=True):
-                with patch('src.Client.TelegramClient', return_value=mock_telegram_client):
+                with patch('src.client.TelegramClient', return_value=mock_telegram_client):
                     await handler.toggle_client("session1", mock_event)
                     
                     assert "session1" in mock_tbot.active_clients
@@ -563,7 +563,7 @@ class TestAccountHandler:
         
         mock_telegram_client.disconnect = AsyncMock()
         
-        with patch('src.Client.get_safe_session_file_path', return_value="session1.session"):
+        with patch('src.client.get_safe_session_file_path', return_value="session1.session"):
             with patch('os.path.exists', return_value=True):
                 with patch('os.remove'):
                     await handler.delete_client("session1", mock_event)

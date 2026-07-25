@@ -3,8 +3,8 @@ Flow tests for Account Management functionality
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from src.Client import AccountHandler, SessionManager
-from src.Handlers import CallbackHandler
+from src.client import AccountHandler, SessionManager
+from src.handlers import CallbackHandler
 
 
 class TestAccountManagementFlows:
@@ -30,7 +30,7 @@ class TestAccountManagementFlows:
         account_handler.tbot.tbot.send_message = AsyncMock()
         
         # Mock client connection flow
-        with patch('src.Client.TelegramClient') as mock_client_class:
+        with patch('src.client.TelegramClient') as mock_client_class:
             mock_client = AsyncMock()
             mock_client.is_user_authorized = AsyncMock(return_value=False)
             mock_client.connect = AsyncMock()
@@ -133,7 +133,7 @@ class TestAccountManagementFlows:
         callback_handler = CallbackHandler(mock_tbot)
         account_handler = AccountHandler(mock_tbot)
         
-        with patch('src.Client.TelegramClient') as mock_client_class:
+        with patch('src.client.TelegramClient') as mock_client_class:
             new_client = AsyncMock()
             new_client.start = AsyncMock()
             mock_client_class.return_value = new_client
@@ -206,7 +206,7 @@ class TestAccountManagementFlows:
         account_handler = AccountHandler(mock_tbot)
         callback_handler.account_handler = account_handler
         
-        with patch('src.Client.CLIENTS_JSON_PATH', 'test_clients.json'):
+        with patch('src.client.CLIENTS_JSON_PATH', 'test_clients.json'):
             with patch('builtins.open', create=True) as mock_open:
                 mock_file = MagicMock()
                 mock_file.read.return_value = json.dumps({"clients": {}})

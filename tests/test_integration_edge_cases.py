@@ -4,10 +4,10 @@ Integration tests and edge cases
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-from src.Telbot import TelegramBot
-from src.Client import SessionManager, AccountHandler
+from src.telbot import TelegramBot
+from src.client import SessionManager, AccountHandler
 from src.actions import Actions
-from src.Monitor import Monitor
+from src.monitor import Monitor
 
 
 class TestIntegrationFlows:
@@ -42,7 +42,7 @@ class TestIntegrationFlows:
             mock_tbot
         )
         
-        with patch('src.Client.TelegramClient') as mock_client_class:
+        with patch('src.client.TelegramClient') as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value = mock_client
             
@@ -103,7 +103,7 @@ class TestIntegrationFlows:
     @pytest.mark.asyncio
     async def test_config_persistence(self, mock_tbot, temp_config_file):
         """Test that configuration changes persist"""
-        from src.Config import ConfigManager
+        from src.config import ConfigManager
         
         manager = ConfigManager(temp_config_file)
         manager.config = {"KEYWORDS": ["test"]}
@@ -178,7 +178,7 @@ class TestEdgeCases:
         long_message = "a" * 4096
         mock_event.message.text = long_message
         
-        from src.Validation import InputValidator
+        from src.validation import InputValidator
         is_valid, error_msg = InputValidator.validate_message_text(long_message)
         
         assert is_valid  # Should be valid (at limit)
@@ -192,7 +192,7 @@ class TestEdgeCases:
         # Keyword with special characters
         mock_event.message.text = "test@keyword#123"
         
-        from src.Validation import InputValidator
+        from src.validation import InputValidator
         is_valid, error_msg = InputValidator.validate_keyword("test@keyword#123")
         
         # Should be valid (no restrictions on special chars)
@@ -205,7 +205,7 @@ class TestEdgeCases:
         
         mock_callback_event.data = b'cancel'
         
-        from src.Handlers import CallbackHandler
+        from src.handlers import CallbackHandler
         handler = CallbackHandler(mock_tbot)
         await handler.callback_handler(mock_callback_event)
         
@@ -220,7 +220,7 @@ class TestEdgeCases:
         
         mock_event.message.text = "test"
         
-        from src.Handlers import KeywordHandler
+        from src.handlers import KeywordHandler
         handler = KeywordHandler(mock_tbot)
         await handler.add_keyword_handler(mock_event)
         
@@ -238,7 +238,7 @@ class TestEdgeCases:
             "1234567890+",  # Wrong position
         ]
         
-        from src.Validation import InputValidator
+        from src.validation import InputValidator
         
         for phone in invalid_numbers:
             is_valid, error_msg = InputValidator.validate_phone_number(phone)
@@ -255,7 +255,7 @@ class TestEdgeCases:
             "invalid",  # Invalid format
         ]
         
-        from src.Validation import InputValidator
+        from src.validation import InputValidator
         
         for link in invalid_links:
             is_valid, error_msg = InputValidator.validate_telegram_link(link)
@@ -267,7 +267,7 @@ class TestEdgeCases:
         """Test message handler when no conversation is active"""
         mock_tbot._conversations = {}  # No active conversations
         
-        from src.Handlers import MessageHandler
+        from src.handlers import MessageHandler
         handler = MessageHandler(mock_tbot)
         result = await handler.message_handler(mock_event)
         
@@ -279,7 +279,7 @@ class TestEdgeCases:
         """Test callback handler with unknown command"""
         mock_callback_event.data = b'unknown_command_xyz'
         
-        from src.Handlers import CallbackHandler
+        from src.handlers import CallbackHandler
         handler = CallbackHandler(mock_tbot)
         await handler.callback_handler(mock_callback_event)
         
@@ -297,7 +297,7 @@ class TestEdgeCases:
             mock_tbot
         )
         
-        with patch('src.Client.TelegramClient') as mock_client_class:
+        with patch('src.client.TelegramClient') as mock_client_class:
             mock_client = AsyncMock()
             # is_connected() is a regular method, not async
             mock_client.is_connected = MagicMock(return_value=False)
@@ -360,7 +360,7 @@ class TestEdgeCases:
         with open(temp_config_file, 'w') as f:
             f.write("invalid json {")
         
-        from src.Config import ConfigManager
+        from src.config import ConfigManager
         manager = ConfigManager(temp_config_file)
         config = manager.load_config()
         

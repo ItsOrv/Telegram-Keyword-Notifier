@@ -8,7 +8,7 @@ from unittest.mock import Mock, AsyncMock, MagicMock, patch
 from telethon import events
 from telethon.tl.types import User, Channel, Chat, Message
 
-from src.Monitor import Monitor
+from src.monitor import Monitor
 
 
 @pytest.mark.asyncio
@@ -36,8 +36,8 @@ class TestResolveChannelId:
         mock_entity.username = "testchannel"
         mock_tbot.tbot.get_entity = AsyncMock(return_value=mock_entity)
 
-        with patch('src.Monitor.CHANNEL_ID', 'testchannel'), \
-                patch('src.Monitor.get_peer_id', return_value=-100123456789) as mock_peer_id:
+        with patch('src.monitor.CHANNEL_ID', 'testchannel'), \
+                patch('src.monitor.get_peer_id', return_value=-100123456789) as mock_peer_id:
             await monitor.resolve_channel_id()
 
             mock_peer_id.assert_called_once_with(mock_entity)
@@ -48,7 +48,7 @@ class TestResolveChannelId:
         """Test resolving numeric channel ID"""
         monitor = Monitor(mock_tbot)
         
-        with patch('src.Monitor.CHANNEL_ID', '123456789'):
+        with patch('src.monitor.CHANNEL_ID', '123456789'):
             await monitor.resolve_channel_id()
             
             assert monitor.channel_id == 123456789
@@ -57,7 +57,7 @@ class TestResolveChannelId:
         """Test when channel ID is not configured"""
         monitor = Monitor(mock_tbot)
         
-        with patch('src.Monitor.CHANNEL_ID', None):
+        with patch('src.monitor.CHANNEL_ID', None):
             await monitor.resolve_channel_id()
             
             assert monitor.channel_id is None

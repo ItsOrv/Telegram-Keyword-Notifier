@@ -4,7 +4,7 @@ Flow tests for Individual Operations functionality
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from src.actions import Actions
-from src.Handlers import CallbackHandler
+from src.handlers import CallbackHandler
 
 
 class TestIndividualOperationsFlows:

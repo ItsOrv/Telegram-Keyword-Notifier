@@ -2,7 +2,7 @@
 Unit tests for InputValidator class
 """
 import pytest
-from src.Validation import InputValidator
+from src.validation import InputValidator
 
 
 class TestInputValidator:

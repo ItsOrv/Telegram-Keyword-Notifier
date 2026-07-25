@@ -13,15 +13,15 @@ from typing import List, Optional, Dict, Any, Callable
 from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError
 
-from src.Config import ConfigManager, API_ID, API_HASH
+from src.config import ConfigManager, API_ID, API_HASH
 from src.actions import Actions
-from src.Client import SessionManager
-from src.Validation import InputValidator
+from src.client import SessionManager
+from src.validation import InputValidator
 from src.utils import get_session_name, resolve_entity, sanitize_session_name
 from telethon.tl.functions.channels import JoinChannelRequest
 from telethon.tl.functions.contacts import BlockRequest
 from telethon.tl.functions.messages import SendVoteRequest
-from src.Logger import setup_logging
+from src.logger import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -1855,7 +1855,7 @@ class InteractiveCLI:
         """Check report status flow."""
         self._print_header("Check Report Status")
         
-        from src.Config import REPORT_CHECK_BOT
+        from src.config import REPORT_CHECK_BOT
         if not REPORT_CHECK_BOT:
             self._print_error("REPORT_CHECK_BOT not configured. Please set it in .env file.")
             input("\nPress Enter to continue...")

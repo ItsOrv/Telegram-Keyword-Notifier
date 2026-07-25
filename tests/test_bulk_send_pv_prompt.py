@@ -1,7 +1,7 @@
 """Bulk "Send PV" asks how many accounts to use before doing anything."""
 import pytest
 
-from src.Handlers import CallbackHandler
+from src.handlers import CallbackHandler
 
 
 def _replies(event):

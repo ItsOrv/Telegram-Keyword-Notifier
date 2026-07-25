@@ -3,7 +3,7 @@ Unit tests for Handler classes
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from src.Handlers import CommandHandler, MessageHandler, CallbackHandler, KeywordHandler, StatsHandler
+from src.handlers import CommandHandler, MessageHandler, CallbackHandler, KeywordHandler, StatsHandler
 
 
 class TestCommandHandler:
@@ -129,7 +129,7 @@ class TestMessageHandler:
     async def test_message_handler_non_admin(self, mock_tbot, mock_non_admin_event, monkeypatch):
         """Test message handler rejects non-admin"""
         # Patch ADMIN_ID for this test
-        monkeypatch.setattr('src.Handlers.ADMIN_ID', 123456789)
+        monkeypatch.setattr('src.handlers.ADMIN_ID', 123456789)
         
         handler = MessageHandler(mock_tbot)
         result = await handler.message_handler(mock_non_admin_event)
@@ -302,7 +302,7 @@ class TestCallbackHandler:
     async def test_callback_handler_non_admin(self, mock_tbot, mock_callback_event, monkeypatch):
         """Test callback handler rejects non-admin"""
         # Patch ADMIN_ID for this test
-        monkeypatch.setattr('src.Handlers.ADMIN_ID', 123456789)
+        monkeypatch.setattr('src.handlers.ADMIN_ID', 123456789)
         
         mock_callback_event.sender_id = 999999999  # Non-admin
         

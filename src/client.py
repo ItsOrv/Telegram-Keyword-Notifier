@@ -1,4 +1,5 @@
 import os
+import time
 import logging
 import asyncio
 import json
@@ -6,9 +7,9 @@ from datetime import datetime
 from telethon import TelegramClient, events, Button
 from telethon.errors import SessionPasswordNeededError, FloodWaitError
 from telethon.tl.types import Channel, Chat
-from src.Config import ConfigManager, API_ID, API_HASH, ADMIN_ID, CHANNEL_ID, CLIENTS_JSON_PATH, RATE_LIMIT_SLEEP, GROUPS_BATCH_SIZE, GROUPS_UPDATE_SLEEP, REPORT_CHECK_BOT
-from src.Keyboards import Keyboard
-from src.Validation import InputValidator
+from src.config import ConfigManager, API_ID, API_HASH, ADMIN_ID, CHANNEL_ID, CLIENTS_JSON_PATH, RATE_LIMIT_SLEEP, GROUPS_BATCH_SIZE, GROUPS_UPDATE_SLEEP, REPORT_CHECK_BOT
+from src.keyboards import Keyboard
+from src.validation import InputValidator
 from src.utils import send_error_message, extract_account_name, prompt_for_input, is_session_revoked_error, remove_revoked_session_completely, sanitize_session_name, get_safe_session_file_path
 
 
@@ -275,7 +276,7 @@ class SessionManager:
                 try:
                     # Create new client instance
                     from telethon import TelegramClient
-                    from src.Config import API_ID, API_HASH
+                    from src.config import API_ID, API_HASH
 
                     # Sanitize phone number for use as session name
                     try:
@@ -1003,6 +1004,89 @@ class AccountHandler:
             logger.error(f"Critical error in show_accounts: {e}", exc_info=True)
             await event.respond("Error showing accounts. Please try again.")
 
+    TRANSIENT_ERRORS = (
+        (('database is locked', 'sqlite'), 'database issue', 'Database lock'),
+        (('flood', 'too many'), 'Telegram limit', 'Flood control'),
+        (('network', 'connection'), 'network issue', 'Network issue'),
+    )
+
+    def _mark_inactive(self, session: str, reason: str, details: str):
+        self.tbot.config.setdefault('inactive_accounts', {})[session] = {
+            'phone': session,
+            'last_seen': time.time(),
+            'reason': reason,
+            'error_details': details,
+        }
+        self.tbot.config_manager.save_config(self.tbot.config)
+
+    async def _disable_client(self, session: str, event):
+        async with self.tbot.active_clients_lock:
+            client = self.tbot.active_clients[session]
+            if hasattr(self.tbot, 'monitor'):
+                self.tbot.monitor.cleanup_client_handlers(client)
+            await client.disconnect()
+            del self.tbot.active_clients[session]
+        logger.info(f"Client {session} disabled successfully.")
+        await event.respond(f"Account {session} disabled.")
+
+    async def _activate_authorized_client(self, session: str, client, event):
+        async with self.tbot.active_clients_lock:
+            self.tbot.active_clients[session] = client
+
+        if hasattr(self.tbot, 'monitor') and not hasattr(client, '_message_processing_set'):
+            await self.tbot.monitor.process_messages_for_client(client)
+            client._message_processing_set = True
+
+        logger.info(f"Client {session} enabled successfully.")
+        await event.respond(f"Account {session} activated.")
+
+        inactive = self.tbot.config.get('inactive_accounts', {})
+        if session in inactive:
+            del inactive[session]
+            self.tbot.config_manager.save_config(self.tbot.config)
+
+    async def _handle_enable_error(self, session: str, error: Exception, event):
+        error_msg = str(error).lower()
+        logger.error(f"Error enabling client {session}: {error}")
+
+        for needles, user_reason, log_reason in self.TRANSIENT_ERRORS:
+            if any(needle in error_msg for needle in needles):
+                await event.respond(
+                    f"Account {session} is temporarily inactive ({user_reason}). Please try again later.")
+                logger.warning(f"{log_reason} for {session}, will retry later")
+                return
+
+        self._mark_inactive(session, 'connection_error', str(error))
+        await event.respond(f"Error activating account {session}: {str(error)[:100]}...")
+
+    async def _enable_client(self, session: str, event):
+        try:
+            session_file = get_safe_session_file_path(session)
+        except ValueError as e:
+            logger.error(f"Invalid session name: {e}")
+            await event.respond("Invalid session name format.")
+            return
+
+        if not os.path.exists(session_file):
+            await event.respond(f"Session file for account {session} not found.")
+            logger.error(f"Session file {session_file} not found")
+            return
+
+        client = TelegramClient(session, API_ID, API_HASH)
+        try:
+            await client.connect()
+            if await client.is_user_authorized():
+                await self._activate_authorized_client(session, client, event)
+                return
+
+            await client.disconnect()
+            self._mark_inactive(session, 'not_authorized_on_reactivation', 'Client not authorized')
+            await event.respond(f"Account {session} has been unauthorized by Telegram.")
+            logger.warning(f"Client {session} not authorized on reactivation")
+        except Exception as e:
+            await client.disconnect()
+            await self._handle_enable_error(session, e, event)
+
     async def toggle_client(self, session: str, event):
         """
         Toggle the active/inactive status of a client account.
@@ -1018,114 +1102,16 @@ class AccountHandler:
                 await event.respond("Account not found.")
                 return
 
-            # Check current status with lock
             async with self.tbot.active_clients_lock:
                 currently_active = session in self.tbot.active_clients
-            
+
             logger.info(f"Current status for {session}: {'Active' if currently_active else 'Inactive'}")
 
             if currently_active:
-                logger.info(f"Disabling client: {session}")
-                # Use lock when modifying active_clients
-                async with self.tbot.active_clients_lock:
-                    client = self.tbot.active_clients[session]
-                    # Cleanup handlers before disconnecting
-                    if hasattr(self.tbot, 'monitor'):
-                        self.tbot.monitor.cleanup_client_handlers(client)
-                    await client.disconnect()
-                    del self.tbot.active_clients[session]
-                logger.info(f"Client {session} disabled successfully.")
-                await event.respond(f"Account {session} disabled.")
+                await self._disable_client(session, event)
             else:
-                logger.info(f"Enabling client: {session}")
                 try:
-                    # Check if session file exists
-                    try:
-                        session_file = get_safe_session_file_path(session)
-                    except ValueError as e:
-                        logger.error(f"Invalid session name: {e}")
-                        await event.respond(f"Invalid session name format.")
-                        return
-                    
-                    if not os.path.exists(session_file):
-                        await event.respond(f"Session file for account {session} not found.")
-                        logger.error(f"Session file {session_file} not found")
-                        return
-
-                    # Try to create client and connect - avoid database operations initially
-                    client = TelegramClient(session, API_ID, API_HASH)
-
-                    # Try to connect and check authorization without full start
-                    try:
-                        # Connect first
-                        await client.connect()
-
-                        # Check authorization
-                        if await client.is_user_authorized():
-                            # Client is authorized, add to active clients
-                            async with self.tbot.active_clients_lock:
-                                self.tbot.active_clients[session] = client
-
-                            # Set up message monitoring for this newly enabled client
-                            if hasattr(self.tbot, 'monitor') and not hasattr(client, '_message_processing_set'):
-                                await self.tbot.monitor.process_messages_for_client(client)
-                                client._message_processing_set = True
-
-                            logger.info(f"Client {session} enabled successfully.")
-                            await event.respond(f"Account {session} activated.")
-
-                            # Remove from inactive accounts if it was there
-                            if 'inactive_accounts' in self.tbot.config and session in self.tbot.config['inactive_accounts']:
-                                del self.tbot.config['inactive_accounts'][session]
-                                self.tbot.config_manager.save_config(self.tbot.config)
-                        else:
-                            # Client is not authorized, move to inactive accounts
-                            await client.disconnect()
-                            if 'inactive_accounts' not in self.tbot.config:
-                                self.tbot.config['inactive_accounts'] = {}
-                            import time as time_module
-                            self.tbot.config['inactive_accounts'][session] = {
-                                'phone': session,
-                                'last_seen': time_module.time(),
-                                'reason': 'not_authorized_on_reactivation',
-                                'error_details': 'Client not authorized'
-                            }
-                            self.tbot.config_manager.save_config(self.tbot.config)
-                            await event.respond(f"Account {session} has been unauthorized by Telegram.")
-                            logger.warning(f"Client {session} not authorized on reactivation")
-
-                    except Exception as e:
-                        await client.disconnect()
-                        error_msg = str(e).lower()
-                        logger.error(f"Error enabling client {session}: {e}")
-
-                        # Handle different types of errors
-                        if 'database is locked' in error_msg or 'sqlite' in error_msg:
-                            # Database lock - this is temporary, keep the account in config for retry
-                            await event.respond(f"Account {session} is temporarily inactive (database issue). Please try again later.")
-                            logger.warning(f"Database lock for {session}, will retry later")
-                        elif 'flood' in error_msg or 'too many' in error_msg:
-                            # Flood control - temporary issue
-                            await event.respond(f"Account {session} is temporarily inactive (Telegram limit). Please try again later.")
-                            logger.warning(f"Flood control for {session}, will retry later")
-                        elif 'network' in error_msg or 'connection' in error_msg:
-                            # Network issue - temporary
-                            await event.respond(f"Account {session} is temporarily inactive (network issue). Please try again later.")
-                            logger.warning(f"Network issue for {session}, will retry later")
-                        else:
-                            # Other error - move to inactive accounts for admin review
-                            if 'inactive_accounts' not in self.tbot.config:
-                                self.tbot.config['inactive_accounts'] = {}
-                            import time as time_module
-                            self.tbot.config['inactive_accounts'][session] = {
-                                'phone': session,
-                                'last_seen': time_module.time(),
-                                'reason': 'connection_error',
-                                'error_details': str(e)
-                            }
-                            self.tbot.config_manager.save_config(self.tbot.config)
-                            await event.respond(f"Error activating account {session}: {str(e)[:100]}...")
-
+                    await self._enable_client(session, event)
                 except Exception as e:
                     logger.error(f"Error in toggle_client enable section: {e}")
                     await event.respond(f"Error activating account {session}.")

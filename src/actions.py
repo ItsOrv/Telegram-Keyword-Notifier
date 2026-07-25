@@ -14,8 +14,8 @@ except ImportError:
     # Fallback for older Telethon versions
     from telethon.tl import types
     ReactionEmoji = getattr(types, 'ReactionEmoji', None)
-from src.Config import CHANNEL_ID, REPORT_CHECK_BOT
-from src.Validation import InputValidator
+from src.config import CHANNEL_ID, REPORT_CHECK_BOT
+from src.validation import InputValidator
 from src.utils import (
     get_session_name, cleanup_conversation_state, is_session_revoked_error,
     execute_bulk_operation, format_bulk_result_message,
@@ -29,7 +29,7 @@ from src.constants import (
     MIN_POLL_OPTION, MAX_POLL_OPTION,
     REPORT_CHECK_DELAY, HandlerKeys, ConversationStates
 )
-from src.Keyboards import Keyboard
+from src.keyboards import Keyboard
 
 logger = logging.getLogger(__name__)
 

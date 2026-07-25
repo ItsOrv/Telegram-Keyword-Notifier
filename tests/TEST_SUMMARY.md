@@ -278,14 +278,10 @@
 
 ## آمار تست‌ها
 
-- **تعداد کل کلاس‌های تست**: 25+
-- **تعداد کل متدهای تست**: 150+
-- **پوشش ماژول‌ها**:
-  - ✅ utils.py (100% coverage)
-  - ✅ Client.py (100% coverage)
-  - ✅ actions.py (100% coverage)
-  - ✅ Monitor.py (100% coverage)
-  - ✅ Config.py (100% coverage)
+- **تعداد کل تست‌ها**: 482
+- **پوشش کل**: 42% (جزئیات در README_COMPREHENSIVE_TESTS.md)
+
+بزرگ‌ترین شکاف‌ها: `interactive_cli.py` (0%)، `telbot.py` (10%)، `cli.py` (13%).
 
 ## نحوه اجرای تست‌ها
 

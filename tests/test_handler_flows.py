@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from src.Handlers import CONVERSATION_ROUTES, MessageHandler
+from src.handlers import CONVERSATION_ROUTES, MessageHandler
 
 SRC = Path(__file__).resolve().parent.parent / 'src'
 
@@ -48,7 +48,7 @@ def test_every_armed_state_is_routable(state):
 @pytest.mark.parametrize('state', dispatcher_states())
 @pytest.mark.asyncio
 async def test_dispatcher_routes_state(state, mock_tbot, mock_new_message_event, monkeypatch):
-    monkeypatch.setattr('src.Handlers.ADMIN_ID', mock_new_message_event.sender_id)
+    monkeypatch.setattr('src.handlers.ADMIN_ID', mock_new_message_event.sender_id)
     handler = MessageHandler(mock_tbot)
 
     # Replace the concrete handlers so routing is measured, not their side effects.
@@ -67,7 +67,7 @@ async def test_dispatcher_routes_state(state, mock_tbot, mock_new_message_event,
 
 @pytest.mark.asyncio
 async def test_unknown_state_is_not_routed(mock_tbot, mock_new_message_event, monkeypatch):
-    monkeypatch.setattr('src.Handlers.ADMIN_ID', mock_new_message_event.sender_id)
+    monkeypatch.setattr('src.handlers.ADMIN_ID', mock_new_message_event.sender_id)
     handler = MessageHandler(mock_tbot)
     mock_tbot._conversations[mock_new_message_event.chat_id] = 'no_such_state_handler'
     mock_new_message_event.message.text = 'input'
@@ -78,7 +78,7 @@ async def test_unknown_state_is_not_routed(mock_tbot, mock_new_message_event, mo
 @pytest.mark.asyncio
 async def test_commands_are_not_swallowed(mock_tbot, mock_new_message_event, monkeypatch):
     """A /command must not be eaten by an armed conversation."""
-    monkeypatch.setattr('src.Handlers.ADMIN_ID', mock_new_message_event.sender_id)
+    monkeypatch.setattr('src.handlers.ADMIN_ID', mock_new_message_event.sender_id)
     handler = MessageHandler(mock_tbot)
     mock_tbot._conversations[mock_new_message_event.chat_id] = 'phone_number_handler'
     mock_new_message_event.message.text = '/start'

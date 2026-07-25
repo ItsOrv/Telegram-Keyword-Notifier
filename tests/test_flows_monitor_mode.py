@@ -3,8 +3,8 @@ Flow tests for Monitor Mode functionality
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from src.Handlers import KeywordHandler, CallbackHandler
-from src.Monitor import Monitor
+from src.handlers import KeywordHandler, CallbackHandler
+from src.monitor import Monitor
 
 
 class TestMonitorModeFlows:

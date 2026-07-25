@@ -1,10 +1,10 @@
 import logging
 from telethon import TelegramClient, events, Button
 from telethon.utils import get_peer_id
-from src.Config import CHANNEL_ID
-from src.Keyboards import Keyboard
+from src.config import CHANNEL_ID
+from src.keyboards import Keyboard
 from src.utils import extract_account_name, get_session_name
-from src.Validation import InputValidator
+from src.validation import InputValidator
 from src.constants import TELEGRAM_MAX_MESSAGE_LENGTH
 
 # Set up logger for the Monitor class

@@ -9,7 +9,7 @@ import tempfile
 import shutil
 from unittest.mock import patch, Mock
 
-from src.Config import (
+from src.config import (
     ConfigManager,
     validate_env_file,
     get_env_variable,

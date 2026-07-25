@@ -119,16 +119,25 @@ pytest tests/test_comprehensive_utils.py::TestSanitizeSessionName::test_valid_se
 ## نتایج تست‌ها
 
 ### آمار کلی:
-- **تعداد کل تست‌ها**: 188+
-- **تعداد کلاس‌های تست**: 25+
-- **پوشش ماژول‌ها**: 100% برای ماژول‌های اصلی
+- **تعداد کل تست‌ها**: 482
+- **پوشش کل**: 42%
 
-### ماژول‌های تست شده:
-- ✅ `src/utils.py` - 100% coverage
-- ✅ `src/Client.py` - 100% coverage  
-- ✅ `src/actions.py` - 100% coverage
-- ✅ `src/Monitor.py` - 100% coverage
-- ✅ `src/Config.py` - 100% coverage
+عددها را از خروجی `pytest --cov=src` بردارید، نه از این فایل:
+
+| ماژول | پوشش |
+|---|---|
+| `src/validation.py` | 100% |
+| `src/constants.py` | 100% |
+| `src/monitor.py` | 91% |
+| `src/utils.py` | 91% |
+| `src/config.py` | 86% |
+| `src/handlers.py` | 79% |
+| `src/keyboards.py` | 75% |
+| `src/actions.py` | 58% |
+| `src/client.py` | 57% |
+| `src/cli.py` | 13% |
+| `src/telbot.py` | 10% |
+| `src/interactive_cli.py` | 0% |
 
 ## مثال‌های تست
 
