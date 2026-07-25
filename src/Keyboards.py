@@ -42,8 +42,8 @@ class Keyboard:
         try:
             if hasattr(event, 'answer'):
                 await event.answer()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to answer callback: {e}")
         try:
             await event.edit(text, buttons=buttons)
         except MessageIdInvalidError:

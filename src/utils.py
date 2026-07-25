@@ -138,8 +138,8 @@ def get_session_name(account: TelegramClient) -> str:
             filename = account.session.filename
             if filename:
                 return filename
-    except (AttributeError, Exception):
-        pass
+    except Exception as e:
+        logger.debug(f"Failed to read session name: {e}")
     return 'Unknown'
 
 
@@ -487,8 +487,8 @@ def extract_account_name(client) -> str:
                 if account_name.endswith('.session'):
                     account_name = account_name[:-8]
                 return account_name
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Failed to read session name: {e}")
     return 'Unknown Account'
 
 
@@ -608,8 +608,8 @@ async def remove_revoked_session_completely(tbot, session_name: str):
                     if get_session_name(client) in (session_name, base_name):
                         resolved_key = key
                         break
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Failed to read session name: {e}")
         if resolved_key is not None:
             client_to_disconnect = tbot.active_clients.pop(resolved_key)
             # config/active_clients share the same key convention

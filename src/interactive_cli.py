@@ -2025,8 +2025,8 @@ class InteractiveCLI:
                 try:
                     if client.is_connected():
                         await client.disconnect()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Failed to disconnect client: {e}")
     
     async def run(self):
         """Run interactive CLI."""

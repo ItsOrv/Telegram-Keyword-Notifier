@@ -1869,16 +1869,16 @@ class Actions:
                     try:
                         await message.delete()
                         await response.delete()
-                    except (Exception, AttributeError):
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Failed to delete report messages: {e}")
                     
                     return is_reported
                 
                 # If no response, assume not reported
                 try:
                     await message.delete()
-                except (Exception, AttributeError):
-                    pass
+                except Exception as e:
+                    logger.debug(f"Failed to delete report messages: {e}")
                 return False
                 
             except Exception as e:

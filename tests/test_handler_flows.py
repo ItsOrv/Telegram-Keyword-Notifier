@@ -7,16 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from src.Handlers import MessageHandler
+from src.Handlers import CONVERSATION_ROUTES, MessageHandler
 
 SRC = Path(__file__).resolve().parent.parent / 'src'
 
 
 def dispatcher_states():
-    """States MessageHandler.message_handler branches on."""
-    source = (SRC / 'Handlers.py').read_text(encoding='utf-8')
-    body = source.split('async def message_handler', 1)[1]
-    return sorted(set(re.findall(r"handler_name == '([a-z_]+)'", body)))
+    return sorted(CONVERSATION_ROUTES)
 
 
 def armed_states():

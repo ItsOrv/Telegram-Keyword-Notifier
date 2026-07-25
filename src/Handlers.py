@@ -20,6 +20,41 @@ from src.utils import (
 # Setting up the logger
 logger = logging.getLogger(__name__)
 
+REACTION_BUTTONS = frozenset({
+    'reaction_thumbsup', 'reaction_heart', 'reaction_laugh',
+    'reaction_wow', 'reaction_sad', 'reaction_angry',
+})
+INDIVIDUAL_ACTIONS = ('reaction', 'send_pv', 'join', 'left', 'block', 'comment')
+BULK_ACTIONS = ('reaction', 'poll', 'join', 'leave', 'block', 'comment', 'send_pv')
+UNKNOWN_COMMAND = "Command not recognized. Please try again."
+
+CONVERSATION_ROUTES = {
+    'phone_number_handler': 'account_handler',
+    'code_handler': 'account_handler',
+    'password_handler': 'account_handler',
+    'ignore_user_handler': 'keyword_handler',
+    'delete_ignore_user_handler': 'keyword_handler',
+    'add_keyword_handler': 'keyword_handler',
+    'remove_keyword_handler': 'keyword_handler',
+    'reaction_link_handler': 'actions',
+    'poll_link_handler': 'actions',
+    'poll_option_handler': 'actions',
+    'join_link_handler': 'actions',
+    'left_link_handler': 'actions',
+    'block_user_handler': 'actions',
+    'send_pv_user_handler': 'actions',
+    'send_pv_message_handler': 'actions',
+    'bulk_send_pv_account_count_handler': 'actions',
+    'bulk_send_pv_user_handler': 'actions',
+    'bulk_send_pv_message_handler': 'actions',
+    'comment_link_handler': 'actions',
+    'comment_text_handler': 'actions',
+    'bulk_join_link_handler': 'actions',
+    'bulk_leave_link_handler': 'actions',
+    'bulk_block_user_handler': 'actions',
+}
+
+
 # Constants
 
 def is_callback_event(event):
@@ -279,94 +314,9 @@ class MessageHandler:
             handler_name = self.tbot._conversations.get(event.chat_id)
         
         if handler_name:
-            
-            # Account handlers
-            if handler_name == 'phone_number_handler':
-                await self.account_handler.phone_number_handler(event)
-                return True
-            elif handler_name == 'code_handler':
-                await self.account_handler.code_handler(event)
-                return True
-            elif handler_name == 'password_handler':
-                await self.account_handler.password_handler(event)
-                return True
-            
-            # Keyword handlers
-            elif handler_name == 'ignore_user_handler':
-                await self.keyword_handler.ignore_user_handler(event)
-                return True
-            elif handler_name == 'delete_ignore_user_handler':
-                await self.keyword_handler.delete_ignore_user_handler(event)
-                return True
-            elif handler_name == 'add_keyword_handler':
-                await self.keyword_handler.add_keyword_handler(event)
-                return True
-            elif handler_name == 'remove_keyword_handler':
-                await self.keyword_handler.remove_keyword_handler(event)
-                return True
-            
-            # Action handlers - Reaction
-            elif handler_name == 'reaction_link_handler':
-                await self.actions.reaction_link_handler(event)
-                return True
-            
-            # Action handlers - Poll
-            elif handler_name == 'poll_link_handler':
-                await self.actions.poll_link_handler(event)
-                return True
-            elif handler_name == 'poll_option_handler':
-                await self.actions.poll_option_handler(event)
-                return True
-            
-            # Action handlers - Join
-            elif handler_name == 'join_link_handler':
-                await self.actions.join_link_handler(event)
-                return True
-            
-            # Action handlers - Left
-            elif handler_name == 'left_link_handler':
-                await self.actions.left_link_handler(event)
-                return True
-            
-            # Action handlers - Block
-            elif handler_name == 'block_user_handler':
-                await self.actions.block_user_handler(event)
-                return True
-            
-            # Action handlers - Send PV
-            elif handler_name == 'send_pv_user_handler':
-                await self.actions.send_pv_user_handler(event)
-                return True
-            elif handler_name == 'send_pv_message_handler':
-                await self.actions.send_pv_message_handler(event)
-                return True
-            elif handler_name == 'bulk_send_pv_account_count_handler':
-                await self.actions.bulk_send_pv_account_count_handler(event)
-                return True
-            elif handler_name == 'bulk_send_pv_user_handler':
-                await self.actions.bulk_send_pv_user_handler(event)
-                return True
-            elif handler_name == 'bulk_send_pv_message_handler':
-                await self.actions.bulk_send_pv_message_handler(event)
-                return True
-            
-            # Action handlers - Comment
-            elif handler_name == 'comment_link_handler':
-                await self.actions.comment_link_handler(event)
-                return True
-            elif handler_name == 'comment_text_handler':
-                await self.actions.comment_text_handler(event)
-                return True
-            
-            # Bulk operation handlers
-            elif handler_name == 'bulk_join_link_handler':
-                await self.actions.bulk_join_link_handler(event)
-                return True
-            elif handler_name == 'bulk_leave_link_handler':
-                await self.actions.bulk_leave_link_handler(event)
-                return True
-            elif handler_name == 'bulk_block_user_handler':
-                await self.actions.bulk_block_user_handler(event)
+            owner_name = CONVERSATION_ROUTES.get(handler_name)
+            if owner_name:
+                await getattr(getattr(self, owner_name), handler_name)(event)
                 return True
 
         return False
@@ -700,147 +650,123 @@ class CallbackHandler:
         else:
             await event.respond("Client manager not initialized. Please restart the bot.")
 
+    async def _answer_callback(self, event):
+        try:
+            await event.answer()
+        except Exception as e:
+            logger.warning(f"Error answering callback query: {e}")
+
+    async def _callback_sender_is_admin(self, event) -> bool:
+        try:
+            admin_id = int(ADMIN_ID) if isinstance(ADMIN_ID, str) else ADMIN_ID
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid ADMIN_ID: {ADMIN_ID}, skipping admin check")
+            return True
+        if admin_id != 0 and event.sender_id != admin_id:
+            await event.respond("You are not the admin")
+            return False
+        return True
+
+    @staticmethod
+    def _split_action(data: str):
+        """Split callback data into (action, suffix); 'send_pv' contains an underscore."""
+        parts = data.split('_')
+        if len(parts) >= 3 and parts[0] == 'send' and parts[1] == 'pv':
+            return 'send_pv', '_'.join(parts[2:])
+        return parts[0], '_'.join(parts[1:])
+
+    async def _handle_ignore(self, event, data):
+        parts = data.split('_')
+        if len(parts) == 2 and parts[1].isdigit():
+            await self.keyword_handler.ignore_user(int(parts[1]), event)
+        else:
+            logger.error(f"Invalid user ID in callback data: {data}")
+            await event.respond("Invalid user ID.")
+
+    async def _handle_toggle(self, event, data):
+        await self.account_handler.toggle_client(data.replace('toggle_', ''), event)
+
+    async def _handle_delete(self, event, data):
+        session = data.replace('delete_', '')
+        try:
+            if getattr(self.tbot, 'client_manager', None):
+                await self.tbot.client_manager.delete_session(session)
+                await event.respond(f"Account {session} deleted successfully.")
+            else:
+                await event.respond("Client manager not initialized. Please restart the bot.")
+        except Exception as e:
+            logger.error(f"Error deleting session {session}: {e}")
+            await event.respond(f"Error deleting account {session}: {str(e)}")
+
+    async def _handle_account_or_bulk(self, event, data):
+        """Route callbacks like 'reaction_3' (bulk) or 'reaction_98912...' (one account)."""
+        action_name, suffix = self._split_action(data)
+
+        # Check the suffix against active accounts first: session keys are phone
+        # numbers, so isdigit() alone would read an account pick as a bulk count.
+        async with self.tbot.active_clients_lock:
+            account = self.tbot.active_clients.get(suffix)
+            active_count = len(self.tbot.active_clients)
+
+        if account is not None and action_name in INDIVIDUAL_ACTIONS:
+            await getattr(self.actions, action_name)(account, event)
+        elif (suffix.isdigit() and action_name in BULK_ACTIONS
+              and int(suffix) <= active_count):
+            # The count bound stops a vanished digit-only session key from being
+            # read as a huge bulk count and fanning out to every account.
+            await self.actions.handle_group_action(event, action_name, int(suffix))
+        elif action_name in INDIVIDUAL_ACTIONS:
+            await event.respond(f"Account {suffix} not found.")
+        else:
+            await self._fallback(event, data)
+
+    async def _fallback(self, event, data):
+        action = self.callback_actions.get(data)
+        if action:
+            await action(event)
+        else:
+            logger.warning(f"No handler found for callback data: {data}")
+            await event.respond(UNKNOWN_COMMAND)
+
+    async def _route_callback(self, event, data):
+        if data == 'cancel':
+            await cleanup_conversation_state(self.tbot, event.chat_id)
+            # Replace the cancelled prompt in place rather than leaving it behind.
+            await self.show_start_keyboard(event)
+        elif data == 'request_phone_number':
+            await prompt_for_input(
+                self.tbot, event,
+                "Please enter your phone number:",
+                'phone_number_handler'
+            )
+        elif data in REACTION_BUTTONS:
+            await self.actions.reaction_select_handler(event)
+        elif data in self.callback_actions:
+            await self.callback_actions[data](event)
+        elif data.startswith('ignore_'):
+            await self._handle_ignore(event, data)
+        elif data.startswith('toggle_'):
+            await self._handle_toggle(event, data)
+        elif data.startswith('delete_'):
+            await self._handle_delete(event, data)
+        elif '_' in data:
+            await self._handle_account_or_bulk(event, data)
+        else:
+            await self._fallback(event, data)
+
     async def callback_handler(self, event):
         """Handle callback queries"""
         logger.info("callback_handler in CallbackHandler")
         try:
-            # Skip callbacks from the bot itself
             if is_bot_message(event, BOT_TOKEN):
                 logger.debug(f"Ignoring callback from bot itself")
                 return
 
-            # Answer the callback query first to remove loading state
-            try:
-                await event.answer()
-            except Exception as e:
-                logger.warning(f"Error answering callback query: {e}")
-
-            try:
-                admin_id = int(ADMIN_ID) if isinstance(ADMIN_ID, str) else ADMIN_ID
-                # Skip admin check if ADMIN_ID is 0 or invalid (e.g., in tests)
-                if admin_id != 0 and event.sender_id != admin_id:
-                    await event.respond("You are not the admin")
-                    return
-            except (ValueError, TypeError):
-                # If ADMIN_ID is not valid (e.g., in tests), skip admin check
-                logger.warning(f"Invalid ADMIN_ID: {ADMIN_ID}, skipping admin check")
-                pass
-
-            data = event.data.decode()
-
-            if data == 'cancel':
-                chat_id = event.chat_id
-                # Clean up conversation state
-                await cleanup_conversation_state(self.tbot, chat_id)
-                # Edit the current message back into the main menu in place, so the
-                # cancelled prompt/menu is replaced rather than left behind.
-                await self.show_start_keyboard(event)
+            await self._answer_callback(event)
+            if not await self._callback_sender_is_admin(event):
                 return
 
-            # Handle special cases (e.g., phone number request, toggle, delete, ignore)
-            elif data == 'request_phone_number':
-                logger.info("request_phone_number in callback_handler")
-                await prompt_for_input(
-                    self.tbot, event,
-                    "Please enter your phone number:",
-                    'phone_number_handler'
-                )
-                return
-            # Handle reaction button selections (must be before other handlers)
-            elif data in ['reaction_thumbsup', 'reaction_heart', 'reaction_laugh', 'reaction_wow', 'reaction_sad', 'reaction_angry']:
-                await self.actions.reaction_select_handler(event)
-                return
-            # Check if it's a known callback action (before prefix checks like 'ignore_')
-            elif data in self.callback_actions:
-                action = self.callback_actions[data]
-                await action(event)
-                return
-            elif data.startswith('ignore_'):
-                parts = data.split('_')
-                if len(parts) == 2 and parts[1].isdigit():
-                    user_id = int(parts[1])
-                    await self.keyword_handler.ignore_user(user_id, event)
-                else:
-                    logger.error(f"Invalid user ID in callback data: {data}")
-                    await event.respond("Invalid user ID.")
-                return
-            elif data.startswith('toggle_'):
-                session = data.replace('toggle_', '')
-                await self.account_handler.toggle_client(session, event)
-                return
-            elif data.startswith('delete_'):
-                session = data.replace('delete_', '')
-                try:
-                    if hasattr(self.tbot, 'client_manager') and self.tbot.client_manager:
-                        await self.tbot.client_manager.delete_session(session)
-                        await event.respond(f"Account {session} deleted successfully.")
-                    else:
-                        await event.respond("Client manager not initialized. Please restart the bot.")
-                except Exception as e:
-                    logger.error(f"Error deleting session {session}: {e}")
-                    await event.respond(f"Error deleting account {session}: {str(e)}")
-                return
-            # Handle bulk action callbacks (e.g., "reaction_3" means 3 accounts for reaction)
-            elif '_' in data:
-                parts = data.split('_')
-                if len(parts) >= 2:
-                    # Determine the action name and the suffix that follows it.
-                    # 'send_pv' is special-cased because the action name itself
-                    # contains an underscore.
-                    if len(parts) >= 3 and parts[0] == 'send' and parts[1] == 'pv':
-                        action_name = 'send_pv'
-                        suffix = '_'.join(parts[2:])
-                    else:
-                        action_name = parts[0]
-                        suffix = '_'.join(parts[1:])
-
-                    # Disambiguate individual vs bulk by checking the suffix against
-                    # the active accounts FIRST. Session keys are phone numbers (all
-                    # digits), so an isdigit() check alone would misread an individual
-                    # selection as a bulk account count.
-                    async with self.tbot.active_clients_lock:
-                        account = self.tbot.active_clients.get(suffix)
-
-                    individual_actions = ['reaction', 'send_pv', 'join', 'left', 'block', 'comment']
-                    bulk_actions = ['reaction', 'poll', 'join', 'leave', 'block', 'comment', 'send_pv']
-
-                    async with self.tbot.active_clients_lock:
-                        active_count = len(self.tbot.active_clients)
-
-                    if account is not None and action_name in individual_actions:
-                        # Individual operation on the selected account
-                        await getattr(self.actions, action_name)(account, event)
-                    elif (suffix.isdigit() and action_name in bulk_actions
-                          and int(suffix) <= active_count):
-                        # Bulk operation with the given number of accounts. The
-                        # count bound prevents a digit-only session key (a phone
-                        # number) whose account vanished from being misread as a
-                        # huge bulk count and fanning out to every account.
-                        await self.actions.handle_group_action(event, action_name, int(suffix))
-                    elif action_name in individual_actions:
-                        # Looked like an individual selection but the account is gone
-                        await event.respond(f"Account {suffix} not found.")
-                    else:
-                        action = self.callback_actions.get(data)
-                        if action:
-                            await action(event)
-                        else:
-                            logger.warning(f"No handler found for callback data: {data} (after parsing underscores)")
-                            await event.respond("Command not recognized. Please try again.")
-                else:
-                    action = self.callback_actions.get(data)
-                    if action:
-                        await action(event)
-                    else:
-                        logger.warning(f"No handler found for callback data: {data} (single part with underscore)")
-                        await event.respond("Command not recognized. Please try again.")
-            else:
-                action = self.callback_actions.get(data)
-                if action:
-                    await action(event)
-                else:
-                    logger.warning(f"No handler found for callback data: {data} (no underscore)")
-                    await event.respond("❌ دستور شناسایی نشد. لطفاً دوباره تلاش کنید.")
+            await self._route_callback(event, event.data.decode())
 
         except Exception as e:
             logger.error(f"Error in callback_handler: {e}", exc_info=True)
