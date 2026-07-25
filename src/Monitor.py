@@ -3,7 +3,9 @@ from telethon import TelegramClient, events, Button
 from telethon.utils import get_peer_id
 from src.Config import CHANNEL_ID
 from src.Keyboards import Keyboard
-from src.utils import extract_account_name
+from src.utils import extract_account_name, get_session_name
+from src.Validation import InputValidator
+from src.constants import TELEGRAM_MAX_MESSAGE_LENGTH
 
 # Set up logger for the Monitor class
 logger = logging.getLogger(__name__)
@@ -58,6 +60,28 @@ class Monitor:
                 logger.error(f"Error resolving channel username '{CHANNEL_ID}': {e}")
                 raise
 
+    @staticmethod
+    def _sender_info(sender) -> str:
+        if not sender:
+            return "User: -\n• User ID: -\n"
+        first_name = InputValidator.sanitize_input(getattr(sender, 'first_name', '') or '', max_length=50)
+        last_name = InputValidator.sanitize_input(getattr(sender, 'last_name', '') or '', max_length=50)
+        return f"User: {first_name} {last_name}\n• User ID: {getattr(sender, 'id', 0)}\n"
+
+    @staticmethod
+    def _message_link(chat, event) -> str:
+        if getattr(chat, 'username', None):
+            return f"https://t.me/{chat.username}/{event.id}"
+        # Private channels use t.me/c/<id>/<msg> with the -100 prefix stripped.
+        chat_id_str = str(event.chat_id)
+        if chat_id_str.startswith('-100'):
+            chat_id_str = chat_id_str[4:]
+        return f"https://t.me/c/{chat_id_str.lstrip('-')}/{event.id}"
+
+    @staticmethod
+    def _matches_keywords(message: str, keywords) -> bool:
+        return any(keyword.lower() in message.lower() for keyword in keywords)
+
     async def process_messages_for_client(self, client):
         """
         Set up message processing and forwarding for a specific Telegram client.
@@ -65,116 +89,68 @@ class Monitor:
         :param client: TelegramClient instance to handle message events for.
         """
         logger.info("Setting up message processing for client.")
-        await self.resolve_channel_id()  # Ensure channel ID is resolved
-        
-        # Check if channel ID is configured
+        await self.resolve_channel_id()
+
         if self.channel_id is None:
             logger.warning("CHANNEL_ID not configured. Message forwarding is disabled.")
             return
-        
-        # Capture self references to avoid scope issues in nested function
+
+        # Captured so the closure does not reach back through self.
         channel_id = self.channel_id
         tbot_instance = self.tbot.tbot
         config = self.tbot.config
 
-        # Define the handler function BEFORE decorating to enable cleanup
         async def process_message(event):
             """
             Handle and process new messages received by the client.
 
             :param event: NewMessage event from Telethon.
             """
+            text = None
             try:
-                logger.debug("Received new message event.")
-
-                # Ignore messages sent to the monitored channel or by the bot itself
                 if event.chat_id == channel_id or event.out:
                     logger.debug("Message sent to the channel itself or by the bot. Ignoring to avoid loops.")
                     return
 
-                # Extract message text or set a placeholder if empty
-                raw_message = event.message.text or "-"
-                # Sanitize message text to prevent injection attacks
-                # Use Telegram's max length (4096) minus some buffer for safety
-                from src.Validation import InputValidator
-                from src.constants import TELEGRAM_MAX_MESSAGE_LENGTH
-                message = InputValidator.sanitize_input(raw_message, max_length=TELEGRAM_MAX_MESSAGE_LENGTH - 100)
+                message = InputValidator.sanitize_input(
+                    event.message.text or "-",
+                    max_length=TELEGRAM_MAX_MESSAGE_LENGTH - 100
+                )
                 sender = await event.get_sender()
-                if sender:
-                    # Safely extract and sanitize sender info
-                    first_name = InputValidator.sanitize_input(getattr(sender, 'first_name', '') or '', max_length=50)
-                    last_name = InputValidator.sanitize_input(getattr(sender, 'last_name', '') or '', max_length=50)
-                    sender_id = getattr(sender, 'id', 0)
-                    sender_info = f"User: {first_name} {last_name}\n• User ID: {sender_id}\n"
-                else:
-                    sender_info = "User: -\n• User ID: -\n"
 
-                # Ignore messages from users listed in the IGNORE_USERS configuration
                 if sender and sender.id in config['IGNORE_USERS']:
                     logger.info(f"Message from ignored user {sender.id}. Skipping.")
                     return
 
-                # Check if the message contains any of the configured keywords
-                if not any(keyword.lower() in message.lower() for keyword in config['KEYWORDS']):
+                if not self._matches_keywords(message, config['KEYWORDS']):
                     logger.debug("Message does not contain any configured keywords. Skipping.")
                     return
 
-                # Extract chat information
                 chat = await event.get_chat()
-                raw_chat_title = getattr(chat, 'title', '') or ''
-                chat_title = InputValidator.sanitize_input(raw_chat_title, max_length=100) or '-'
+                chat_title = InputValidator.sanitize_input(
+                    getattr(chat, 'title', '') or '', max_length=100) or '-'
                 logger.info(f"Processing message from chat: {chat_title}")
 
-                # Extract session name from the client's session file
-                account_name = extract_account_name(client)
-
-                # Prepare the message content for forwarding
                 text = (
-                    f"Account: {account_name}\n"
-                    f"{sender_info}"
+                    f"Account: {extract_account_name(client)}\n"
+                    f"{self._sender_info(sender)}"
                     f"• Chat: {chat_title}\n\n"
                     f"• Message:\n{message}\n"
                 )
+                buttons = Keyboard.channel_message_keyboard(
+                    self._message_link(chat, event), sender.id if sender else 0)
 
-                # Generate a link to the original message
-                if hasattr(chat, 'username') and chat.username:
-                    message_link = f"https://t.me/{chat.username}/{event.id}"
-                else:
-                    # Convert chat_id to format required for private channel links
-                    # Telegram private channels use format: t.me/c/1234567890/123
-                    # where 1234567890 is the chat_id without -100 prefix
-                    chat_id_str = str(event.chat_id)
-                    # Remove -100 prefix if present (for supergroups/channels)
-                    if chat_id_str.startswith('-100'):
-                        chat_id_str = chat_id_str[4:]  # Remove '-100' prefix
-                    # Remove any remaining minus sign
-                    chat_id_str = chat_id_str.lstrip('-')
-                    message_link = f"https://t.me/c/{chat_id_str}/{event.id}"
-
-                # Create buttons for the forwarded message
-                buttons = Keyboard.channel_message_keyboard(message_link, sender.id if sender else 0)
-
-                # Forward the message to the configured channel.
-                # parse_mode=None sends the (user-controlled) text literally so a
-                # stray '*', '_', '[' or backtick can't break markdown parsing and
-                # cause the whole forward to be silently dropped.
+                # parse_mode=None sends user-controlled text literally, so a stray
+                # '*' or backtick cannot break parsing and drop the forward.
                 await tbot_instance.send_message(
-                    channel_id,
-                    text,
-                    buttons=buttons,
-                    link_preview=False,
-                    parse_mode=None
+                    channel_id, text, buttons=buttons,
+                    link_preview=False, parse_mode=None
                 )
-
                 logger.info(f"Forwarded message from user {getattr(sender, 'id', '-') if sender else '-'} in chat {chat_title}.")
 
             except UnicodeEncodeError as e:
-                # Handle encoding errors gracefully
                 logger.error(f"UnicodeEncodeError: {e}")
-                try:
-                    logger.error(f"Failed text: {text}")
-                except NameError:
-                    logger.error("Failed text: (text variable not defined)")
+                logger.error(f"Failed text: {text}")
                 try:
                     await tbot_instance.send_message(
                         channel_id,
@@ -183,21 +159,17 @@ class Monitor:
                     )
                 except Exception as send_err:
                     logger.error(f"Failed to send encoding error notification: {send_err}")
-            except Exception as e:
-                # Handle any unexpected errors during message processing
+            except Exception:
                 logger.error("Error processing message.", exc_info=True)
-        
-        # Register the event handler
+
         handler = client.on(events.NewMessage)(process_message)
-        
-        # Store handler reference for cleanup
+
         if not hasattr(client, '_registered_handlers'):
             client._registered_handlers = []
         client._registered_handlers.append(handler)
-        
-        from src.utils import get_session_name
+
         logger.info(f"Message processing handler registered for client {get_session_name(client)}")
-        
+
         return process_message
     
     def cleanup_client_handlers(self, client):
@@ -214,7 +186,6 @@ class Monitor:
                     except Exception as e:
                         logger.warning(f"Error removing event handler: {e}")
                 client._registered_handlers.clear()
-                from src.utils import get_session_name
                 logger.info(f"Cleaned up handlers for client {get_session_name(client)}")
         except Exception as e:
             logger.error(f"Error during handler cleanup: {e}")

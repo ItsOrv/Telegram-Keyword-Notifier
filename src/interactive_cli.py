@@ -17,7 +17,10 @@ from src.Config import ConfigManager, API_ID, API_HASH
 from src.actions import Actions
 from src.Client import SessionManager
 from src.Validation import InputValidator
-from src.utils import get_session_name, sanitize_session_name
+from src.utils import get_session_name, resolve_entity, sanitize_session_name
+from telethon.tl.functions.channels import JoinChannelRequest
+from telethon.tl.functions.contacts import BlockRequest
+from telethon.tl.functions.messages import SendVoteRequest
 from src.Logger import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -1150,185 +1153,146 @@ class InteractiveCLI:
         
         await self._execute_bulk_operation('comment', num_accounts, link=link, comment_text=comment_text)
     
-    async def _execute_bulk_operation(self, operation: str, num_accounts: int, **kwargs):
-        """Execute bulk operation."""
+    async def _connected_accounts(self, num_accounts: int):
         async with self.active_clients_lock:
             accounts = list(self.active_clients.values())[:num_accounts]
-        
+
         if not accounts:
             self._print_info("No accounts available")
-            return
-        
-        valid_accounts = []
-        for acc in accounts:
+            return []
+
+        connected = []
+        for account in accounts:
             try:
-                if acc.is_connected():
-                    valid_accounts.append(acc)
-                else:
-                    await acc.connect()
-                    valid_accounts.append(acc)
+                if not account.is_connected():
+                    await account.connect()
+                connected.append(account)
             except Exception as e:
-                logger.warning(f"Error connecting account {get_session_name(acc)}: {e}")
-        
-        if not valid_accounts:
+                logger.warning(f"Error connecting account {get_session_name(account)}: {e}")
+
+        if not connected:
             self._print_info("No connected accounts available")
-            return
-        
-        success_count = 0
-        error_count = 0
-        
-        self._print_info(f"Executing {operation} with {len(valid_accounts)} accounts...")
-        
-        if self.has_rich and self.console:
-            from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeRemainingColumn
-            
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-                TextColumn("•"),
-                TextColumn("[cyan]{task.completed}/{task.total}[/cyan]"),
-                TimeRemainingColumn(),
-                console=self.console,
-                transient=False
-            ) as progress:
-                task = progress.add_task(
-                    f"[cyan]Executing {operation}...[/cyan]", 
-                    total=len(valid_accounts)
-                )
-                
-                for account in valid_accounts:
-                    try:
-                        session_name = get_session_name(account)
-                        progress.update(task, description=f"Processing {session_name}...")
-                        
-                        if operation == 'reaction':
-                            await self.actions.apply_reaction(account, kwargs['link'], kwargs['reaction'])
-                        elif operation == 'vote':
-                            chat_entity, message_id = await self.actions.parse_telegram_link(kwargs['link'], account)
-                            if chat_entity and message_id:
-                                from src.utils import resolve_entity
-                                from telethon.tl.functions.messages import SendVoteRequest
-                                chat_entity = await resolve_entity(chat_entity, account)
-                                option_index = kwargs['option'] - 1
-                                await account(SendVoteRequest(
-                                    peer=chat_entity,
-                                    msg_id=message_id,
-                                    options=[bytes([option_index])]
-                                ))
-                        elif operation == 'join':
-                            if hasattr(account, 'join_chat'):
-                                await account.join_chat(kwargs['link'])
-                            else:
-                                from src.utils import resolve_entity
-                                from telethon.tl.functions.channels import JoinChannelRequest
-                                entity = await resolve_entity(kwargs['link'], account)
-                                await account(JoinChannelRequest(entity))
-                        elif operation == 'leave':
-                            from src.utils import resolve_entity
-                            entity = await resolve_entity(kwargs['link'], account)
-                            await account.delete_dialog(entity)
-                        elif operation == 'block':
-                            from src.utils import resolve_entity
-                            from telethon.tl.functions.contacts import BlockRequest
-                            entity = await resolve_entity(kwargs['user_input'], account)
-                            await account(BlockRequest(entity))
-                        elif operation == 'send_pv':
-                            from src.utils import resolve_entity
-                            entity = await resolve_entity(kwargs['user_input'], account)
-                            await account.send_message(entity, kwargs['message'])
-                        elif operation == 'comment':
-                            chat_entity, message_id = await self.actions.parse_telegram_link(kwargs['link'], account)
-                            if chat_entity and message_id:
-                                from src.utils import resolve_entity
-                                chat_entity = await resolve_entity(chat_entity, account)
-                                await account.send_message(chat_entity, kwargs['comment_text'], reply_to=message_id)
-                        
-                        success_count += 1
-                        progress.update(task, advance=1, description=f"[green]✓[/green] {session_name} completed")
-                        
-                    except Exception as e:
-                        error_count += 1
-                        progress.update(task, advance=1, description=f"[red]✗[/red] {get_session_name(account)} failed")
-                        logger.error(f"Error in bulk operation for {get_session_name(account)}: {e}")
-        else:
-            for account in valid_accounts:
+        return connected
+
+    async def _apply_operation(self, account, operation: str, kwargs: dict):
+        """Run one bulk operation against a single account."""
+        if operation == 'reaction':
+            await self.actions.apply_reaction(account, kwargs['link'], kwargs['reaction'])
+
+        elif operation == 'vote':
+            chat_entity, message_id = await self.actions.parse_telegram_link(kwargs['link'], account)
+            if chat_entity and message_id:
+                chat_entity = await resolve_entity(chat_entity, account)
+                await account(SendVoteRequest(
+                    peer=chat_entity,
+                    msg_id=message_id,
+                    options=[bytes([kwargs['option'] - 1])]
+                ))
+
+        elif operation == 'join':
+            if hasattr(account, 'join_chat'):
+                await account.join_chat(kwargs['link'])
+            else:
+                entity = await resolve_entity(kwargs['link'], account)
+                await account(JoinChannelRequest(entity))
+
+        elif operation == 'leave':
+            entity = await resolve_entity(kwargs['link'], account)
+            await account.delete_dialog(entity)
+
+        elif operation == 'block':
+            entity = await resolve_entity(kwargs['user_input'], account)
+            await account(BlockRequest(entity))
+
+        elif operation == 'send_pv':
+            entity = await resolve_entity(kwargs['user_input'], account)
+            await account.send_message(entity, kwargs['message'])
+
+        elif operation == 'comment':
+            chat_entity, message_id = await self.actions.parse_telegram_link(kwargs['link'], account)
+            if chat_entity and message_id:
+                chat_entity = await resolve_entity(chat_entity, account)
+                await account.send_message(chat_entity, kwargs['comment_text'], reply_to=message_id)
+
+    async def _run_bulk_with_progress(self, accounts, operation, kwargs):
+        from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeRemainingColumn
+
+        success_count = error_count = 0
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TextColumn("•"),
+            TextColumn("[cyan]{task.completed}/{task.total}[/cyan]"),
+            TimeRemainingColumn(),
+            console=self.console,
+            transient=False
+        ) as progress:
+            task = progress.add_task(f"[cyan]Executing {operation}...[/cyan]", total=len(accounts))
+            for account in accounts:
+                session_name = get_session_name(account)
                 try:
-                    session_name = get_session_name(account)
-                    
-                    if operation == 'reaction':
-                        await self.actions.apply_reaction(account, kwargs['link'], kwargs['reaction'])
-                    elif operation == 'vote':
-                        chat_entity, message_id = await self.actions.parse_telegram_link(kwargs['link'], account)
-                        if chat_entity and message_id:
-                            from src.utils import resolve_entity
-                            from telethon.tl.functions.messages import SendVoteRequest
-                            chat_entity = await resolve_entity(chat_entity, account)
-                            option_index = kwargs['option'] - 1
-                            await account(SendVoteRequest(
-                                peer=chat_entity,
-                                msg_id=message_id,
-                                options=[bytes([option_index])]
-                            ))
-                    elif operation == 'join':
-                        if hasattr(account, 'join_chat'):
-                            await account.join_chat(kwargs['link'])
-                        else:
-                            from src.utils import resolve_entity
-                            from telethon.tl.functions.channels import JoinChannelRequest
-                            entity = await resolve_entity(kwargs['link'], account)
-                            await account(JoinChannelRequest(entity))
-                    elif operation == 'leave':
-                        from src.utils import resolve_entity
-                        entity = await resolve_entity(kwargs['link'], account)
-                        await account.delete_dialog(entity)
-                    elif operation == 'block':
-                        from src.utils import resolve_entity
-                        from telethon.tl.functions.contacts import BlockRequest
-                        entity = await resolve_entity(kwargs['user_input'], account)
-                        await account(BlockRequest(entity))
-                    elif operation == 'send_pv':
-                        from src.utils import resolve_entity
-                        entity = await resolve_entity(kwargs['user_input'], account)
-                        await account.send_message(entity, kwargs['message'])
-                    elif operation == 'comment':
-                        chat_entity, message_id = await self.actions.parse_telegram_link(kwargs['link'], account)
-                        if chat_entity and message_id:
-                            from src.utils import resolve_entity
-                            chat_entity = await resolve_entity(chat_entity, account)
-                            await account.send_message(chat_entity, kwargs['comment_text'], reply_to=message_id)
-                    
+                    progress.update(task, description=f"Processing {session_name}...")
+                    await self._apply_operation(account, operation, kwargs)
                     success_count += 1
-                    print(f"✓ {session_name}: Success")
-                    
+                    progress.update(task, advance=1, description=f"[green]✓[/green] {session_name} completed")
                 except Exception as e:
                     error_count += 1
-                    print(f"✗ {get_session_name(account)}: {str(e)}")
-        
-        # Show summary with better formatting
+                    progress.update(task, advance=1, description=f"[red]✗[/red] {session_name} failed")
+                    logger.error(f"Error in bulk operation for {session_name}: {e}")
+        return success_count, error_count
+
+    async def _run_bulk_plain(self, accounts, operation, kwargs):
+        success_count = error_count = 0
+        for account in accounts:
+            session_name = get_session_name(account)
+            try:
+                await self._apply_operation(account, operation, kwargs)
+                success_count += 1
+                print(f"✓ {session_name}: Success")
+            except Exception as e:
+                error_count += 1
+                print(f"✗ {session_name}: {str(e)}")
+        return success_count, error_count
+
+    def _print_bulk_summary(self, success_count: int, error_count: int):
         self._clear_screen()
         if self.has_rich and self.console:
             summary_table = Table(title="Operation Summary", box=box.ROUNDED, border_style="cyan")
             summary_table.add_column("Status", style="cyan", width=15)
             summary_table.add_column("Count", style="green", justify="right")
-            
             if success_count > 0:
                 summary_table.add_row("[bold green]✓ Success[/bold green]", str(success_count))
             if error_count > 0:
                 summary_table.add_row("[bold red]✗ Errors[/bold red]", str(error_count))
-            
             self.console.print(summary_table)
             input("\nPress Enter to continue...")
             self._clear_screen()
+            return
+
+        result_msg = f"Operation completed: {success_count} success, {error_count} errors"
+        if success_count > 0:
+            self._print_success(result_msg, wait=True)
+        elif error_count > 0:
+            self._print_error(result_msg, wait=True)
         else:
-            result_msg = f"Operation completed: {success_count} success, {error_count} errors"
-            if success_count > 0:
-                self._print_success(result_msg, wait=True)
-            elif error_count > 0:
-                self._print_error(result_msg, wait=True)
-            else:
-                self._print_info(result_msg, wait=True)
+            self._print_info(result_msg, wait=True)
+
+    async def _execute_bulk_operation(self, operation: str, num_accounts: int, **kwargs):
+        """Execute bulk operation."""
+        accounts = await self._connected_accounts(num_accounts)
+        if not accounts:
+            return
+
+        self._print_info(f"Executing {operation} with {len(accounts)} accounts...")
+
+        if self.has_rich and self.console:
+            success_count, error_count = await self._run_bulk_with_progress(accounts, operation, kwargs)
+        else:
+            success_count, error_count = await self._run_bulk_plain(accounts, operation, kwargs)
+
+        self._print_bulk_summary(success_count, error_count)
     
     async def monitor_menu(self):
         """Monitor mode menu."""

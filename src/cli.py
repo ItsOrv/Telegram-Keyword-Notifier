@@ -663,143 +663,96 @@ if HAS_CLICK:
 
 else:
     # Fallback to argparse
+    REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '😡']
+
+    INDIVIDUAL_COMMANDS = {
+        'reaction': ('Apply reaction', [('session_name', {}), ('link', {}), ('reaction', {'choices': REACTIONS})]),
+        'vote': ('Vote in poll', [('session_name', {}), ('link', {}), ('option', {'type': int})]),
+        'join': ('Join chat', [('session_name', {}), ('link', {})]),
+        'leave': ('Leave chat', [('session_name', {}), ('link', {})]),
+        'block': ('Block user', [('session_name', {}), ('user_input', {})]),
+        'send-pv': ('Send private message', [('session_name', {}), ('user_input', {}), ('message', {})]),
+        'comment': ('Post comment', [('session_name', {}), ('link', {}), ('comment_text', {})]),
+    }
+
+    BULK_COMMANDS = {
+        'reaction': ('Bulk reaction', [('num_accounts', {'type': int}), ('link', {}), ('reaction', {'choices': REACTIONS})]),
+        'vote': ('Bulk vote', [('num_accounts', {'type': int}), ('link', {}), ('option', {'type': int})]),
+        'join': ('Bulk join', [('num_accounts', {'type': int}), ('link', {})]),
+        'leave': ('Bulk leave', [('num_accounts', {'type': int}), ('link', {})]),
+        'block': ('Bulk block', [('num_accounts', {'type': int}), ('user_input', {})]),
+        'send-pv': ('Bulk send private message', [('num_accounts', {'type': int}), ('user_input', {}), ('message', {})]),
+        'comment': ('Bulk comment', [('num_accounts', {'type': int}), ('link', {}), ('comment_text', {})]),
+    }
+
+    TOP_LEVEL_OPS = {
+        'list-accounts': lambda m, a: m.list_accounts(),
+        'add-account': lambda m, a: m.add_account(a.phone_number),
+        'remove-account': lambda m, a: m.remove_account(a.session_name),
+    }
+
+    INDIVIDUAL_OPS = {
+        'reaction': lambda m, a: m.reaction(a.session_name, a.link, a.reaction),
+        'vote': lambda m, a: m.vote_poll(a.session_name, a.link, a.option),
+        'join': lambda m, a: m.join_chat(a.session_name, a.link),
+        'leave': lambda m, a: m.leave_chat(a.session_name, a.link),
+        'block': lambda m, a: m.block_user(a.session_name, a.user_input),
+        'send-pv': lambda m, a: m.send_message(a.session_name, a.user_input, a.message),
+        'comment': lambda m, a: m.comment(a.session_name, a.link, a.comment_text),
+    }
+
+    BULK_OPS = {
+        'reaction': lambda m, a: m.bulk_operation('reaction', a.num_accounts, link=a.link, reaction=a.reaction),
+        'vote': lambda m, a: m.bulk_operation('vote', a.num_accounts, link=a.link, option=a.option),
+        'join': lambda m, a: m.bulk_operation('join', a.num_accounts, link=a.link),
+        'leave': lambda m, a: m.bulk_operation('leave', a.num_accounts, link=a.link),
+        'block': lambda m, a: m.bulk_operation('block', a.num_accounts, user_input=a.user_input),
+        'send-pv': lambda m, a: m.bulk_operation('send_pv', a.num_accounts, user_input=a.user_input, message=a.message),
+        'comment': lambda m, a: m.bulk_operation('comment', a.num_accounts, link=a.link, comment_text=a.comment_text),
+    }
+
+    def _add_group(subparsers, name, help_text, commands):
+        group = subparsers.add_parser(name, help=help_text)
+        group_subparsers = group.add_subparsers(dest='operation')
+        for command, (command_help, arguments) in commands.items():
+            command_parser = group_subparsers.add_parser(command, help=command_help)
+            for argument, kwargs in arguments:
+                command_parser.add_argument(argument, **kwargs)
+
+    def _build_parser():
+        parser = argparse.ArgumentParser(description='Telegram Panel CLI')
+        subparsers = parser.add_subparsers(dest='command', help='Available commands')
+
+        subparsers.add_parser('list-accounts', help='List all accounts')
+        subparsers.add_parser('add-account', help='Add a new account').add_argument('phone_number', help='Phone number')
+        subparsers.add_parser('remove-account', help='Remove an account').add_argument('session_name', help='Session name')
+
+        _add_group(subparsers, 'individual', 'Individual operations', INDIVIDUAL_COMMANDS)
+        _add_group(subparsers, 'bulk', 'Bulk operations', BULK_COMMANDS)
+        return parser
+
+    def _resolve_operation(args):
+        """Return a callable running the requested command, or None."""
+        if args.command in TOP_LEVEL_OPS:
+            return TOP_LEVEL_OPS[args.command]
+        table = {'individual': INDIVIDUAL_OPS, 'bulk': BULK_OPS}.get(args.command)
+        if table is None:
+            return None
+        return table.get(getattr(args, 'operation', None))
+
     def main():
         """Main CLI entry point using argparse."""
         setup_logging()
-        parser = argparse.ArgumentParser(description='Telegram Panel CLI')
-        subparsers = parser.add_subparsers(dest='command', help='Available commands')
-        
-        # Account management
-        subparsers.add_parser('list-accounts', help='List all accounts')
-        add_parser = subparsers.add_parser('add-account', help='Add a new account')
-        add_parser.add_argument('phone_number', help='Phone number')
-        remove_parser = subparsers.add_parser('remove-account', help='Remove an account')
-        remove_parser.add_argument('session_name', help='Session name')
-        
-        # Individual operations
-        individual_parser = subparsers.add_parser('individual', help='Individual operations')
-        individual_subparsers = individual_parser.add_subparsers(dest='operation')
-        
-        reaction_parser = individual_subparsers.add_parser('reaction', help='Apply reaction')
-        reaction_parser.add_argument('session_name')
-        reaction_parser.add_argument('link')
-        reaction_parser.add_argument('reaction', choices=['👍', '❤️', '😂', '😮', '😢', '😡'])
-        
-        vote_parser = individual_subparsers.add_parser('vote', help='Vote in poll')
-        vote_parser.add_argument('session_name')
-        vote_parser.add_argument('link')
-        vote_parser.add_argument('option', type=int)
-        
-        join_parser = individual_subparsers.add_parser('join', help='Join chat')
-        join_parser.add_argument('session_name')
-        join_parser.add_argument('link')
-        
-        leave_parser = individual_subparsers.add_parser('leave', help='Leave chat')
-        leave_parser.add_argument('session_name')
-        leave_parser.add_argument('link')
-        
-        block_parser = individual_subparsers.add_parser('block', help='Block user')
-        block_parser.add_argument('session_name')
-        block_parser.add_argument('user_input')
-        
-        send_pv_parser = individual_subparsers.add_parser('send-pv', help='Send private message')
-        send_pv_parser.add_argument('session_name')
-        send_pv_parser.add_argument('user_input')
-        send_pv_parser.add_argument('message')
-        
-        comment_parser = individual_subparsers.add_parser('comment', help='Post comment')
-        comment_parser.add_argument('session_name')
-        comment_parser.add_argument('link')
-        comment_parser.add_argument('comment_text')
-        
-        # Bulk operations
-        bulk_parser = subparsers.add_parser('bulk', help='Bulk operations')
-        bulk_subparsers = bulk_parser.add_subparsers(dest='operation')
-        
-        bulk_reaction_parser = bulk_subparsers.add_parser('reaction', help='Bulk reaction')
-        bulk_reaction_parser.add_argument('num_accounts', type=int)
-        bulk_reaction_parser.add_argument('link')
-        bulk_reaction_parser.add_argument('reaction', choices=['👍', '❤️', '😂', '😮', '😢', '😡'])
-        
-        bulk_vote_parser = bulk_subparsers.add_parser('vote', help='Bulk vote')
-        bulk_vote_parser.add_argument('num_accounts', type=int)
-        bulk_vote_parser.add_argument('link')
-        bulk_vote_parser.add_argument('option', type=int)
-        
-        bulk_join_parser = bulk_subparsers.add_parser('join', help='Bulk join')
-        bulk_join_parser.add_argument('num_accounts', type=int)
-        bulk_join_parser.add_argument('link')
-        
-        bulk_leave_parser = bulk_subparsers.add_parser('leave', help='Bulk leave')
-        bulk_leave_parser.add_argument('num_accounts', type=int)
-        bulk_leave_parser.add_argument('link')
-        
-        bulk_block_parser = bulk_subparsers.add_parser('block', help='Bulk block')
-        bulk_block_parser.add_argument('num_accounts', type=int)
-        bulk_block_parser.add_argument('user_input')
-        
-        bulk_send_pv_parser = bulk_subparsers.add_parser('send-pv', help='Bulk send private message')
-        bulk_send_pv_parser.add_argument('num_accounts', type=int)
-        bulk_send_pv_parser.add_argument('user_input')
-        bulk_send_pv_parser.add_argument('message')
-        
-        bulk_comment_parser = bulk_subparsers.add_parser('comment', help='Bulk comment')
-        bulk_comment_parser.add_argument('num_accounts', type=int)
-        bulk_comment_parser.add_argument('link')
-        bulk_comment_parser.add_argument('comment_text')
-        
+        parser = _build_parser()
         args = parser.parse_args()
-        
-        if not args.command:
-            parser.print_help()
-            return
-        
-        # Build a single async operation for the requested command so that
-        # initialization, execution and cleanup all share one event loop.
-        operation = None
-        if args.command == 'list-accounts':
-            operation = lambda m: m.list_accounts()
-        elif args.command == 'add-account':
-            operation = lambda m: m.add_account(args.phone_number)
-        elif args.command == 'remove-account':
-            operation = lambda m: m.remove_account(args.session_name)
-        elif args.command == 'individual':
-            if args.operation == 'reaction':
-                operation = lambda m: m.reaction(args.session_name, args.link, args.reaction)
-            elif args.operation == 'vote':
-                operation = lambda m: m.vote_poll(args.session_name, args.link, args.option)
-            elif args.operation == 'join':
-                operation = lambda m: m.join_chat(args.session_name, args.link)
-            elif args.operation == 'leave':
-                operation = lambda m: m.leave_chat(args.session_name, args.link)
-            elif args.operation == 'block':
-                operation = lambda m: m.block_user(args.session_name, args.user_input)
-            elif args.operation == 'send-pv':
-                operation = lambda m: m.send_message(args.session_name, args.user_input, args.message)
-            elif args.operation == 'comment':
-                operation = lambda m: m.comment(args.session_name, args.link, args.comment_text)
-        elif args.command == 'bulk':
-            if args.operation == 'reaction':
-                operation = lambda m: m.bulk_operation('reaction', args.num_accounts, link=args.link, reaction=args.reaction)
-            elif args.operation == 'vote':
-                operation = lambda m: m.bulk_operation('vote', args.num_accounts, link=args.link, option=args.option)
-            elif args.operation == 'join':
-                operation = lambda m: m.bulk_operation('join', args.num_accounts, link=args.link)
-            elif args.operation == 'leave':
-                operation = lambda m: m.bulk_operation('leave', args.num_accounts, link=args.link)
-            elif args.operation == 'block':
-                operation = lambda m: m.bulk_operation('block', args.num_accounts, user_input=args.user_input)
-            elif args.operation == 'send-pv':
-                operation = lambda m: m.bulk_operation('send_pv', args.num_accounts, user_input=args.user_input, message=args.message)
-            elif args.operation == 'comment':
-                operation = lambda m: m.bulk_operation('comment', args.num_accounts, link=args.link, comment_text=args.comment_text)
 
+        operation = _resolve_operation(args) if args.command else None
         if operation is None:
             parser.print_help()
             return
 
         try:
-            result = run_command(operation)
+            result = run_command(lambda m: operation(m, args))
             if args.command == 'list-accounts':
                 if result:
                     print("\nAvailable accounts:")
