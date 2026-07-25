@@ -4,10 +4,10 @@
 
 **Centralized management for multiple Telegram accounts: monitoring, bulk operations, and automation from a single control plane.**
 
-[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
+[![Tests](https://github.com/ItsOrv/Telegram-Panel/actions/workflows/python-app.yml/badge.svg)](https://github.com/ItsOrv/Telegram-Panel/actions/workflows/python-app.yml)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Telethon](https://img.shields.io/badge/built%20with-Telethon-2CA5E0.svg)](https://github.com/LonamiWebs/Telethon)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-341%20passing-brightgreen.svg)](tests/)
 
 ### 🌐 TelegramOS: the full platform at [**telegramos.orvteam.com**](https://telegramos.orvteam.com) <kbd>BETA</kbd>
 
@@ -52,7 +52,7 @@ Telegram Panel is a self-hostable system for operating many Telegram accounts fr
 
 ## Quick Start
 
-> Requires **Python 3.8+**, Telegram API credentials from [my.telegram.org](https://my.telegram.org/apps), and a bot token from [@BotFather](https://t.me/BotFather).
+> Requires **Python 3.11+**, Telegram API credentials from [my.telegram.org](https://my.telegram.org/apps), and a bot token from [@BotFather](https://t.me/BotFather).
 
 ```bash
 # 1. Clone
@@ -155,7 +155,7 @@ Telegram-Panel/
 │   ├── Validation.py      # Input validation & sanitization
 │   ├── utils.py           # Shared helpers
 │   └── Logger.py          # Logging setup
-├── tests/                 # Test suite (341 tests)
+├── tests/                 # Test suite
 └── docs/                  # Documentation
 ```
 

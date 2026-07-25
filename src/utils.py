@@ -20,6 +20,41 @@ from telethon import TelegramClient
 logger = logging.getLogger(__name__)
 
 
+def _revocation_error_types() -> tuple:
+    from telethon import errors
+
+    names = (
+        'SessionRevokedError', 'SessionExpiredError',
+        'AuthKeyUnregisteredError', 'AuthKeyInvalidError',
+        'AuthKeyDuplicatedError', 'AuthKeyPermEmptyError',
+        'UnauthorizedError', 'UserDeactivatedError', 'UserDeactivatedBanError',
+    )
+    found = tuple(
+        getattr(errors, name) for name in names if isinstance(getattr(errors, name, None), type)
+    )
+    return found or (SessionRevokedError,)
+
+
+REVOCATION_ERRORS = _revocation_error_types()
+
+# Full phrases only: "session" or "authorization" alone also match proxy and
+# sqlite failures.
+REVOCATION_PHRASES = (
+    'session revoked',
+    'session was revoked',
+    'session expired',
+    'session has expired',
+    'auth key is not registered',
+    'authorization key is not registered',
+    'key is not registered',
+    'auth key unregistered',
+    'unregistered auth key',
+    'not logged in',
+    'user is deactivated',
+    'authorization has been invalidated',
+)
+
+
 def sanitize_session_name(session_name: str) -> str:
     """
     Sanitize session name to prevent path traversal attacks.
@@ -130,17 +165,11 @@ def is_session_revoked_error(error: Exception) -> bool:
     Returns:
         True if error indicates revoked session
     """
-    error_msg = str(error).lower()
-    error_type = type(error).__name__.lower()
-    # Check for AuthKeyUnregisteredError
-    if AuthKeyUnregisteredError and isinstance(error, AuthKeyUnregisteredError):
+    if isinstance(error, REVOCATION_ERRORS):
         return True
-    # Check error message and type - use specific keywords to avoid false positives
-    return any(keyword in error_msg for keyword in [
-        'session', 'revoked', 'not logged in', 'auth key',
-        'authorization', 'key is not registered', 'unregistered', 'invalidated'
-    ]) or \
-           any(keyword in error_type for keyword in ['revoked', 'auth', 'unregistered'])
+
+    error_msg = str(error).lower()
+    return any(phrase in error_msg for phrase in REVOCATION_PHRASES)
 
 
 def validate_admin_id(admin_id: Any) -> int:

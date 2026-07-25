@@ -243,27 +243,28 @@ class TestIsSessionRevokedError:
             "Session revoked",
             "session not logged in",
             "auth key is not registered",
-            "invalid session",
             "unregistered auth key"
         ]
         for msg in error_messages:
             error = Exception(msg)
             assert is_session_revoked_error(error) is True
-    
+
     def test_error_type_names(self):
-        """Test error type name detection"""
-        class SessionRevoked(Exception):
+        """Revocation is decided by Telethon's error types, not by name matching.
+
+        A class whose name merely contains "Auth" is usually a proxy or
+        transport failure, and treating it as a revocation deletes a working
+        account.
+        """
+        from telethon.errors import AuthKeyUnregisteredError
+
+        class ProxyAuthError(Exception):
             pass
-        
-        class AuthError(Exception):
-            pass
-        
-        error1 = SessionRevoked("test")
-        error2 = AuthError("test")
-        
-        assert is_session_revoked_error(error1) is True
-        assert is_session_revoked_error(error2) is True
-    
+
+        assert is_session_revoked_error(AuthKeyUnregisteredError(Mock())) is True
+        assert is_session_revoked_error(ProxyAuthError("proxy rejected credentials")) is False
+
+
     def test_non_revoked_errors(self):
         """Test non-revoked errors"""
         from unittest.mock import Mock
