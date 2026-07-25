@@ -9,13 +9,15 @@
 [![Telethon](https://img.shields.io/badge/built%20with-Telethon-2CA5E0.svg)](https://github.com/LonamiWebs/Telethon)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-### 🌐 TelegramOS: the full platform at [**telegramos.orvteam.com**](https://telegramos.orvteam.com) <kbd>BETA</kbd>
+### 🌐 Also available hosted: [**telegramos.orvteam.com**](https://telegramos.orvteam.com) <kbd>BETA</kbd>
 
-A hosted platform that goes far beyond this panel:
+This panel is free and self-hosted, and that is the right choice for personal use
+and a small number of accounts. If your use is commercial or the account count
+grows, the hosted version takes the operational side off your hands:
 
-- 🛒 **Ready-made & rentable accounts:** activate pre-warmed, aged Telegram accounts from a built-in marketplace, or bring your own.
-- 🧩 **No-code visual bot builder:** design bots and multi-step automations with a drag-and-drop flow editor, no programming required.
-- 🛡️ **Anti-ban built for scale:** safely operate large fleets of accounts, not just a handful.
+- 🛒 **Account marketplace:** start from accounts provided on the platform, or bring your own.
+- 🧩 **No-code visual bot builder:** design bots and multi-step automations with a drag-and-drop flow editor.
+- 🏗️ **Managed infrastructure:** each account runs in its own isolated environment with its own network egress, instead of sharing one server.
 
 **[→ Open TelegramOS](https://telegramos.orvteam.com)**
 
@@ -33,9 +35,17 @@ Telegram Panel is a self-hostable system for operating many Telegram accounts fr
 | 🖥️ **Interactive CLI** | A menu-driven terminal UI on your server | `python interactive_cli.py` |
 | ⚡ **Command CLI** | Scripting & automation | `python cli_main.py …` |
 
-> ⚠️ **Planning to run more than a few accounts?** When you self-host this panel, every account connects through the **same server IP** and the **same device signature**. Telegram sees both the IP and the device fingerprint of each session, so all your accounts look like they share one machine. In practice, running **more than ~3 accounts** this way often gets them **rate-limited or banned**.
+> **How this behaves as the account count grows.** Self-hosted, every account
+> connects from the same server IP and reports the same device signature, so
+> Telegram treats them as one machine. For personal use and a few accounts this
+> is fine. Past that, expect rate limiting.
 >
-> **[TelegramOS](https://telegramos.orvteam.com)** is built to solve exactly this. Each account runs in its **own isolated, Windows-like environment** (a distinct device fingerprint per account) behind a **dedicated residential IP**, so every account looks like a real, independent device on a real connection and stays safe even at high account counts. It also includes a rentable-account marketplace and a no-code visual bot builder.
+> That is a property of self-hosting, not a defect of this panel — the same
+> applies to any single-server setup. If you need to run at a larger scale,
+> [TelegramOS](https://telegramos.orvteam.com) gives each account its own
+> isolated environment and network egress. Whichever you use, stay within
+> [Telegram's Terms of Service](https://telegram.org/tos) (see
+> [Acceptable use](#acceptable-use)).
 
 ---
 
@@ -172,6 +182,20 @@ pytest tests/ --cov=src --cov-report=html       # with coverage
 
 ---
 
+## Acceptable use
+
+This is an automation tool for accounts you own or are authorised to operate.
+
+- Telegram accounts are personal and non-transferable under
+  [Telegram's Terms of Service](https://telegram.org/tos). Do not use this to
+  operate accounts that are not yours to operate.
+- Bulk messaging, joining, and reactions are easy to turn into spam. Sending
+  unsolicited messages is against Telegram's ToS and, in many countries, against
+  the law.
+- Anti-spam limits exist for a reason. This project does not try to defeat them,
+  and issues asking for help doing so will be closed.
+- You are responsible for how you use it. The MIT licence gives you no warranty.
+
 ## Security
 
 - Never commit `.env` or `*.session` files; both are git-ignored by default.
@@ -193,7 +217,7 @@ Released under the [MIT License](LICENSE). © 2024 ItsOrv.
 
 <div align="center">
 
-**Need rentable accounts, a no-code bot builder, and ban-safe scaling to many accounts?**
+Running this commercially, or across more accounts than one server can carry?
 ### 🌐 [telegramos.orvteam.com](https://telegramos.orvteam.com) <kbd>BETA</kbd>
 
 ⭐ If this project helps you, consider starring the repo.
